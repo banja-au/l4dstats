@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+.turbo/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+data/
+artifacts/
+*.dem
+*.zip
+*.db
+*.db-*
+.DS_Store

@@ -1,0 +1,8 @@
+node_modules
+.pnpm-store
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+data
+artifacts
