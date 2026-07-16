@@ -66,14 +66,11 @@ Planned packages are introduced only when their sprint needs them: `demo-source1
 Requirements: Node 24+ and Corepack.
 
 ```bash
-corepack enable
-pnpm install
-pnpm check
-pnpm test
+./init.sh
 pnpm dev
 ```
 
-The UI is at `http://localhost:5173`. Raw demos, archives, databases, and derived artifacts are ignored by Git. Copy `.env.example` only when an ingestion service exists.
+`init.sh` installs container system prerequisites, Node 24 when needed, the pinned pnpm release, the frozen workspace, and runs every quality check. Set `SKIP_CHECKS=1` for a dependency-only setup or `SKIP_SYSTEM_DEPS=1` when the container image already has the native tools. The UI is at `http://localhost:5173`. Raw demos, archives, databases, and derived artifacts are ignored by Git. Copy `.env.example` only when an ingestion service exists.
 
 ## Quality bar
 
