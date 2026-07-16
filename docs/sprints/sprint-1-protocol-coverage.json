@@ -1,0 +1,396 @@
+{
+  "demoCount": 10,
+  "demos": [
+    {
+      "bytes": 12036694,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 14876,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "891158_c8m3_sewers.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c8m3_sewers",
+        "networkProtocol": 2100,
+        "playbackFrames": 14876,
+        "playbackTicks": 89270,
+        "playbackTimeSeconds": 892.699951171875,
+        "signonLength": 1815495,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "b86d0a6695579a5955f47f25598c95188e7c162c77411a0a580f13d1e28a2bf4",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 8019187,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 10602,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "893904_c11m1_greenhouse.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c11m1_greenhouse",
+        "networkProtocol": 2100,
+        "playbackFrames": 10602,
+        "playbackTicks": 63621,
+        "playbackTimeSeconds": 636.2099609375,
+        "signonLength": 1807415,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "30c05fd4c1c6d7ef1999cde616d40cdd5d2d7d6a85a2d4a24d61cba4f4c8125f",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 7952241,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 8095,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "896516_c3m3_shantytown.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c3m3_shantytown",
+        "networkProtocol": 2100,
+        "playbackFrames": 8095,
+        "playbackTicks": 48584,
+        "playbackTimeSeconds": 485.8399963378906,
+        "signonLength": 1923303,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "9e0203279aa5dbaed421f4ca65246b1b2c29f3a36a8831569e5dc9df3f9d95ee",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 11458257,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 12936,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "899189_c9m1_alleys.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c9m1_alleys",
+        "networkProtocol": 2100,
+        "playbackFrames": 12936,
+        "playbackTicks": 77811,
+        "playbackTimeSeconds": 778.1099853515625,
+        "signonLength": 1808648,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "4c7e0454bf955d02a07951826fab89899d31f934fcec47479ef8f2be614fcd9b",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 13821246,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 17337,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "901780_c2m1_highway.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c2m1_highway",
+        "networkProtocol": 2100,
+        "playbackFrames": 17337,
+        "playbackTicks": 104208,
+        "playbackTimeSeconds": 1042.0799560546875,
+        "signonLength": 1916687,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "299019bf3e956176034230b3ad28b634016ec8fe0334ca6c6b95cc0597ac483d",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 9422029,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 10726,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "904378_c2m4_barns.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c2m4_barns",
+        "networkProtocol": 2100,
+        "playbackFrames": 10726,
+        "playbackTicks": 64376,
+        "playbackTimeSeconds": 643.760009765625,
+        "signonLength": 1917910,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "5cbb37e82ff9fd84b5c1d98e8ec8619d7d6bf128f797cff1124e900cd6525881",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 5989730,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 6380,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "907079_c5m1_waterfront.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c5m1_waterfront",
+        "networkProtocol": 2100,
+        "playbackFrames": 6380,
+        "playbackTicks": 38314,
+        "playbackTimeSeconds": 383.1399841308594,
+        "signonLength": 1918413,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "370f61dab8b0dfcd0d56f79541dd3d3be0172f783ebec0c40bbf3c19ae750734",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 7070338,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 7171,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "909662_c12m4_barn.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c12m4_barn",
+        "networkProtocol": 2100,
+        "playbackFrames": 7171,
+        "playbackTicks": 43212,
+        "playbackTimeSeconds": 432.1199951171875,
+        "signonLength": 1807083,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "0c0bad09157300c6797d8d498683ee0453b517f7fcbd59fa4deddaaff83dc065",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 7925889,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 8024,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "912290_c8m4_interior.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c8m4_interior",
+        "networkProtocol": 2100,
+        "playbackFrames": 8024,
+        "playbackTicks": 48158,
+        "playbackTimeSeconds": 481.5799865722656,
+        "signonLength": 1820900,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "7bb8447b084db909d3e3f1a9e61025a5bc197fa3fabf5e08221b710be0cbc89b",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    },
+    {
+      "bytes": 7772486,
+      "commandCounts": {
+        "data-tables": 1,
+        "packet": 8036,
+        "signon": 3,
+        "stop": 1,
+        "string-tables": 1,
+        "sync-tick": 1
+      },
+      "fixture": "914948_c2m1_highway.dem",
+      "header": {
+        "demoProtocol": 4,
+        "gameDirectory": "left4dead2",
+        "mapName": "c2m1_highway",
+        "networkProtocol": 2100,
+        "playbackFrames": 8036,
+        "playbackTicks": 48231,
+        "playbackTimeSeconds": 482.30999755859375,
+        "signonLength": 1917375,
+        "stamp": "HL2DEMO"
+      },
+      "issues": [],
+      "limitations": [
+        "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+        "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+        "Unavailable telemetry is never substituted with zero-valued observations."
+      ],
+      "schemaVersion": 1,
+      "sha256": "64fadac7ba7bdcfc2ebf8cd1d21c90ced85007dab67f159196852c4394a41249",
+      "telemetryAvailability": {
+        "gameEvents": "unavailable",
+        "playerEyeAngles": "unavailable",
+        "playerIdentity": "unavailable",
+        "playerPositions": "unavailable",
+        "userCommands": "unavailable-for-sourcetv",
+        "weaponAndFire": "unavailable"
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

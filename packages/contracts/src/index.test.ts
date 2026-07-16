@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evidenceKinds } from "./index";
+import { evidenceKinds, observationSchemaVersion } from "./index";
 
 describe("evidence contract", () => {
   it("keeps the detector taxonomy explicit", () => {
@@ -9,5 +9,9 @@ describe("evidence contract", () => {
       "movement",
       "invariant",
     ]);
+  });
+
+  it("versions canonical observations independently of detectors", () => {
+    expect(observationSchemaVersion).toBe(1);
   });
 });

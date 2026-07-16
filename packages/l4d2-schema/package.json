@@ -1,0 +1,20 @@
+{
+  "name": "@witchwatch/l4d2-schema",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "check": "tsc -p tsconfig.json --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@witchwatch/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4"
+  }
+}

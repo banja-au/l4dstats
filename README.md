@@ -36,30 +36,34 @@ The first useful interface is not a cinematic renderer. It is a fast evidence ti
 
 ## Engineering choices
 
-| Concern         | Initial choice                                            | Why                                                                   |
-| --------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| Workspace       | pnpm + Turborepo                                          | Small task graph; low ceremony; polyglot escape hatch                 |
-| Parser spike    | TypeScript adapter around a pinned/forked `demofile` core | Fastest credible Source 1 experiment; isolate L4D2 schema assumptions |
-| Contracts       | Versioned TypeScript/JSON schemas                         | Stable boundary between parser, jobs, API, and UI                     |
-| Metadata        | SQLite                                                    | One-process, local-first development                                  |
-| Large artifacts | SHA-256 content-addressed files                           | Immutable provenance without database blobs                           |
-| UI              | React + Vite + Tailwind                                   | Lightweight, typed, quick to iterate                                  |
-| Scoring         | Interpretable, calibrated model                           | Auditable contributions and measurable error                          |
+| Concern         | Initial choice                               | Why                                                             |
+| --------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| Workspace       | pnpm + Turborepo                             | Small task graph; low ceremony; polyglot escape hatch           |
+| Parser engine   | Narrow dependency-free L4D2 Source 1 decoder | Real fixtures rejected CS:GO/Portal-oriented parser assumptions |
+| Contracts       | Versioned TypeScript/JSON schemas            | Stable boundary between parser, jobs, API, and UI               |
+| Metadata        | SQLite                                       | One-process, local-first development                            |
+| Large artifacts | SHA-256 content-addressed files              | Immutable provenance without database blobs                     |
+| UI              | React + Vite + Tailwind                      | Lightweight, typed, quick to iterate                            |
+| Scoring         | Interpretable, calibrated model              | Auditable contributions and measurable error                    |
 
-The parser choice is deliberately conditional. Sprint 1 must parse ten heterogeneous CEDAPug archives and recover stable identity, events, positions, view angles, and weapon/fire state. Failure triggers a narrow Source 1 decoder decision—not hidden schedule drift.
+The parser choice was deliberately conditional. Sprint 1 proved deterministic outer framing across ten current CEDAPug demos, but the corpus is homogeneous SourceTV protocol 2100 and no evaluated parser decodes its L4D2 entity telemetry. The project therefore took its declared pivot: [ADR 0003](docs/decisions/0003-pivot-to-narrow-l4d2-decoder.md) approves a narrow L4D2 network/entity decoder and blocks scoring until player telemetry passes the gate.
 
 ## Repository
 
 ```text
 apps/web/             evidence-workbench shell
+apps/cli/             deterministic demo/corpus inspection
+packages/acquisition/ guarded discovery, download, and ZIP handling
 packages/contracts/   canonical cross-boundary types
+packages/demo-source1 bounded Source 1 outer framing
+packages/l4d2-schema/ explicit-availability projection primitives
 docs/                 architecture, research, decisions, safety
 PLAN.md               five executable sprint workflows
 AGENTS.md              rules for coding agents
 CLAUDE.md              concise Claude entrypoint
 ```
 
-Planned packages are introduced only when their sprint needs them: `demo-source1`, `l4d2-schema`, `detectors`, `scoring`, `storage`, and an API/worker app. This avoids empty architecture theatre.
+Later packages are introduced only when their sprint needs them: `detectors`, `scoring`, `storage`, and the API/worker apps. This avoids empty architecture theatre.
 
 ## Start locally
 
@@ -83,7 +87,7 @@ pnpm dev
 
 ## Status
 
-**Bootstrap / research complete. Implementation has not yet crossed the parser feasibility gate.** See [PLAN.md](PLAN.md) for the five sprint contracts and [docs/RESEARCH.md](docs/RESEARCH.md) for sourced findings.
+**Sprint 1 feasibility completed with the documented parser pivot.** Safe acquisition, outer framing, canonical availability contracts, corpus inspection, provenance, and the CLI are implemented. Player/entity telemetry remains intentionally unavailable, and Sprint 2/scoring is blocked until the narrow decoder crosses that gate. See the [Sprint 1 report](docs/sprints/sprint-1-execution.md).
 
 ## Name and license
 

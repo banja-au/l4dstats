@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "source": "https://cedapug.com/demos/",
+  "acquiredAt": "2026-07-17",
+  "retention": "Raw ZIP and DEM files are local, ignored, and not redistributed.",
+  "selection": "Ten approximately evenly spaced rows from the current Apache index.",
+  "index": {
+    "zipRowCount": 63257,
+    "byteCount": 9617493,
+    "timestampSemantics": "Values are reproduced from the directory index; its timezone is unspecified.",
+    "earliestObservedModified": "2026-06-29 05:25",
+    "latestObservedModified": "2026-07-16 23:18"
+  },
+  "fixtures": [
+    {
+      "name": "891158_c8m3_sewers",
+      "modifiedAsListed": "2026-06-29 05:25",
+      "zipBytes": 5178155,
+      "zipSha256": "a051fc1dd0d64d254fd1825ba09d7ab8456699b89781dbace5cbf1fdf11847af",
+      "demoBytes": 12036694,
+      "demoSha256": "b86d0a6695579a5955f47f25598c95188e7c162c77411a0a580f13d1e28a2bf4",
+      "map": "c8m3_sewers"
+    },
+    {
+      "name": "893904_c11m1_greenhouse",
+      "modifiedAsListed": "2026-07-01 04:43",
+      "zipBytes": 2941569,
+      "zipSha256": "35105350e905637c2b94d6b21be16c9394fcf7cd4f14edcdc866dda2bc710770",
+      "demoBytes": 8019187,
+      "demoSha256": "30c05fd4c1c6d7ef1999cde616d40cdd5d2d7d6a85a2d4a24d61cba4f4c8125f",
+      "map": "c11m1_greenhouse"
+    },
+    {
+      "name": "896516_c3m3_shantytown",
+      "modifiedAsListed": "2026-07-03 06:16",
+      "zipBytes": 3593677,
+      "zipSha256": "361644d74afa7ac31f31102dfbafff62bd3c02181d7dc38c62840f6237792082",
+      "demoBytes": 7952241,
+      "demoSha256": "9e0203279aa5dbaed421f4ca65246b1b2c29f3a36a8831569e5dc9df3f9d95ee",
+      "map": "c3m3_shantytown"
+    },
+    {
+      "name": "899189_c9m1_alleys",
+      "modifiedAsListed": "2026-07-05 04:06",
+      "zipBytes": 5388868,
+      "zipSha256": "21e648e85892213ea8b1b9df2169229f897f524e3d9703d69e39d3eaaef1f52d",
+      "demoBytes": 11458257,
+      "demoSha256": "4c7e0454bf955d02a07951826fab89899d31f934fcec47479ef8f2be614fcd9b",
+      "map": "c9m1_alleys"
+    },
+    {
+      "name": "901780_c2m1_highway",
+      "modifiedAsListed": "2026-07-07 00:59",
+      "zipBytes": 6185377,
+      "zipSha256": "b810e0aa543e9b6a515ac8a64f1581972a24d0607fb37b38f2febf1d9aeb1099",
+      "demoBytes": 13821246,
+      "demoSha256": "299019bf3e956176034230b3ad28b634016ec8fe0334ca6c6b95cc0597ac483d",
+      "map": "c2m1_highway"
+    },
+    {
+      "name": "904378_c2m4_barns",
+      "modifiedAsListed": "2026-07-09 02:10",
+      "zipBytes": 4146554,
+      "zipSha256": "5667e99a735aedcf19dc4cf9885c179442b7ee8b7603387f9b1bbdb54b94d04e",
+      "demoBytes": 9422029,
+      "demoSha256": "5cbb37e82ff9fd84b5c1d98e8ec8619d7d6bf128f797cff1124e900cd6525881",
+      "map": "c2m4_barns"
+    },
+    {
+      "name": "907079_c5m1_waterfront",
+      "modifiedAsListed": "2026-07-11 02:26",
+      "zipBytes": 2363021,
+      "zipSha256": "252adb98ff922aac0040963ef69ecfaacbcf09a9636ecc5f4ee5eb237441b46b",
+      "demoBytes": 5989730,
+      "demoSha256": "370f61dab8b0dfcd0d56f79541dd3d3be0172f783ebec0c40bbf3c19ae750734",
+      "map": "c5m1_waterfront"
+    },
+    {
+      "name": "909662_c12m4_barn",
+      "modifiedAsListed": "2026-07-12 22:33",
+      "zipBytes": 3042535,
+      "zipSha256": "8f2fd941b314ea4ed073794381751ff2f421b7a9e7de5f25e798dbd3f11cb364",
+      "demoBytes": 7070338,
+      "demoSha256": "0c0bad09157300c6797d8d498683ee0453b517f7fcbd59fa4deddaaff83dc065",
+      "map": "c12m4_barn"
+    },
+    {
+      "name": "912290_c8m4_interior",
+      "modifiedAsListed": "2026-07-14 23:38",
+      "zipBytes": 3607537,
+      "zipSha256": "61232cbb0de2f27e6c0e7d3df86da64930548ffa1bb96ccdbf6a403a524bbb16",
+      "demoBytes": 7925889,
+      "demoSha256": "7bb8447b084db909d3e3f1a9e61025a5bc197fa3fabf5e08221b710be0cbc89b",
+      "map": "c8m4_interior"
+    },
+    {
+      "name": "914948_c2m1_highway",
+      "modifiedAsListed": "2026-07-16 23:18",
+      "zipBytes": 3435249,
+      "zipSha256": "ea8e37c3361e4d1f4eb5c6576f01e87ebbcb8db96b0f7712b59d34d3cd4826ef",
+      "demoBytes": 7772486,
+      "demoSha256": "64fadac7ba7bdcfc2ebf8cd1d21c90ced85007dab67f159196852c4394a41249",
+      "map": "c2m1_highway"
+    }
+  ],
+  "commonHeader": {
+    "demoProtocol": 4,
+    "networkProtocol": 2100,
+    "gameDirectory": "left4dead2",
+    "clientKind": "SourceTV"
+  }
+}
