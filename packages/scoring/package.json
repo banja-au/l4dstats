@@ -1,0 +1,22 @@
+{
+  "name": "@witchwatch/scoring",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "check": "tsc -p tsconfig.json --pretty false",
+    "fixtures:generate": "node scripts/generate-controlled-fixtures.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@witchwatch/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "vitest": "3.2.4"
+  }
+}

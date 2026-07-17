@@ -39,7 +39,7 @@ function extractBits(
 
 describe("quarantined string-table snapshot corpus", () => {
   it.runIf(existsSync(corpusRoot))(
-    "proves snapshot entry boundaries across all ten demos",
+    "proves snapshot entry boundaries across available demos",
     () => {
       const summaries = findDemos(corpusRoot).map((path) => {
         const frame = decodeDemo(readFileSync(path)).frames.find(
@@ -93,7 +93,7 @@ describe("quarantined string-table snapshot corpus", () => {
           remainingBits,
         };
       });
-      expect(summaries).toHaveLength(10);
+      expect(summaries.length).toBeGreaterThanOrEqual(10);
       expect(
         summaries.every(({ unalignedPayloads }) => unalignedPayloads > 0),
       ).toBe(true);

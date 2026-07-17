@@ -1,0 +1,1775 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "id": "witchwatch-synthetic-poor-calibration-v1",
+    "generator": "generate-controlled-fixtures.mjs@1.0.0",
+    "seed": "closed-form-v1",
+    "scenarioLibraryVersion": "controlled-scenarios-v1",
+    "labelPolicyVersion": "controlled-label-policy-v1",
+    "splitLibraries": {
+      "train": {
+        "template": "grid-7-11",
+        "seed": "train-v1"
+      },
+      "calibration": {
+        "template": "grid-13-17",
+        "seed": "calibration-v1"
+      },
+      "test": {
+        "template": "grid-19-23",
+        "seed": "test-v1"
+      }
+    },
+    "createdAt": "2026-07-17T00:00:00.000Z",
+    "owner": "WitchWatch maintainers",
+    "retention": "tracked synthetic fixture; no personal data",
+    "artifactDigests": {
+      "splitManifestSha256": "cd8db8d37490d5b522c922064931da8c8497b310d4dff6d0af3b68475191d4f5"
+    },
+    "exclusions": [],
+    "exclusionReasonSchema": "controlled-exclusion-reasons-v1",
+    "missingness": {
+      "featureCellsMissing": 0,
+      "featureCellsTotal": 240,
+      "rate": 0,
+      "reason": "none by construction"
+    },
+    "reconstructionQuality": {
+      "status": "not-applicable",
+      "reason": "fixture starts from synthetic player-level feature rows"
+    },
+    "demos": {
+      "status": "not-applicable",
+      "reason": "fixture starts from synthetic player-level feature rows"
+    },
+    "composition": {
+      "train": {
+        "routine": {
+          "players": 20,
+          "encounters": 20,
+          "fixtureFamilies": 2
+        },
+        "reviewWorthyControlledAnomaly": {
+          "players": 20,
+          "encounters": 79,
+          "fixtureFamilies": 2
+        }
+      },
+      "calibration": {
+        "routine": {
+          "players": 20,
+          "encounters": 20,
+          "fixtureFamilies": 2
+        },
+        "reviewWorthyControlledAnomaly": {
+          "players": 20,
+          "encounters": 79,
+          "fixtureFamilies": 2
+        }
+      },
+      "test": {
+        "routine": {
+          "players": 20,
+          "encounters": 79,
+          "fixtureFamilies": 2
+        },
+        "reviewWorthyControlledAnomaly": {
+          "players": 20,
+          "encounters": 20,
+          "fixtureFamilies": 2
+        }
+      }
+    },
+    "lineage": "closed-form feature rows -> player-level controlled labels",
+    "redistribution": "CC0-1.0",
+    "semantics": "Synthetic player-level rows deliberately invert held-out controlled labels to force numeric withholding.",
+    "limitations": [
+      "research-only",
+      "reference-validation-pending",
+      "deliberately-miscalibrated"
+    ],
+    "identityPolicy": "Invented fixture identifiers only; no real player identity."
+  },
+  "rows": [
+    {
+      "playerKey": "fixture-poor-train-00",
+      "playerGroupId": "group-poor-train-00",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-01",
+      "playerGroupId": "group-poor-train-01",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-02",
+      "playerGroupId": "group-poor-train-02",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-03",
+      "playerGroupId": "group-poor-train-03",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-04",
+      "playerGroupId": "group-poor-train-04",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-05",
+      "playerGroupId": "group-poor-train-05",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-06",
+      "playerGroupId": "group-poor-train-06",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-07",
+      "playerGroupId": "group-poor-train-07",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-08",
+      "playerGroupId": "group-poor-train-08",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-09",
+      "playerGroupId": "group-poor-train-09",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-10",
+      "playerGroupId": "group-poor-train-10",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-11",
+      "playerGroupId": "group-poor-train-11",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-12",
+      "playerGroupId": "group-poor-train-12",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-13",
+      "playerGroupId": "group-poor-train-13",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-14",
+      "playerGroupId": "group-poor-train-14",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-15",
+      "playerGroupId": "group-poor-train-15",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-16",
+      "playerGroupId": "group-poor-train-16",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-17",
+      "playerGroupId": "group-poor-train-17",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-18",
+      "playerGroupId": "group-poor-train-18",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-19",
+      "playerGroupId": "group-poor-train-19",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-20",
+      "playerGroupId": "group-poor-train-20",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-21",
+      "playerGroupId": "group-poor-train-21",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-22",
+      "playerGroupId": "group-poor-train-22",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-23",
+      "playerGroupId": "group-poor-train-23",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-24",
+      "playerGroupId": "group-poor-train-24",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-25",
+      "playerGroupId": "group-poor-train-25",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-26",
+      "playerGroupId": "group-poor-train-26",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-27",
+      "playerGroupId": "group-poor-train-27",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-28",
+      "playerGroupId": "group-poor-train-28",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-29",
+      "playerGroupId": "group-poor-train-29",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-30",
+      "playerGroupId": "group-poor-train-30",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-31",
+      "playerGroupId": "group-poor-train-31",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-32",
+      "playerGroupId": "group-poor-train-32",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-33",
+      "playerGroupId": "group-poor-train-33",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-34",
+      "playerGroupId": "group-poor-train-34",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-35",
+      "playerGroupId": "group-poor-train-35",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-36",
+      "playerGroupId": "group-poor-train-36",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-0",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-37",
+      "playerGroupId": "group-poor-train-37",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-1",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-38",
+      "playerGroupId": "group-poor-train-38",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-0-2",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-train-39",
+      "playerGroupId": "group-poor-train-39",
+      "fixtureFamilyId": "fixture-family-poor-grid-7-11-1-3",
+      "serverId": "controlled-server-poor-train",
+      "timeBucket": "controlled-time-poor-train",
+      "split": "train",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-00",
+      "playerGroupId": "group-poor-calibration-00",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.265,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-01",
+      "playerGroupId": "group-poor-calibration-01",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.94,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-02",
+      "playerGroupId": "group-poor-calibration-02",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.375,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-03",
+      "playerGroupId": "group-poor-calibration-03",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.22,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-04",
+      "playerGroupId": "group-poor-calibration-04",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.485,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-05",
+      "playerGroupId": "group-poor-calibration-05",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.8,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-06",
+      "playerGroupId": "group-poor-calibration-06",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.155,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-07",
+      "playerGroupId": "group-poor-calibration-07",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.08,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-08",
+      "playerGroupId": "group-poor-calibration-08",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.265,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-09",
+      "playerGroupId": "group-poor-calibration-09",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.3600000000000003,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-10",
+      "playerGroupId": "group-poor-calibration-10",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.375,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-11",
+      "playerGroupId": "group-poor-calibration-11",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.94,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-12",
+      "playerGroupId": "group-poor-calibration-12",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.485,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-13",
+      "playerGroupId": "group-poor-calibration-13",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.22,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-14",
+      "playerGroupId": "group-poor-calibration-14",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.155,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-15",
+      "playerGroupId": "group-poor-calibration-15",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.8,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-16",
+      "playerGroupId": "group-poor-calibration-16",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.265,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-17",
+      "playerGroupId": "group-poor-calibration-17",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.08,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-18",
+      "playerGroupId": "group-poor-calibration-18",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.375,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-19",
+      "playerGroupId": "group-poor-calibration-19",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.3600000000000003,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-20",
+      "playerGroupId": "group-poor-calibration-20",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.485,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-21",
+      "playerGroupId": "group-poor-calibration-21",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.94,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-22",
+      "playerGroupId": "group-poor-calibration-22",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.155,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-23",
+      "playerGroupId": "group-poor-calibration-23",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.22,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-24",
+      "playerGroupId": "group-poor-calibration-24",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.265,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-25",
+      "playerGroupId": "group-poor-calibration-25",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.8,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-26",
+      "playerGroupId": "group-poor-calibration-26",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.375,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-27",
+      "playerGroupId": "group-poor-calibration-27",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.08,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-28",
+      "playerGroupId": "group-poor-calibration-28",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.485,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-29",
+      "playerGroupId": "group-poor-calibration-29",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.3600000000000003,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-30",
+      "playerGroupId": "group-poor-calibration-30",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.155,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-31",
+      "playerGroupId": "group-poor-calibration-31",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.94,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-32",
+      "playerGroupId": "group-poor-calibration-32",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.265,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-33",
+      "playerGroupId": "group-poor-calibration-33",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.22,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-34",
+      "playerGroupId": "group-poor-calibration-34",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.375,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-35",
+      "playerGroupId": "group-poor-calibration-35",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 1.8,
+        "independent-encounters": 5
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-36",
+      "playerGroupId": "group-poor-calibration-36",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-0",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.485,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-37",
+      "playerGroupId": "group-poor-calibration-37",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-1",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.08,
+        "independent-encounters": 4
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-38",
+      "playerGroupId": "group-poor-calibration-38",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-0-2",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 0.155,
+        "independent-encounters": 1
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-calibration-39",
+      "playerGroupId": "group-poor-calibration-39",
+      "fixtureFamilyId": "fixture-family-poor-grid-13-17-1-3",
+      "serverId": "controlled-server-poor-calibration",
+      "timeBucket": "controlled-time-poor-calibration",
+      "split": "calibration",
+      "features": {
+        "family:aim": 2.3600000000000003,
+        "independent-encounters": 3
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-00",
+      "playerGroupId": "group-poor-test-00",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-01",
+      "playerGroupId": "group-poor-test-01",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-02",
+      "playerGroupId": "group-poor-test-02",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-03",
+      "playerGroupId": "group-poor-test-03",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-04",
+      "playerGroupId": "group-poor-test-04",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-05",
+      "playerGroupId": "group-poor-test-05",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 5
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-06",
+      "playerGroupId": "group-poor-test-06",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-07",
+      "playerGroupId": "group-poor-test-07",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-08",
+      "playerGroupId": "group-poor-test-08",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-09",
+      "playerGroupId": "group-poor-test-09",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-10",
+      "playerGroupId": "group-poor-test-10",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-11",
+      "playerGroupId": "group-poor-test-11",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 5
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-12",
+      "playerGroupId": "group-poor-test-12",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-13",
+      "playerGroupId": "group-poor-test-13",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-14",
+      "playerGroupId": "group-poor-test-14",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-15",
+      "playerGroupId": "group-poor-test-15",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-16",
+      "playerGroupId": "group-poor-test-16",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-17",
+      "playerGroupId": "group-poor-test-17",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 5
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-18",
+      "playerGroupId": "group-poor-test-18",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-19",
+      "playerGroupId": "group-poor-test-19",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-20",
+      "playerGroupId": "group-poor-test-20",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-21",
+      "playerGroupId": "group-poor-test-21",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-22",
+      "playerGroupId": "group-poor-test-22",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-23",
+      "playerGroupId": "group-poor-test-23",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 5
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-24",
+      "playerGroupId": "group-poor-test-24",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-25",
+      "playerGroupId": "group-poor-test-25",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-26",
+      "playerGroupId": "group-poor-test-26",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-27",
+      "playerGroupId": "group-poor-test-27",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-28",
+      "playerGroupId": "group-poor-test-28",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-29",
+      "playerGroupId": "group-poor-test-29",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 5
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-30",
+      "playerGroupId": "group-poor-test-30",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-31",
+      "playerGroupId": "group-poor-test-31",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.0100000000000002,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-32",
+      "playerGroupId": "group-poor-test-32",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.43000000000000005,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-33",
+      "playerGroupId": "group-poor-test-33",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.43,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-34",
+      "playerGroupId": "group-poor-test-34",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.32,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-35",
+      "playerGroupId": "group-poor-test-35",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.15,
+        "independent-encounters": 5
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-36",
+      "playerGroupId": "group-poor-test-36",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-0",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.21000000000000002,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-37",
+      "playerGroupId": "group-poor-test-37",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-1",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 1.87,
+        "independent-encounters": 4
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-38",
+      "playerGroupId": "group-poor-test-38",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-0-2",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 0.1,
+        "independent-encounters": 1
+      },
+      "label": 1,
+      "labelProvenance": "synthetic-controlled"
+    },
+    {
+      "playerKey": "fixture-poor-test-39",
+      "playerGroupId": "group-poor-test-39",
+      "fixtureFamilyId": "fixture-family-poor-grid-19-23-1-3",
+      "serverId": "controlled-server-poor-test",
+      "timeBucket": "controlled-time-poor-test",
+      "split": "test",
+      "features": {
+        "family:aim": 2.29,
+        "independent-encounters": 3
+      },
+      "label": 0,
+      "labelProvenance": "synthetic-controlled"
+    }
+  ]
+}

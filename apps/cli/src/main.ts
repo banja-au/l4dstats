@@ -13,6 +13,7 @@ import {
   type PlaybackReference,
 } from "./playback-validation";
 import { stableJson, summarizeDemo, type DemoInspection } from "./report";
+import { parseControlledDataset, writeCalibrationArtifacts } from "./scoring";
 
 const inspect = async (path: string): Promise<DemoInspection> => {
   const bytes = await readFile(path);
@@ -43,7 +44,7 @@ const findDemos = async (root: string): Promise<string[]> => {
 
 const usage = (): never => {
   throw new Error(
-    "Usage: witchwatch inspect <demo.dem> | corpus <directory> | features <request.json> | detectors | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
+    "Usage: witchwatch inspect <demo.dem> | corpus <directory> | features <request.json> | detectors | calibrate <dataset.json> <output-directory> | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
   );
 };
 
@@ -58,6 +59,16 @@ const main = async (): Promise<void> => {
     return;
   }
   const target = input ?? usage();
+  if (commandName === "calibrate") {
+    if (extra.length !== 1) usage();
+    const dataset = parseControlledDataset(
+      JSON.parse(await readFile(resolve(target), "utf8")),
+    );
+    process.stdout.write(
+      stableJson(await writeCalibrationArtifacts(dataset, resolve(extra[0]!))),
+    );
+    return;
+  }
   if (commandName === "playback-export") {
     if (extra.length !== 1) usage();
     const request = parsePlaybackExportRequest(

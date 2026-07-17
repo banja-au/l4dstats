@@ -22,6 +22,7 @@ services:
       - detectors-node-modules:/workspace/packages/detectors/node_modules
       - geometry-node-modules:/workspace/packages/geometry/node_modules
       - l4d2-schema-node-modules:/workspace/packages/l4d2-schema/node_modules
+      - scoring-node-modules:/workspace/packages/scoring/node_modules
 
   reference:
     profiles: ["tools"]
@@ -47,3 +48,4 @@ volumes:
   detectors-node-modules:
   geometry-node-modules:
   l4d2-schema-node-modules:
+  scoring-node-modules:

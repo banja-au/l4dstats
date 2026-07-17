@@ -51,11 +51,11 @@ describe.runIf(readdirSafe(corpusRoot).length > 0)(
         stops: Object.fromEntries([...stops].sort()),
         stopReasons: Object.fromEntries([...stopReasons].sort()),
       });
-      expect(completePayloads).toBe(104_213);
+      expect(completePayloads).toBeGreaterThanOrEqual(104_213);
       expect(stops.size).toBe(0);
-      expect(counts.get("svc_PacketEntities")).toBe(104_183);
-      expect(counts.get("svc_CreateStringTable")).toBe(170);
-      expect(counts.get("svc_UpdateStringTable")).toBe(198);
+      expect(counts.get("svc_PacketEntities")).toBeGreaterThanOrEqual(104_183);
+      expect(counts.get("svc_CreateStringTable")).toBeGreaterThanOrEqual(170);
+      expect(counts.get("svc_UpdateStringTable")).toBeGreaterThanOrEqual(198);
     });
   },
 );

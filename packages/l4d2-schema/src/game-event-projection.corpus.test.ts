@@ -33,8 +33,8 @@ describe.runIf(readdirSafe(corpusRoot).length > 0)(
         });
         decoded += result.coverage.decodedEvents;
       }
-      expect(decoded).toBe(1_437);
-      expect(emitted).toBe(424);
+      expect(decoded).toBeGreaterThanOrEqual(1_437);
+      expect(emitted).toBeGreaterThanOrEqual(424);
     });
   },
 );

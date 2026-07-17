@@ -15,6 +15,7 @@
     "dev:docker:down": "docker compose down",
     "dev:cli": "pnpm --filter @witchwatch/cli dev",
     "reference:untitled:docker": "docker compose --profile tools run --rm reference",
+    "scoring:evaluate": "pnpm --filter @witchwatch/cli dev calibrate ../../packages/scoring/fixtures/controlled-v1.json ../../packages/scoring/models",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "turbo run test"

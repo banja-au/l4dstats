@@ -56,6 +56,8 @@ Every detector produces tick range, raw features, effect size/contribution place
 
 **Outcome:** turn evidence into an honest, measured review priority with an insufficient-data state.
 
+**Status:** complete for controlled-fixture research evaluation; real-population validation remains explicitly unclaimed. See `docs/sprints/sprint-3-execution.md`.
+
 ### Parallel tracks
 
 - **Ground truth and governance:** consented clean sessions, controlled known configurations, blinded expert clip review, label disagreement and provenance; reports are not positive labels.

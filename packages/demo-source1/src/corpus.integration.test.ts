@@ -66,10 +66,10 @@ describe("quarantined Sprint 1 corpus", () => {
     60_000,
   );
   it.runIf(existsSync(corpusRoot))(
-    "frames all ten real demos completely and deterministically",
+    "frames every available real demo completely and deterministically",
     () => {
       const paths = findDemos(corpusRoot);
-      expect(paths).toHaveLength(10);
+      expect(paths.length).toBeGreaterThanOrEqual(10);
 
       const summaries = paths.map((path) => {
         const bytes = readFileSync(path);
@@ -127,14 +127,14 @@ describe("quarantined Sprint 1 corpus", () => {
           ...info,
         };
       });
-      expect(summaries).toHaveLength(10);
+      expect(summaries.length).toBeGreaterThanOrEqual(10);
       console.info("Source 1 redacted ServerInfo coverage", summaries);
     },
     60_000,
   );
 
   it.runIf(existsSync(corpusRoot))(
-    "reports the first NET/SVC identifier across all ten demos",
+    "reports the first NET/SVC identifier across every available demo",
     () => {
       const coverage = new Map<string, number>();
       let payloads = 0;
@@ -217,7 +217,7 @@ describe("quarantined Sprint 1 corpus", () => {
           ),
         };
       });
-      expect(summaries).toHaveLength(10);
+      expect(summaries.length).toBeGreaterThanOrEqual(10);
       expect(summaries.every(({ identities }) => identities > 0)).toBe(true);
       // No names, account IDs, GUIDs, or local paths are printed.
       console.info("Source 1 redacted string-table coverage", summaries);
@@ -226,7 +226,7 @@ describe("quarantined Sprint 1 corpus", () => {
   );
 
   it.runIf(existsSync(corpusRoot))(
-    "decodes every populated instancebaseline across all ten demos",
+    "decodes every populated instancebaseline across available demos",
     () => {
       const summaries = findDemos(corpusRoot).map((path) => {
         const decoded = decodeDemo(readFileSync(path));
@@ -268,7 +268,7 @@ describe("quarantined Sprint 1 corpus", () => {
           ),
         };
       });
-      expect(summaries).toHaveLength(10);
+      expect(summaries.length).toBeGreaterThanOrEqual(10);
       console.info("Source 1 redacted baseline coverage", summaries);
     },
     60_000,

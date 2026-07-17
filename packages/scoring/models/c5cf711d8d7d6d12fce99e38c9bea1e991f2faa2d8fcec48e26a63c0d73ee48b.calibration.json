@@ -1,0 +1,302 @@
+{
+  "averagePrecision": 1,
+  "brier": 0.0000010082424596830646,
+  "brierInterval": {
+    "level": 0.95,
+    "lower": 1.1666503370595377e-7,
+    "method": "player-bootstrap",
+    "upper": 0.0000025931022024396355
+  },
+  "calibrationAccepted": true,
+  "confusion": {
+    "falseNegative": 0,
+    "falsePositive": 0,
+    "trueNegative": 20,
+    "truePositive": 20
+  },
+  "constantPrevalenceBrier": 0.25,
+  "controlledFixtureOnly": true,
+  "ece": 0.0004776951464849173,
+  "falsePositivePer1000": 0,
+  "falsePositivePer1000Interval": {
+    "level": 0.95,
+    "lower": 0,
+    "method": "player-bootstrap",
+    "upper": 0
+  },
+  "limitations": [
+    "research-only",
+    "reference-validation-pending",
+    "controlled-fixture-results-do-not-establish-population-validity"
+  ],
+  "logLoss": 0.00047820055970084114,
+  "maximumCalibrationGap": 0.0006471746644987064,
+  "precision": 1,
+  "precisionRecall": [
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.05,
+      "threshold": 0.9999995433420967,
+      "truePositive": 1
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.1,
+      "threshold": 0.999999198949225,
+      "truePositive": 2
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.2,
+      "threshold": 0.9999985948295799,
+      "truePositive": 4
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.25,
+      "threshold": 0.9999975351087952,
+      "truePositive": 5
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.3,
+      "threshold": 0.9999956761943548,
+      "truePositive": 6
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.35,
+      "threshold": 0.9999844501749426,
+      "truePositive": 7
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.4,
+      "threshold": 0.9999727234379484,
+      "truePositive": 8
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.45,
+      "threshold": 0.9999521535287478,
+      "truePositive": 9
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.55,
+      "threshold": 0.9999160726599433,
+      "truePositive": 11
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.65,
+      "threshold": 0.9998527873306071,
+      "truePositive": 13
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.75,
+      "threshold": 0.999470771233104,
+      "truePositive": 15
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.85,
+      "threshold": 0.9990720184179106,
+      "truePositive": 17
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.9,
+      "threshold": 0.9983733102134277,
+      "truePositive": 18
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 0.95,
+      "threshold": 0.9971500220686184,
+      "truePositive": 19
+    },
+    {
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 1,
+      "threshold": 0.9950114047495825,
+      "truePositive": 20
+    },
+    {
+      "falsePositive": 5,
+      "precision": 0.8,
+      "recall": 1,
+      "threshold": 0.0005307754434570295,
+      "truePositive": 20
+    },
+    {
+      "falsePositive": 10,
+      "precision": 0.6666666666666666,
+      "recall": 1,
+      "threshold": 0.00034136928756081013,
+      "truePositive": 20
+    },
+    {
+      "falsePositive": 15,
+      "precision": 0.5714285714285714,
+      "recall": 1,
+      "threshold": 0.0002195374934988833,
+      "truePositive": 20
+    },
+    {
+      "falsePositive": 20,
+      "precision": 0.5,
+      "recall": 1,
+      "threshold": 0.00014118028936778941,
+      "truePositive": 20
+    }
+  ],
+  "prevalenceSensitivity": [
+    {
+      "assumedPrevalence": 0.001,
+      "positivePredictiveValue": 1
+    },
+    {
+      "assumedPrevalence": 0.01,
+      "positivePredictiveValue": 1
+    },
+    {
+      "assumedPrevalence": 0.05,
+      "positivePredictiveValue": 1
+    },
+    {
+      "assumedPrevalence": 0.1,
+      "positivePredictiveValue": 1
+    }
+  ],
+  "recall": 1,
+  "recallInterval": {
+    "level": 0.95,
+    "lower": 1,
+    "method": "player-bootstrap",
+    "upper": 1
+  },
+  "reliability": {
+    "bins": [
+      {
+        "count": 20,
+        "lower": 0,
+        "meanPrediction": 0.0003082156284711281,
+        "observedRate": 0,
+        "upper": 0.1
+      },
+      {
+        "count": 0,
+        "lower": 0.1,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.2
+      },
+      {
+        "count": 0,
+        "lower": 0.2,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.3
+      },
+      {
+        "count": 0,
+        "lower": 0.3,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.4
+      },
+      {
+        "count": 0,
+        "lower": 0.4,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.5
+      },
+      {
+        "count": 0,
+        "lower": 0.5,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.6
+      },
+      {
+        "count": 0,
+        "lower": 0.6,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.7
+      },
+      {
+        "count": 0,
+        "lower": 0.7,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.8
+      },
+      {
+        "count": 0,
+        "lower": 0.8,
+        "meanPrediction": null,
+        "observedRate": null,
+        "upper": 0.9
+      },
+      {
+        "count": 20,
+        "lower": 0.9,
+        "meanPrediction": 0.9993528253355013,
+        "observedRate": 1,
+        "upper": 1
+      }
+    ],
+    "ece": 0.0004776951464849173,
+    "maximumGap": 0.0006471746644987064
+  },
+  "rows": 40,
+  "splitComposition": {
+    "calibration": {
+      "players": 40,
+      "reviewWorthyControlledAnomaly": 20,
+      "routine": 20
+    },
+    "test": {
+      "players": 40,
+      "reviewWorthyControlledAnomaly": 20,
+      "routine": 20
+    },
+    "train": {
+      "players": 40,
+      "reviewWorthyControlledAnomaly": 20,
+      "routine": 20
+    }
+  },
+  "unevaluatedSlices": [
+    "high-skill-proxy",
+    "latency-ping",
+    "sensitivity-input-device",
+    "protocol-capture-type",
+    "server-modifications",
+    "map-game-version",
+    "real-telemetry-gaps",
+    "independent-demos-encounters",
+    "detector-signal-family",
+    "smoothed-delayed-randomized-strength-anomalies"
+  ],
+  "usefulOperatingPoint": true
+}

@@ -6,3 +6,4 @@ coverage
 pnpm-lock.yaml
 data
 artifacts
+packages/scoring/models

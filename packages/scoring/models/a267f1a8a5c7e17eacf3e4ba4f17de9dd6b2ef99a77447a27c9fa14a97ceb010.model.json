@@ -1,0 +1,98 @@
+{
+  "calibrationAccepted": true,
+  "calibrationReportSha256": "c5cf711d8d7d6d12fce99e38c9bea1e991f2faa2d8fcec48e26a63c0d73ee48b",
+  "caps": {
+    "detectorPerEncounter": 1,
+    "encounter": 2,
+    "familyPerDemo": 2,
+    "familyPerEncounter": 1.5,
+    "familyPerPlayer": 3
+  },
+  "controlledFixtureOnly": true,
+  "datasetManifestSha256": "65e5e5a73192f59c5e6915c516516ab80c27f3c9427a9ec85c53f33d15c1bd77",
+  "id": "witchwatch-controlled-review-priority",
+  "limitations": [
+    "research-only",
+    "reference-validation-pending",
+    "controlled-fixture-results-do-not-establish-population-validity"
+  ],
+  "lineage": {
+    "calibration": {
+      "iterations": 2000,
+      "l2": 0,
+      "learningRate": 0.1
+    },
+    "dependencies": {
+      "typescript": "5.9.3"
+    },
+    "detectorVersions": {
+      "fixture-feature-generator": "1.0.0"
+    },
+    "featureConfigVersion": "controlled-features-v1",
+    "reproductionCommand": "pnpm scoring:evaluate",
+    "runtime": "node-v24.16.0",
+    "scoreContractVersion": 1,
+    "sourceRevision": "90a7067+sprint-3-diff",
+    "splitManifestSha256": "466246533a57f17aa1ee0f565a7dd6aea455671e226e3dc68de15dc75456b14b",
+    "training": {
+      "iterations": 2000,
+      "l2": 0.01,
+      "learningRate": 0.1
+    }
+  },
+  "logistic": {
+    "coefficients": [
+      2.126091271288885,
+      2.2422133690442116
+    ],
+    "features": [
+      {
+        "id": "family:aim",
+        "maximum": 3,
+        "mean": 1.25,
+        "minimum": 0,
+        "required": true,
+        "scale": 1.25
+      },
+      {
+        "id": "independent-encounters",
+        "maximum": 10,
+        "mean": 2.5,
+        "minimum": 0,
+        "required": true,
+        "scale": 1.5
+      }
+    ],
+    "intercept": 0.4049748484100516
+  },
+  "operatingPointAccepted": true,
+  "platt": {
+    "intercept": 0.08706621957281141,
+    "slope": 2.360091106424173
+  },
+  "policy": {
+    "decisionThreshold": 0.5,
+    "falsePositiveBudgetPer1000": 50,
+    "highlyAnomalousMinimumDemos": 2,
+    "highlyAnomalousMinimumSignalFamilies": 2,
+    "maximumBrier": 0.25,
+    "maximumCalibrationGap": 0.2,
+    "maximumEce": 0.1,
+    "minimumCalibrationRows": 2,
+    "minimumEvaluationRowsPerLabel": 20,
+    "minimumIndependentDemos": 1,
+    "minimumIndependentEncounters": 2,
+    "minimumIndependentSignalFamilies": 1,
+    "minimumRecall": 0.6,
+    "minimumReconstructionQuality": 0.8,
+    "orthogonalSignalFamilies": [
+      "aim",
+      "awareness",
+      "movement",
+      "invariant"
+    ],
+    "version": "controlled-policy-v1"
+  },
+  "schemaVersion": 1,
+  "version": "1.0.0"
+}

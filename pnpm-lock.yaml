@@ -32,6 +32,9 @@ importers:
       '@witchwatch/l4d2-schema':
         specifier: workspace:*
         version: link:../../packages/l4d2-schema
+      '@witchwatch/scoring':
+        specifier: workspace:*
+        version: link:../../packages/scoring
     devDependencies:
       '@types/node':
         specifier: 24.10.1
@@ -139,6 +142,19 @@ importers:
       tsx:
         specifier: 4.20.6
         version: 4.20.6
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.20.6)
+
+  packages/scoring:
+    dependencies:
+      '@witchwatch/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 24.10.1
+        version: 24.10.1
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.20.6)

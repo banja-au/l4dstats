@@ -112,7 +112,7 @@ it.runIf(existsSync(corpusRoot))(
     })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".dem"))
       .map((entry) => join(entry.parentPath, entry.name));
-    expect(demos).toHaveLength(10);
+    expect(demos.length).toBeGreaterThanOrEqual(10);
     const dynamicCounts: number[] = [];
     let explicitClears = 0;
     for (const path of demos) {

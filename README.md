@@ -56,14 +56,16 @@ apps/cli/             deterministic demo/corpus inspection
 packages/acquisition/ guarded discovery, download, and ZIP handling
 packages/contracts/   canonical cross-boundary types
 packages/demo-source1 bounded Source 1 outer framing
+packages/detectors/   explainable evidence windows and encounters
 packages/l4d2-schema/ explicit-availability projection primitives
+packages/scoring/     capped aggregation, calibration, and policy
 docs/                 architecture, research, decisions, safety
 PLAN.md               five executable sprint workflows
 AGENTS.md              rules for coding agents
 CLAUDE.md              concise Claude entrypoint
 ```
 
-Later packages are introduced only when their sprint needs them: `detectors`, `scoring`, `storage`, and the API/worker apps. This avoids empty architecture theatre.
+Later packages are introduced only when their sprint needs them. `storage` and the API/worker apps remain deferred until Sprint 4.
 
 ## Start locally
 
@@ -99,6 +101,16 @@ pnpm dev
 
 `pnpm dev` starts only the long-running web application; the CLI is intentionally one-shot. Run CLI commands with `pnpm dev:cli -- <command>` or `pnpm --filter @witchwatch/cli dev <command>`. `init.sh` installs container system prerequisites, Node 24 when needed, the pinned pnpm release, the frozen workspace, and runs every quality check. Set `SKIP_CHECKS=1` for a dependency-only setup or `SKIP_SYSTEM_DEPS=1` when the container image already has the native tools. Raw demos, archives, databases, and derived artifacts are ignored by Git.
 
+Reproduce the controlled-fixture calibration and immutable Sprint 3 bundle with:
+
+```bash
+pnpm scoring:evaluate
+```
+
+This validates the engineering machinery, not population performance. Its numeric
+output is a research-only review priority and every artifact carries
+`reference-validation-pending`.
+
 ## Quality bar
 
 - Deterministic output for the same demo hash, engine version, assets, and config.
@@ -110,7 +122,7 @@ pnpm dev
 
 ## Status
 
-**Sprint 2 is complete and Sprint 3 calibration development is unblocked.** Across ten real demos, the decoder reconstructs 104,183 entity frames and projects 932,553 observations, 76 privacy-bound human epochs, and 1,437 game events. The evidence engine produces deterministic findings or explicit skips without a combined score. UntitledParser framing comparison and licensed playback remain pre-release scientific validation gates; they do not block implementation or exploratory calibration. See the [Sprint 2 report](docs/sprints/sprint-2-execution.md) and [validation procedure](docs/sprints/sprint-1-playback-validation.md).
+**Sprint 3's research calibration engine is implemented.** It hierarchically caps evidence, withholds numeric priority below independent-evidence or calibration gates, enforces the `highly-anomalous` corroboration rule, evaluates player-separated controlled fixtures, and emits hash-addressed model/report bundles. The passing held-out result validates machinery only; it does not establish real-player accuracy or moderation suitability. See the [Sprint 3 report](docs/sprints/sprint-3-execution.md), [model card](docs/scoring/MODEL_CARD.md), and [operating policy](docs/decisions/0005-scoring-operating-policy.md).
 
 ## Name and license
 
