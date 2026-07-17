@@ -161,6 +161,20 @@ function gatherProps(
     throw new RangeError(`cyclic send table ${table.name}`);
   stack.add(table.name);
   const local: FlattenedSendProp[] = [];
+  iterateProps(table, prefix, tables, excludes, output, local, stack);
+  output.push(...local);
+  stack.delete(table.name);
+}
+
+function iterateProps(
+  table: SendTableSchema,
+  prefix: string,
+  tables: ReadonlyMap<string, SendTableSchema>,
+  excludes: ReadonlySet<string>,
+  output: FlattenedSendProp[],
+  local: FlattenedSendProp[],
+  stack: Set<string>,
+): void {
   for (let index = 0; index < table.props.length; index += 1) {
     const prop = table.props[index]!;
     if (
@@ -175,18 +189,22 @@ function gatherProps(
       const child = tables.get(prop.dataTableName);
       if (!child)
         throw new RangeError(`missing send table ${prop.dataTableName}`);
-      gatherProps(
-        child,
-        (prop.flags & SendPropFlag.Collapsible) !== 0
-          ? prefix
-          : prop.name
-            ? prop.name
-            : "",
-        tables,
-        excludes,
-        (prop.flags & SendPropFlag.Collapsible) !== 0 ? local : output,
-        stack,
-      );
+      if ((prop.flags & SendPropFlag.Collapsible) !== 0) {
+        if (stack.has(child.name))
+          throw new RangeError(`cyclic send table ${child.name}`);
+        stack.add(child.name);
+        iterateProps(child, prefix, tables, excludes, output, local, stack);
+        stack.delete(child.name);
+      } else {
+        gatherProps(
+          child,
+          prop.name ? prop.name : "",
+          tables,
+          excludes,
+          output,
+          stack,
+        );
+      }
       continue;
     }
     const arrayElement =
@@ -199,8 +217,6 @@ function gatherProps(
       throw new RangeError(`array ${path} has no inside-array element`);
     local.push({ path, prop, arrayElement });
   }
-  output.push(...local);
-  stack.delete(table.name);
 }
 
 function sortByPriority(
@@ -211,16 +227,19 @@ function sortByPriority(
     ...new Set([...props.map(({ prop }) => prop.priority), 64]),
   ].sort((left, right) => left - right);
   let start = 0;
-  for (const priority of priorities)
-    for (let index = start; index < output.length; index += 1) {
-      const prop = output[index]!.prop;
-      if (
-        prop.priority === priority ||
-        (priority === 64 && (prop.flags & SendPropFlag.ChangesOften) !== 0)
-      ) {
-        [output[start], output[index]] = [output[index]!, output[start]!];
-        start += 1;
-      }
+  for (const priority of priorities) {
+    while (true) {
+      const index = output.findIndex(({ prop }, candidate) => {
+        if (candidate < start) return false;
+        return (
+          prop.priority === priority ||
+          (priority === 64 && (prop.flags & SendPropFlag.ChangesOften) !== 0)
+        );
+      });
+      if (index === -1) break;
+      [output[start], output[index]] = [output[index]!, output[start]!];
+      start += 1;
     }
+  }
   return output;
 }

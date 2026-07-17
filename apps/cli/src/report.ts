@@ -19,11 +19,11 @@ export interface DemoInspection {
   readonly commandCounts: Readonly<Record<string, number>>;
   readonly issues: DemoDecodeResult["issues"];
   readonly telemetryAvailability: {
-    readonly playerIdentity: "unavailable";
-    readonly gameEvents: "unavailable";
-    readonly playerPositions: "unavailable";
-    readonly playerEyeAngles: "unavailable";
-    readonly weaponAndFire: "unavailable";
+    readonly playerIdentity: "not-evaluated-by-lightweight-inspect";
+    readonly gameEvents: "not-evaluated-by-lightweight-inspect";
+    readonly playerPositions: "not-evaluated-by-lightweight-inspect";
+    readonly playerEyeAngles: "not-evaluated-by-lightweight-inspect";
+    readonly weaponAndFire: "not-evaluated-by-lightweight-inspect";
     readonly userCommands: "unavailable-for-sourcetv";
   };
   readonly limitations: readonly string[];
@@ -59,15 +59,15 @@ export const summarizeDemo = (
     ),
     issues: result.issues,
     telemetryAvailability: {
-      playerIdentity: "unavailable",
-      gameEvents: "unavailable",
-      playerPositions: "unavailable",
-      playerEyeAngles: "unavailable",
-      weaponAndFire: "unavailable",
+      playerIdentity: "not-evaluated-by-lightweight-inspect",
+      gameEvents: "not-evaluated-by-lightweight-inspect",
+      playerPositions: "not-evaluated-by-lightweight-inspect",
+      playerEyeAngles: "not-evaluated-by-lightweight-inspect",
+      weaponAndFire: "not-evaluated-by-lightweight-inspect",
       userCommands: "unavailable-for-sourcetv",
     },
     limitations: [
-      "Network messages, send tables, string tables, entity deltas and game events are not decoded yet.",
+      "The inspect command validates outer framing only; deep entity, identity, and event projection use dedicated streaming commands and corpus gates.",
       "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
       "Unavailable telemetry is never substituted with zero-valued observations.",
     ],

@@ -1,6 +1,6 @@
 # ADR 0004: Hold Sprint 2 at the real-telemetry gate
 
-- Status: accepted
+- Status: accepted; internal decoder blocker resolved, external playback gate retained
 - Date: 2026-07-17
 
 ## Context
@@ -23,3 +23,9 @@ The next decoder investigation must determine whether L4D2 wraps, compresses, or
 - Current real CEDAPug demos cannot produce detector findings or satisfy Sprint 2's reproducibility gate.
 - `packages/demo-source1` entity APIs are bounded and tested but explicitly not real-corpus validated.
 - Sprint 3 calibration and all probability work remain blocked.
+
+## Recovery note (2026-07-17)
+
+The baseline diagnosis above is historical. Recovery proved that L4D2 property streams interleave indexes and values and that non-collapsible descendants beneath collapsible tables participate in class-global flattening. All 510 populated baselines now decode, all 104,213 NET/SVC payloads traverse, and all 104,183 packet-entity frames reconstruct across the ten-demo corpus.
+
+Canonical projection produced 932,553 player observations with complete position, team, class, and network pitch/yaw coverage; 76 human connection epochs bind to keyed pseudonyms without exposing raw identifiers. Dynamic game-event schemas decode all 1,437 corpus events and project 424 canonical death events; the corpus contains no fire or hurt messages, so those stay explicitly absent. A real detector integration also produced a byte-reproducible, conservative no-finding artifact. These results remove the internal decoder blocker but do not retroactively waive ADR 0003's licensed-playback comparison. The exact remaining procedure is recorded in `docs/sprints/sprint-1-playback-validation.md`.

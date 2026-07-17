@@ -7,15 +7,21 @@ export {
   decodePacketEntitiesEnvelope,
   decodePacketEntityData,
   decodePropertyStream,
+  EntityReconstructor,
   readPropertyIndexes,
   type ClassBaseline,
   type DecodedProperty,
   type EntityUpdateKind,
+  type EntityFrame,
+  type EntityReconstructorOptions,
+  type EntitySnapshot,
+  type PacketEntityDataOptions,
   type PacketEntityUpdate,
   type PacketEntitiesEnvelope,
   type SendPropValue,
 } from "./entities";
 export {
+  extractNetworkBits,
   inspectNetworkPayload,
   identifyFirstNetworkMessage,
   decodeL4d2ServerInfo,
@@ -25,15 +31,25 @@ export {
   type L4d2ServerInfo,
   type NetworkMessageBoundary,
   type NetworkPayloadInspection,
+  type NetworkMessageEnvelope,
+  type GameEventDataEnvelope,
+  type GameEventListEnvelope,
 } from "./network";
 export {
   decodeL4d2UserInfo,
   decodeStringTableSnapshot,
+  decodeStringTableSnapshotWithDiagnostics,
+  decodeNetworkStringTableChanges,
+  unwrapL4d2StringTableData,
   type DemoStringTable,
   type DemoStringTableEntry,
   type StringTableLimits,
   type StringTableSnapshot,
+  type StringTableEntryBoundary,
+  type StringTableSnapshotDiagnostics,
   type UserInfoIdentity,
+  type NetworkStringTableChange,
+  type NetworkStringTableSchema,
 } from "./string-tables";
 export {
   decodeL4d2DataTables,
@@ -46,6 +62,30 @@ export {
   type SendTableSchema,
   type ServerClassSchema,
 } from "./data-tables";
+export {
+  visitL4d2EntityFrames,
+  visitL4d2GameEvents,
+  type EntityFrameVisit,
+  type EntityTelemetrySummary,
+  type GameEventVisit,
+  type GameEventTelemetrySummary,
+} from "./telemetry";
+export {
+  decodeL4d2GameEvent,
+  decodeL4d2GameEventList,
+  gameEventFieldTypes,
+  L4d2GameEventDecoder,
+  projectRequiredGameEvent,
+  type DecodedGameEvent,
+  type EventFieldAvailability,
+  type GameEventDecodeLimits,
+  type GameEventFieldSchema,
+  type GameEventFieldType,
+  type GameEventSchema,
+  type GameEventValue,
+  type RequiredGameEventName,
+  type RequiredGameEventProjection,
+} from "./game-events";
 export {
   DEMO_HEADER_BYTES,
   DEMO_STAMP,

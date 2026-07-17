@@ -45,16 +45,16 @@ describe("Source 1 entity streams", () => {
     const bits = new Bits()
       .write(1, 1) // new way
       .write(1, 1) // index 0
+      .write(17, 8) // value 0
       .write(0, 1)
       .write(1, 1)
       .write(2, 3) // index 3
+      .write(42, 8) // value 3
       .write(0, 1)
       .write(0, 1)
       .write(31, 5)
       .write(3, 2)
-      .write(127, 7) // 4095 terminator
-      .write(17, 8)
-      .write(42, 8);
+      .write(127, 7); // 4095 terminator
     expect(
       decodePropertyStream(new BitReader(bits.bytes()), [
         integerProp("a"),

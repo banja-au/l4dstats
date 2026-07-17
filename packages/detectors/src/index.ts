@@ -4,4 +4,5 @@ export * from "./encounters.js";
 export * from "./invariants.js";
 export * from "./math.js";
 export * from "./registry.js";
+export * from "./real-evidence.js";
 export * from "./types.js";

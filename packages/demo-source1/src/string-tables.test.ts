@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { decodeL4d2UserInfo, decodeStringTableSnapshot } from "./string-tables";
+import {
+  decodeL4d2UserInfo,
+  decodeStringTableSnapshot,
+  decodeStringTableSnapshotWithDiagnostics,
+} from "./string-tables";
 
 class Bits {
   values: number[] = [];
@@ -43,6 +47,24 @@ describe("demo string table snapshots", () => {
         clientEntries: [],
       },
     ]);
+    expect(
+      decodeStringTableSnapshotWithDiagnostics(fixture).boundaries,
+    ).toEqual([
+      {
+        tableIndex: 0,
+        tableName: "userinfo",
+        section: "server",
+        entryIndex: 0,
+        entryName: "0",
+        entryStartBit: 96,
+        dataStartBit: 129,
+        dataLengthBytes: 2,
+        entryEndBit: 145,
+      },
+    ]);
+    expect(
+      decodeStringTableSnapshotWithDiagnostics(fixture).snapshot.consumedBits,
+    ).toBe(146);
   });
 
   it("fails closed on truncation and limits", () => {

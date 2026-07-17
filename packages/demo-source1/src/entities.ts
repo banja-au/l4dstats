@@ -65,15 +65,25 @@ export function decodePropertyStream(
   reader: BitReader,
   props: readonly FlattenedSendProp[],
 ): readonly DecodedProperty[] {
-  const indexes = readPropertyIndexes(reader, props.length);
-  return indexes.map((index) => {
+  const newWay = reader.readBoolean();
+  const properties: DecodedProperty[] = [];
+  let last = -1;
+  while (true) {
+    const index = readPropertyIndex(reader, last, newWay);
+    if (index === -1) break;
+    if (index <= last || index >= props.length)
+      throw new RangeError(
+        `property index ${index} outside ${props.length} at bit ${reader.bitOffset} after ${last}`,
+      );
     const flattened = props[index]!;
-    return {
+    properties.push({
       index,
       path: flattened.path,
       value: decodeValue(reader, flattened),
-    };
-  });
+    });
+    last = index;
+  }
+  return properties;
 }
 
 export function readPropertyIndexes(
@@ -86,34 +96,39 @@ export function readPropertyIndexes(
   const indexes: number[] = [];
   let last = -1;
   while (true) {
-    let index: number;
-    if (newWay && reader.readBoolean()) index = last + 1;
-    else {
-      let delta: number;
-      if (newWay && reader.readBoolean()) delta = reader.readBits(3);
-      else {
-        delta = reader.readBits(7);
-        switch (delta & 0x60) {
-          case 0x20:
-            delta = (delta & 0x1f) | (reader.readBits(2) << 5);
-            break;
-          case 0x40:
-            delta = (delta & 0x1f) | (reader.readBits(4) << 5);
-            break;
-          case 0x60:
-            delta = (delta & 0x1f) | (reader.readBits(7) << 5);
-            break;
-        }
-      }
-      if (delta === 4_095) break;
-      index = last + delta + 1;
-    }
+    const index = readPropertyIndex(reader, last, newWay);
+    if (index === -1) break;
     if (index <= last || index >= propCount)
       throw new RangeError(`property index ${index} outside ${propCount}`);
     indexes.push(index);
     last = index;
   }
   return indexes;
+}
+
+function readPropertyIndex(
+  reader: BitReader,
+  last: number,
+  newWay: boolean,
+): number {
+  if (newWay && reader.readBoolean()) return last + 1;
+  let delta: number;
+  if (newWay && reader.readBoolean()) delta = reader.readBits(3);
+  else {
+    delta = reader.readBits(7);
+    switch (delta & 0x60) {
+      case 0x20:
+        delta = (delta & 0x1f) | (reader.readBits(2) << 5);
+        break;
+      case 0x40:
+        delta = (delta & 0x1f) | (reader.readBits(4) << 5);
+        break;
+      case 0x60:
+        delta = (delta & 0x1f) | (reader.readBits(7) << 5);
+        break;
+    }
+  }
+  return delta === 4_095 ? -1 : last + delta + 1;
 }
 
 function decodeValue(
@@ -240,6 +255,7 @@ function decodeFloat(
   }
   if (low === null || high === null)
     throw new RangeError("scaled float has no bounds");
+  if (bits === 0) throw new RangeError("scaled float has zero bit count");
   const raw = reader.readBits(bits);
   return low + (high - low) * (raw / (2 ** bits - 1));
 }
@@ -284,7 +300,7 @@ function readBitCellCoord(
 }
 
 function requiredBits(bits: number | null): number {
-  if (bits === null || bits < 1 || bits > 32)
+  if (bits === null || bits < 0 || bits > 32)
     throw new RangeError(`invalid send-prop bit count ${bits}`);
   return bits;
 }
@@ -350,6 +366,7 @@ export function decodePacketEntityData(
   updatedEntries: number,
   classes: readonly FlattenedServerClass[],
   classByEntity: ReadonlyMap<number, number>,
+  options: PacketEntityDataOptions = {},
 ): readonly PacketEntityUpdate[] {
   if (
     !Number.isSafeInteger(updatedEntries) ||
@@ -405,5 +422,274 @@ export function decodePacketEntityData(
       properties: decodePropertyStream(reader, serverClass.props),
     });
   }
+  // L4D2 builds >= 2091 append a UBitVar count followed by delta-coded UBitVar
+  // indexes on delta packets. Keep this opt-in because older Source branches
+  // use a sentinel encoding and byte padding is otherwise ambiguous.
+  if (options.explicitDeletionList) {
+    if (options.isDelta !== true)
+      throw new RangeError("L4D2 explicit deletions require a delta packet");
+    const bitLength = options.dataBitLength ?? bytes.byteLength * 8;
+    if (bitLength < reader.bitOffset || bitLength > bytes.byteLength * 8)
+      throw new RangeError("invalid packet entity data bit length");
+    const deletionCount = readBoundedUBitVar(reader, bitLength);
+    if (deletionCount > (options.maxEntries ?? MAX_EDICTS))
+      throw new RangeError("explicit entity deletion count exceeds limit");
+    let deletedIndex = -1;
+    for (let count = 0; count < deletionCount; count += 1) {
+      deletedIndex += readBoundedUBitVar(reader, bitLength);
+      if (deletedIndex >= (options.maxEntries ?? MAX_EDICTS))
+        throw new RangeError(
+          `deleted entity index ${deletedIndex} exceeds limit`,
+        );
+      updates.push({
+        entityIndex: deletedIndex,
+        kind: "delete",
+        classId: null,
+        serial: null,
+        properties: [],
+      });
+    }
+    if (reader.bitOffset !== bitLength)
+      throw new RangeError("explicit deletion list has trailing bits");
+  }
   return updates;
+}
+
+export interface PacketEntityDataOptions {
+  /** Required for L4D2 (engine build >= 2091). */
+  readonly explicitDeletionList?: boolean;
+  /** Explicit deletions exist only on delta PacketEntities messages. */
+  readonly isDelta?: boolean;
+  /** Exact nested payload length; prevents treating byte padding as protocol. */
+  readonly dataBitLength?: number;
+  readonly maxEntries?: number;
+}
+
+function readBoundedUBitVar(reader: BitReader, bitLength: number): number {
+  if (bitLength - reader.bitOffset < 6)
+    throw new RangeError("truncated explicit entity deletion integer");
+  const head = reader.readBits(6);
+  const tailBits = [0, 4, 8, 28][head >>> 4]!;
+  if (bitLength - reader.bitOffset < tailBits)
+    throw new RangeError("truncated explicit entity deletion integer");
+  return (head & 0x0f) + reader.readBits(tailBits) * 16;
+}
+
+export interface EntitySnapshot {
+  readonly entityIndex: number;
+  readonly classId: number;
+  readonly serial: number;
+  readonly lifetime: number;
+  readonly active: boolean;
+  readonly properties: ReadonlyMap<string, SendPropValue>;
+}
+
+export interface EntityFrame {
+  readonly sequence: number;
+  readonly entities: ReadonlyMap<number, EntitySnapshot>;
+}
+
+export interface EntityReconstructorOptions {
+  readonly maxEntries?: number;
+  readonly maxHistory?: number;
+  readonly instanceBaselines?: ReadonlyMap<number, ClassBaseline>;
+}
+
+/**
+ * Bounded state machine for decoded PacketEntities updates.
+ *
+ * It deliberately accepts decoded updates: transport/framing can be validated
+ * independently, and callers cannot accidentally turn absent telemetry into
+ * zeroes. Frames and dynamic baselines are immutable snapshots.
+ */
+export class EntityReconstructor {
+  readonly #maxEntries: number;
+  readonly #maxHistory: number;
+  readonly #instanceBaselines: ReadonlyMap<number, ClassBaseline>;
+  readonly #frames = new Map<number, EntityFrame>();
+  readonly #dynamicBaselines: [
+    Map<number, DynamicEntityBaseline>,
+    Map<number, DynamicEntityBaseline>,
+  ] = [new Map(), new Map()];
+  #nextLifetime = 1;
+
+  constructor(options: EntityReconstructorOptions = {}) {
+    this.#maxEntries = options.maxEntries ?? MAX_EDICTS;
+    this.#maxHistory = options.maxHistory ?? 64;
+    if (
+      !Number.isSafeInteger(this.#maxEntries) ||
+      this.#maxEntries < 1 ||
+      this.#maxEntries > MAX_EDICTS
+    )
+      throw new RangeError("invalid entity-state maximum");
+    if (!Number.isSafeInteger(this.#maxHistory) || this.#maxHistory < 1)
+      throw new RangeError("invalid entity-state history limit");
+    this.#instanceBaselines = options.instanceBaselines ?? new Map();
+  }
+
+  getFrame(sequence: number): EntityFrame | undefined {
+    return this.#frames.get(sequence);
+  }
+
+  applyPacket(
+    sequence: number,
+    envelope: Pick<
+      PacketEntitiesEnvelope,
+      "isDelta" | "deltaFrom" | "baseline" | "updateBaseline" | "maxEntries"
+    >,
+    updates: readonly PacketEntityUpdate[],
+  ): EntityFrame {
+    if (!Number.isSafeInteger(sequence) || sequence < 0)
+      throw new RangeError("invalid packet sequence");
+    if (this.#frames.has(sequence))
+      throw new RangeError(`duplicate packet sequence ${sequence}`);
+    if (
+      !Number.isSafeInteger(envelope.maxEntries) ||
+      envelope.maxEntries < 1 ||
+      envelope.maxEntries > this.#maxEntries
+    )
+      throw new RangeError("packet exceeds configured entity maximum");
+    if (envelope.baseline !== 0 && envelope.baseline !== 1)
+      throw new RangeError("invalid dynamic baseline slot");
+
+    let entities: Map<number, EntitySnapshot>;
+    if (envelope.isDelta) {
+      if (envelope.deltaFrom === null)
+        throw new RangeError("delta packet has no source sequence");
+      const source = this.#frames.get(envelope.deltaFrom);
+      if (!source)
+        throw new RangeError(`missing delta frame ${envelope.deltaFrom}`);
+      entities = cloneEntities(source.entities);
+    } else {
+      entities = new Map();
+    }
+
+    const touched = new Set<number>();
+    for (const update of updates) {
+      if (
+        !Number.isSafeInteger(update.entityIndex) ||
+        update.entityIndex < 0 ||
+        update.entityIndex >= envelope.maxEntries ||
+        update.entityIndex >= this.#maxEntries
+      )
+        throw new RangeError(
+          `entity index ${update.entityIndex} exceeds state bounds`,
+        );
+      if (touched.has(update.entityIndex) && update.kind !== "delete")
+        throw new RangeError(
+          `duplicate update for entity ${update.entityIndex}`,
+        );
+      touched.add(update.entityIndex);
+      const current = entities.get(update.entityIndex);
+
+      if (update.kind === "delete") {
+        entities.delete(update.entityIndex);
+        continue;
+      }
+      if (update.kind === "leave") {
+        if (!current)
+          throw new RangeError(
+            `leave for unknown entity ${update.entityIndex}`,
+          );
+        entities.set(update.entityIndex, { ...current, active: false });
+        continue;
+      }
+      if (update.kind === "delta") {
+        if (!current || !current.active)
+          throw new RangeError(
+            `delta for inactive entity ${update.entityIndex}`,
+          );
+        if (update.classId !== null && update.classId !== current.classId)
+          throw new RangeError(
+            `delta class mismatch for entity ${update.entityIndex}`,
+          );
+        entities.set(
+          update.entityIndex,
+          mergeSnapshot(current, update.properties),
+        );
+        continue;
+      }
+
+      if (update.classId === null || update.serial === null)
+        throw new RangeError(
+          `enter lacks class or serial for entity ${update.entityIndex}`,
+        );
+      const resumed =
+        current?.serial === update.serial && current.classId === update.classId;
+      const dynamic = this.#dynamicBaselines[envelope.baseline].get(
+        update.entityIndex,
+      );
+      const seed =
+        envelope.isDelta && dynamic?.classId === update.classId
+          ? dynamic.properties
+          : baselineProperties(this.#instanceBaselines.get(update.classId));
+      const entered: EntitySnapshot = {
+        entityIndex: update.entityIndex,
+        classId: update.classId,
+        serial: update.serial,
+        lifetime: resumed ? current.lifetime : this.#nextLifetime++,
+        active: true,
+        properties: mergeProperties(seed, update.properties),
+      };
+      entities.set(update.entityIndex, entered);
+      // The protocol refreshes the opposite slot only for EnterPVS entities.
+      // It contains class/property state, not a lifetime or serial identity.
+      if (envelope.updateBaseline)
+        this.#dynamicBaselines[envelope.baseline === 0 ? 1 : 0].set(
+          update.entityIndex,
+          {
+            classId: entered.classId,
+            properties: new Map(entered.properties),
+          },
+        );
+    }
+
+    const frame: EntityFrame = { sequence, entities };
+    this.#frames.set(sequence, frame);
+    while (this.#frames.size > this.#maxHistory) {
+      const oldest = this.#frames.keys().next().value as number | undefined;
+      if (oldest === undefined) break;
+      this.#frames.delete(oldest);
+    }
+    return frame;
+  }
+}
+
+interface DynamicEntityBaseline {
+  readonly classId: number;
+  readonly properties: ReadonlyMap<string, SendPropValue>;
+}
+
+function baselineProperties(
+  baseline: ClassBaseline | undefined,
+): ReadonlyMap<string, SendPropValue> {
+  return mergeProperties(new Map(), baseline?.properties ?? []);
+}
+
+function mergeProperties(
+  base: ReadonlyMap<string, SendPropValue>,
+  updates: readonly DecodedProperty[],
+): ReadonlyMap<string, SendPropValue> {
+  const result = new Map(base);
+  for (const property of updates) result.set(property.path, property.value);
+  return result;
+}
+
+function mergeSnapshot(
+  snapshot: EntitySnapshot,
+  updates: readonly DecodedProperty[],
+): EntitySnapshot {
+  return {
+    ...snapshot,
+    properties: mergeProperties(snapshot.properties, updates),
+  };
+}
+
+function cloneEntities(
+  entities: ReadonlyMap<number, EntitySnapshot>,
+): Map<number, EntitySnapshot> {
+  // Entity snapshots and their property maps are replaced, never mutated, so
+  // structural sharing keeps per-tick delta reconstruction bounded to touched
+  // entities instead of cloning the entire world state.
+  return new Map(entities);
 }

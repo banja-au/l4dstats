@@ -5,6 +5,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { decodeDemo, DemoParseError } from "@witchwatch/demo-source1";
 import { detectorCards, exploreFeatures, parseFeatureRequest } from "./explore";
+import {
+  comparePlaybackCheckpoints,
+  exportPlaybackCheckpoints,
+  parsePlaybackExportRequest,
+  type PlaybackCheckpointExport,
+  type PlaybackReference,
+} from "./playback-validation";
 import { stableJson, summarizeDemo, type DemoInspection } from "./report";
 
 const inspect = async (path: string): Promise<DemoInspection> => {
@@ -36,7 +43,7 @@ const findDemos = async (root: string): Promise<string[]> => {
 
 const usage = (): never => {
   throw new Error(
-    "Usage: witchwatch inspect <demo.dem> | corpus <directory> | features <request.json> | detectors",
+    "Usage: witchwatch inspect <demo.dem> | corpus <directory> | features <request.json> | detectors | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
   );
 };
 
@@ -51,6 +58,32 @@ const main = async (): Promise<void> => {
     return;
   }
   const target = input ?? usage();
+  if (commandName === "playback-export") {
+    if (extra.length !== 1) usage();
+    const request = parsePlaybackExportRequest(
+      JSON.parse(await readFile(resolve(extra[0]!), "utf8")),
+    );
+    process.stdout.write(
+      stableJson(
+        exportPlaybackCheckpoints(await readFile(resolve(target)), request),
+      ),
+    );
+    return;
+  }
+  if (commandName === "playback-compare") {
+    if (extra.length !== 1) usage();
+    const observedBytes = await readFile(resolve(target));
+    const referenceBytes = await readFile(resolve(extra[0]!));
+    const report = comparePlaybackCheckpoints(
+      JSON.parse(observedBytes.toString("utf8")) as PlaybackCheckpointExport,
+      JSON.parse(referenceBytes.toString("utf8")) as PlaybackReference,
+      observedBytes,
+      referenceBytes,
+    );
+    process.stdout.write(stableJson(report));
+    if (!report.passed) process.exitCode = 2;
+    return;
+  }
   if (extra.length > 0) usage();
   if (commandName === "features") {
     const request = parseFeatureRequest(

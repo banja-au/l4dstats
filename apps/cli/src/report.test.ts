@@ -36,5 +36,9 @@ describe("stableJson", () => {
     expect(stableJson(inspection)).not.toContain("private server label");
     expect(stableJson(inspection)).not.toContain("recorder label");
     expect(stableJson(inspection)).not.toContain("elapsed");
+    expect(inspection.telemetryAvailability.playerPositions).toBe(
+      "not-evaluated-by-lightweight-inspect",
+    );
+    expect(inspection.limitations.join(" ")).not.toContain("not decoded yet");
   });
 });

@@ -226,33 +226,50 @@ describe("quarantined Sprint 1 corpus", () => {
   );
 
   it.runIf(existsSync(corpusRoot))(
-    "reproduces the known protocol-2100 instancebaseline blocker",
+    "decodes every populated instancebaseline across all ten demos",
     () => {
-      const decoded = decodeDemo(readFileSync(findDemos(corpusRoot)[0]!));
-      const dataTables = decoded.frames.find(
-        ({ kind }) => kind === "data-tables",
-      );
-      const stringTables = decoded.frames.find(
-        ({ kind }) => kind === "string-tables",
-      );
-      expect(dataTables?.payload).toBeDefined();
-      expect(stringTables?.payload).toBeDefined();
+      const summaries = findDemos(corpusRoot).map((path) => {
+        const decoded = decodeDemo(readFileSync(path));
+        const dataTables = decoded.frames.find(
+          ({ kind }) => kind === "data-tables",
+        );
+        const stringTables = decoded.frames.find(
+          ({ kind }) => kind === "string-tables",
+        );
+        expect(dataTables?.payload).toBeDefined();
+        expect(stringTables?.payload).toBeDefined();
 
-      const classes = flattenServerClasses(
-        decodeL4d2DataTables(dataTables!.payload!),
-      );
-      const baselineTable = decodeStringTableSnapshot(
-        stringTables!.payload!,
-      ).tables.find(({ name }) => name === "instancebaseline");
-      expect(baselineTable).toBeDefined();
-      expect(classes[261]).toMatchObject({
-        className: "CWorld",
-        dataTableId: 261,
+        const classes = flattenServerClasses(
+          decodeL4d2DataTables(dataTables!.payload!),
+        );
+        const baselineTable = decodeStringTableSnapshot(
+          stringTables!.payload!,
+        ).tables.find(({ name }) => name === "instancebaseline");
+        expect(baselineTable).toBeDefined();
+        const populated = baselineTable!.entries.filter(
+          ({ data }) => data !== null,
+        ).length;
+        const baselines = decodeInstanceBaselines(baselineTable!, classes);
+        expect(baselines.size).toBe(populated);
+        expect(
+          [...baselines.values()].every(
+            ({ consumedBits, sourceBits }) =>
+              sourceBits - consumedBits >= 0 && sourceBits - consumedBits <= 7,
+          ),
+        ).toBe(true);
+        return {
+          demoSha256: createHash("sha256")
+            .update(readFileSync(path))
+            .digest("hex"),
+          baselines: baselines.size,
+          properties: [...baselines.values()].reduce(
+            (total, baseline) => total + baseline.properties.length,
+            0,
+          ),
+        };
       });
-      expect(classes[261]!.props).toHaveLength(63);
-      expect(() => decodeInstanceBaselines(baselineTable!, classes)).toThrow(
-        "property index 161 outside 63",
-      );
+      expect(summaries).toHaveLength(10);
+      console.info("Source 1 redacted baseline coverage", summaries);
     },
     60_000,
   );

@@ -1,5 +1,32 @@
 import type { AvailableValue, PlayerEpoch } from "@witchwatch/contracts";
 
+export {
+  L4d2PlayerProjector,
+  projectL4d2PlayerObservations,
+  type PlayerProjectionCoverage,
+  type PlayerProjectionOptions,
+  type PlayerProjectionResult,
+  type ProjectableUserInfo,
+  type ProjectedPlayerObservation,
+  type ProjectionFieldProvenance,
+} from "./entity-projection";
+export {
+  projectUserInfoIdentities,
+  collectL4d2UserInfoTimeline,
+  reconcileUserInfoTimeline,
+  type UserInfoPrivacyOptions,
+  type UserInfoProjectionResult,
+} from "./userinfo-identity";
+export {
+  L4d2GameEventProjector,
+  projectL4d2GameEvents,
+  type EventIdentityCorrelation,
+  type GameEventProjectionCoverage,
+  type GameEventProjectionOptions,
+  type GameEventProjectionResult,
+  type ProjectedGameEventObservation,
+} from "./game-event-projection";
+
 export interface PlayerConnection {
   readonly entitySlot: number;
   readonly tick: number;

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-17",
+  "status": "validated-no-finding",
+  "demoSha256": "299019bf3e956176034230b3ad28b634016ec8fe0334ca6c6b95cc0597ac483d",
+  "integrationVersion": "1.0.0",
+  "targetSelectionRule": "nearest-opposing-player-at-same-tick-v1",
+  "observationArtifactSha256": "ec346c386155410b9947d35f7d9d1d8f0a2e63711226eb61454ab05ff052a345",
+  "evidenceArtifactSha256": "58d7af8490dbe1d8b723d67323c27abfefacb54293e3512a2914735ef7b769bc",
+  "projectedObservations": 156033,
+  "playerEpochs": 9,
+  "completeAimSamples": 138696,
+  "findings": 0,
+  "skips": {
+    "no-candidate": 8,
+    "missing-prerequisite": 1
+  },
+  "limitations": [
+    "The selected target is the nearest same-tick opposing player, not inferred player intent.",
+    "Shot timing, line of sight, audibility, and prior knowledge remain explicitly unavailable.",
+    "Networked eye angles are server-observed and are not direct mouse or user-command input."
+  ]
+}

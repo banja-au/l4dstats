@@ -15,7 +15,8 @@
   "dependencies": {
     "@witchwatch/contracts": "workspace:*",
     "@witchwatch/demo-source1": "workspace:*",
-    "@witchwatch/detectors": "workspace:*"
+    "@witchwatch/detectors": "workspace:*",
+    "@witchwatch/l4d2-schema": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
