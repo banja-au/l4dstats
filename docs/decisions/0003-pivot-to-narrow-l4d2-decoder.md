@@ -1,6 +1,6 @@
 # ADR 0003: Pivot to a narrow L4D2 Source 1 decoder
 
-- Status: accepted
+- Status: accepted; amended 2026-07-17
 - Date: 2026-07-17
 
 ## Context
@@ -37,3 +37,9 @@ Each phase retains strict byte/allocation/command limits, corruption tests, real
 - Direct input/aim claims are unavailable for SourceTV. Networked eye angles, if decoded, must be described as server-observed and potentially quantized/interpolated.
 - `@nekz/sdp` remains a useful design/reference candidate, not a runtime dependency.
 - Authentic player-state comparison requires external licensed infrastructure and cannot be replaced by TV-camera agreement.
+
+## Amendment: validation no longer blocks calibration development
+
+The narrow decoder subsequently passed the ten-demo real-corpus telemetry, corruption, determinism, identity, event, and evidence gates. UntitledParser only offers partial L4D2 network support and no L4D2 entity parsing, while licensed playback requires separately owned game infrastructure.
+
+The two external comparisons remain mandatory before release, enforcement use, or claims about reconstruction accuracy. They no longer block Sprint 3 implementation or exploratory calibration. Any model or report produced before those comparisons must carry a prominent `reference-validation-pending` limitation and cannot support moderation action.

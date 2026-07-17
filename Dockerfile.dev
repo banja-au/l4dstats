@@ -1,0 +1,32 @@
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS dotnet
+
+FROM node:24-bookworm-slim
+
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    libgcc-s1 \
+    libgssapi-krb5-2 \
+    libicu72 \
+    libssl3 \
+    libstdc++6 \
+    zlib1g \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=dotnet /usr/share/dotnet /usr/share/dotnet
+
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="/usr/share/dotnet:${PATH}"
+ENV PNPM_HOME=/pnpm
+ENV PATH="/pnpm:${PATH}"
+
+RUN corepack enable && corepack prepare pnpm@11.13.1 --activate
+RUN dotnet --info
+
+WORKDIR /workspace
+
+EXPOSE 5173
+
+CMD ["bash", "-lc", "pnpm install --frozen-lockfile && pnpm dev:container"]

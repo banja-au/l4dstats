@@ -39,4 +39,4 @@ pnpm --filter @witchwatch/cli dev detectors
 pnpm --filter @witchwatch/cli dev features /workspace/apps/cli/fixtures/synthetic-aim-request.json
 ```
 
-The tracked [synthetic evidence artifact](sprints/sprint-2-synthetic-evidence.json) is intentionally obvious synthetic data. Real-demo execution remains blocked until ADR 0003's packet-entity prerequisite is complete.
+The tracked [synthetic evidence artifact](sprints/sprint-2-synthetic-evidence.json) is intentionally obvious synthetic data. Real-demo execution is also covered by a deterministic, conservative [real evidence artifact](sprints/sprint-2-real-evidence.json); external reference validation remains required before release claims.

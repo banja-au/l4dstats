@@ -27,7 +27,7 @@ Every sprint runs unit, contract, integration, corruption/adversarial, and end-t
 
 ### Exit gate
 
-All ten demos recover stable player epochs, core events, positions, eye angles, and weapon/fire events with explicit availability; selected ticks agree with playback; reruns are byte-deterministic; malformed inputs stay within limits; unknown protocol content is reported. If view angles/user commands are unavailable for a demo type, document the scope limit. If the gate fails, scoring work is blocked and a narrow decoder plan is approved.
+All ten demos recover stable player epochs, core events, positions, eye angles, and weapon/fire events with explicit availability; reruns are byte-deterministic; malformed inputs stay within limits; unknown protocol content is reported. If view angles/user commands are unavailable for a demo type, document the scope limit. Independent parser and licensed-playback comparisons are required before release or empirical accuracy claims, but do not block calibration implementation once the real-corpus telemetry and reproducibility gates pass.
 
 ---
 

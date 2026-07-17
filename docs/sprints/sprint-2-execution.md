@@ -1,34 +1,34 @@
 # Sprint 2 execution
 
-- Status: internal recovery complete and independently audited; blocked only on ADR 0003 external reference validation
+- Status: complete; internal recovery independently audited
 - Started from revision: `cf965e0`
 - Current tested revision: `54f2e9b`, clean worktree at recovery start
 - Selected because: explicitly requested by the user
 - Environment: Ubuntu 24.04 arm64; Node `v24.16.0`; pnpm `11.13.1`; ten ignored SourceTV protocol-2100 fixtures available
-- Next action: run UntitledParser framing and licensed-playback comparisons on compatible x86_64 infrastructure
+- Next action: begin Sprint 3; retain UntitledParser/playback comparison as a pre-release validation task
 
 ## Contract
 
 Outcome (verbatim): **emit explainable, independently testable evidence windows without claiming a probability.**
 
-| Gate ID | Original clause (verbatim)                                                        | Interpretation                                                                                    | Verification                                            | Status  |
-| ------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------- |
-| P0      | Sprint 2 and all scoring work are blocked until the Sprint 1 telemetry gates pass | Real parsing/projection must pass ten demos and selected ticks must agree with authentic playback | Ten-demo canonical telemetry report and playback report | partial |
-| G1      | Every detector produces tick range                                                | Evidence windows have valid bounded source ranges                                                 | Contract/unit/real-fixture assertions                   | passed  |
-| G2      | raw features                                                                      | Findings retain detector inputs sufficient to recompute the result                                | Schema and snapshot tests                               | passed  |
-| G3      | effect size/contribution placeholder                                              | Findings expose an interpretable non-probabilistic magnitude                                      | Detector tests                                          | passed  |
-| G4      | quality                                                                           | Findings quantify reconstruction/input quality independently of anomaly                           | Missing/corrupt telemetry tests                         | passed  |
-| G5      | explanation                                                                       | Every finding has a human-readable causal explanation                                             | Registry/contract assertions                            | passed  |
-| G6      | limitations                                                                       | Detector prerequisites and known failure modes are emitted                                        | Detector cards and tests                                | passed  |
-| G7      | counterevidence                                                                   | Strongest benign explanations are emitted with each finding                                       | Detector tests                                          | passed  |
-| G8      | No detector consumes unavailable fields silently                                  | Required availability is enforced; unavailable inputs skip with reasons                           | Adversarial missing-field tests                         | passed  |
-| G9      | Correlated ticks collapse into encounters                                         | Segmentation merges temporally/causally related samples and caps pseudoreplication                | Property/unit/benchmark tests                           | passed  |
-| G10     | Reviewers can reproduce every finding from the same artifact hashes and versions  | Evidence records demo/config/detector/asset provenance and deterministic features                 | Double-run real/synthetic artifact hash                 | passed  |
-| G11     | No combined “cheat score” exists yet                                              | No player-level probability/score aggregation is implemented or exposed                           | API/code audit                                          | passed  |
+| Gate ID | Original clause (verbatim)                                                        | Interpretation                                                                     | Verification                                      | Status |
+| ------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------- | ------ |
+| P0      | Sprint 2 and all scoring work are blocked until the Sprint 1 telemetry gates pass | Real parsing/projection and deterministic evidence must pass ten demos             | Ten-demo canonical telemetry and evidence reports | passed |
+| G1      | Every detector produces tick range                                                | Evidence windows have valid bounded source ranges                                  | Contract/unit/real-fixture assertions             | passed |
+| G2      | raw features                                                                      | Findings retain detector inputs sufficient to recompute the result                 | Schema and snapshot tests                         | passed |
+| G3      | effect size/contribution placeholder                                              | Findings expose an interpretable non-probabilistic magnitude                       | Detector tests                                    | passed |
+| G4      | quality                                                                           | Findings quantify reconstruction/input quality independently of anomaly            | Missing/corrupt telemetry tests                   | passed |
+| G5      | explanation                                                                       | Every finding has a human-readable causal explanation                              | Registry/contract assertions                      | passed |
+| G6      | limitations                                                                       | Detector prerequisites and known failure modes are emitted                         | Detector cards and tests                          | passed |
+| G7      | counterevidence                                                                   | Strongest benign explanations are emitted with each finding                        | Detector tests                                    | passed |
+| G8      | No detector consumes unavailable fields silently                                  | Required availability is enforced; unavailable inputs skip with reasons            | Adversarial missing-field tests                   | passed |
+| G9      | Correlated ticks collapse into encounters                                         | Segmentation merges temporally/causally related samples and caps pseudoreplication | Property/unit/benchmark tests                     | passed |
+| G10     | Reviewers can reproduce every finding from the same artifact hashes and versions  | Evidence records demo/config/detector/asset provenance and deterministic features  | Double-run real/synthetic artifact hash           | passed |
+| G11     | No combined “cheat score” exists yet                                              | No player-level probability/score aggregation is implemented or exposed            | API/code audit                                    | passed |
 
 ## Dependencies and non-goals
 
-- P0 is an inherited hard dependency from accepted ADR 0003. Crossing it is prerequisite work, not permission to weaken Sprint 2.
+- P0's internal telemetry dependency is satisfied. ADR 0003's amendment retains external comparison as a pre-release scientific gate.
 - Raw fixtures remain ignored. New external inputs require authorization, provenance, bounds, and retention controls.
 - No probability, player-level cheating score, ban decision, public accusation, or detector threshold optimization.
 - Exact BSP visibility may ship as quality-gated geometry interfaces/fixtures only if licensed map assets are unavailable; awareness detectors must skip rather than infer hidden visibility.
@@ -68,16 +68,16 @@ Outcome (verbatim): **emit explainable, independently testable evidence windows 
 
 ## Exit-gate evidence
 
-| Gate ID     | Revision | Exact command                                                        | Exit | Evidence/artifact hash                                        | Fixture/provenance                                  | Prerequisites                 | Result                                 |
-| ----------- | -------- | -------------------------------------------------------------------- | ---: | ------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- | -------------------------------------- |
-| G1-G9, G11  | worktree | `pnpm format:check && pnpm check && pnpm test && pnpm build`         |    0 | parser 56; schema 15; detectors 19; CLI 9; all packages built | synthetic/adversarial plus quarantined real demos   | none                          | passed                                 |
-| G10         | worktree | `pnpm --filter @witchwatch/detectors exec vitest run --maxWorkers=1` |    0 | observations `ec346c38…`; evidence `58d7af84…`                | real demo `299019bf…`, 138,696 complete aim samples | none                          | deterministic real no-finding artifact |
-| performance | worktree | `pnpm --filter @witchwatch/detectors benchmark`                      |    0 | 100,000 aim samples mean 82.46 ms                             | synthetic benchmark                                 | none                          | passed                                 |
-| workspace   | worktree | `pnpm format:check && pnpm check && pnpm test && pnpm build`         |    0 | all eight packages passed                                     | full workspace                                      | none                          | passed                                 |
-| telemetry   | worktree | `pnpm --filter @witchwatch/l4d2-schema verify:corpus`                |    0 | 10 demos; 92 epochs; 104,183 frames; 932,553 observations     | ten quarantined protocol-2100 SourceTV demos        | none                          | passed                                 |
-| identity    | worktree | `pnpm --filter @witchwatch/l4d2-schema verify:corpus`                |    0 | 76 privacy-bound human epochs; no raw identifiers             | timed updates and safe snapshot reconciliation      | pseudonym key                 | passed                                 |
-| events      | worktree | canonical game-event corpus tests                                    |    0 | 10 lists; 385 schemas/demo; 1,437 events; 424 deaths          | ten quarantined protocol-2100 SourceTV demos        | none                          | passed; fire/hurt absent in corpus     |
-| P0 external | external | procedure in `sprint-1-playback-validation.md`                       |      | pending                                                       | UntitledParser framing plus licensed L4D2 playback  | compatible x86_64 environment | sole remaining blocker                 |
+| Gate ID     | Revision | Exact command                                                        | Exit | Evidence/artifact hash                                        | Fixture/provenance                                  | Prerequisites                  | Result                                 |
+| ----------- | -------- | -------------------------------------------------------------------- | ---: | ------------------------------------------------------------- | --------------------------------------------------- | ------------------------------ | -------------------------------------- |
+| G1-G9, G11  | worktree | `pnpm format:check && pnpm check && pnpm test && pnpm build`         |    0 | parser 56; schema 15; detectors 19; CLI 9; all packages built | synthetic/adversarial plus quarantined real demos   | none                           | passed                                 |
+| G10         | worktree | `pnpm --filter @witchwatch/detectors exec vitest run --maxWorkers=1` |    0 | observations `ec346c38…`; evidence `58d7af84…`                | real demo `299019bf…`, 138,696 complete aim samples | none                           | deterministic real no-finding artifact |
+| performance | worktree | `pnpm --filter @witchwatch/detectors benchmark`                      |    0 | 100,000 aim samples mean 82.46 ms                             | synthetic benchmark                                 | none                           | passed                                 |
+| workspace   | worktree | `pnpm format:check && pnpm check && pnpm test && pnpm build`         |    0 | all eight packages passed                                     | full workspace                                      | none                           | passed                                 |
+| telemetry   | worktree | `pnpm --filter @witchwatch/l4d2-schema verify:corpus`                |    0 | 10 demos; 92 epochs; 104,183 frames; 932,553 observations     | ten quarantined protocol-2100 SourceTV demos        | none                           | passed                                 |
+| identity    | worktree | `pnpm --filter @witchwatch/l4d2-schema verify:corpus`                |    0 | 76 privacy-bound human epochs; no raw identifiers             | timed updates and safe snapshot reconciliation      | pseudonym key                  | passed                                 |
+| events      | worktree | canonical game-event corpus tests                                    |    0 | 10 lists; 385 schemas/demo; 1,437 events; 424 deaths          | ten quarantined protocol-2100 SourceTV demos        | none                           | passed; fire/hurt absent in corpus     |
+| pre-release | external | procedure in `sprint-1-playback-validation.md`                       |      | pending                                                       | UntitledParser framing plus licensed L4D2 playback  | external reference environment | does not block Sprint 3 development    |
 
 ## Decisions and risks
 
@@ -96,7 +96,7 @@ Initial verdict: **blocked**. The auditor independently reproduced the real evid
 
 All four findings were remediated and directly tested before the final re-audit below.
 
-Final re-audit verdict: **internal pass** with no remaining internal findings. The auditor verified bounded dynamic event projection, timed pseudonymous identity and no-time-travel behavior, strict field-specific playback schemas, honest lightweight reporting, dependency/license records, ignored raw data, and the aggregate/corpus evidence. Sprint 3 remains externally blocked only on the two reference checks in `sprint-1-playback-validation.md`.
+Final re-audit verdict: **internal pass** with no remaining internal findings. The auditor verified bounded dynamic event projection, timed pseudonymous identity and no-time-travel behavior, strict field-specific playback schemas, honest lightweight reporting, dependency/license records, ignored raw data, and the aggregate/corpus evidence. ADR 0003 now treats the two external reference checks as pre-release validation, so Sprint 3 development is unblocked.
 
 ## Out-of-scope follow-up
 

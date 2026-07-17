@@ -46,7 +46,7 @@ The first useful interface is not a cinematic renderer. It is a fast evidence ti
 | UI              | React + Vite + Tailwind                      | Lightweight, typed, quick to iterate                            |
 | Scoring         | Interpretable, calibrated model              | Auditable contributions and measurable error                    |
 
-The parser choice was deliberately conditional. Sprint 1 proved deterministic outer framing across ten current CEDAPug demos, but the corpus is homogeneous SourceTV protocol 2100 and no evaluated parser decodes its L4D2 entity telemetry. The project therefore took its declared pivot: [ADR 0003](docs/decisions/0003-pivot-to-narrow-l4d2-decoder.md) approves a narrow L4D2 network/entity decoder and blocks scoring until player telemetry passes the gate.
+The parser choice was deliberately conditional. The current corpus is homogeneous SourceTV protocol 2100, so protocol and capture-type limitations remain explicit. The narrow decoder now reconstructs real entity telemetry across all ten demos; independent parser/playback comparison remains a pre-release validation task rather than a blocker for calibration development.
 
 ## Repository
 
@@ -67,6 +67,29 @@ Later packages are introduced only when their sprint needs them: `detectors`, `s
 
 ## Start locally
 
+### Docker — recommended
+
+Docker Desktop is the only host requirement. Dependencies, Node 24, pnpm, .NET 7, and Linux-native modules stay in named Docker volumes:
+
+```bash
+docker compose up --build web
+# or, if pnpm is already available on the host:
+pnpm dev:docker
+```
+
+Open `http://localhost:5173`. Source files are bind-mounted for hot reload, while every workspace `node_modules` directory remains container-owned. Stop with `Ctrl+C`; remove the Compose containers with `docker compose down` or `pnpm dev:docker:down`.
+
+To run the independent UntitledParser framing check inside the same image after placing demos under `data/sprint-1-corpus/extracted`:
+
+```bash
+docker compose --profile tools run --rm reference
+# or: pnpm reference:untitled:docker
+```
+
+Outputs stay ignored under `data/reference-validation/`.
+
+### Native
+
 Requirements: Node 24+ and Corepack.
 
 ```bash
@@ -74,7 +97,7 @@ Requirements: Node 24+ and Corepack.
 pnpm dev
 ```
 
-`init.sh` installs container system prerequisites, Node 24 when needed, the pinned pnpm release, the frozen workspace, and runs every quality check. Set `SKIP_CHECKS=1` for a dependency-only setup or `SKIP_SYSTEM_DEPS=1` when the container image already has the native tools. The UI is at `http://localhost:5173`. Raw demos, archives, databases, and derived artifacts are ignored by Git. Copy `.env.example` only when an ingestion service exists.
+`pnpm dev` starts only the long-running web application; the CLI is intentionally one-shot. Run CLI commands with `pnpm dev:cli -- <command>` or `pnpm --filter @witchwatch/cli dev <command>`. `init.sh` installs container system prerequisites, Node 24 when needed, the pinned pnpm release, the frozen workspace, and runs every quality check. Set `SKIP_CHECKS=1` for a dependency-only setup or `SKIP_SYSTEM_DEPS=1` when the container image already has the native tools. Raw demos, archives, databases, and derived artifacts are ignored by Git.
 
 ## Quality bar
 
@@ -87,7 +110,7 @@ pnpm dev
 
 ## Status
 
-**Sprint 2's evidence-engine surface is implemented, but the sprint exit is blocked by real entity telemetry.** Geometry/context primitives, four explainable detector families, encounter segmentation, evidence schema v1, detector cards, and a deterministic feature explorer are tested and build cleanly. They intentionally emit no player probability or combined score. The narrow decoder now reaches send tables, flattened server classes, string tables, baseline/property APIs, and packet-entity envelopes; however, a reproducible protocol-2100 `instancebaseline` mismatch prevents honest real-corpus entity reconstruction. See the [Sprint 2 report](docs/sprints/sprint-2-execution.md) and [ADR 0004](docs/decisions/0004-hold-sprint-2-at-real-telemetry-gate.md).
+**Sprint 2 is complete and Sprint 3 calibration development is unblocked.** Across ten real demos, the decoder reconstructs 104,183 entity frames and projects 932,553 observations, 76 privacy-bound human epochs, and 1,437 game events. The evidence engine produces deterministic findings or explicit skips without a combined score. UntitledParser framing comparison and licensed playback remain pre-release scientific validation gates; they do not block implementation or exploratory calibration. See the [Sprint 2 report](docs/sprints/sprint-2-execution.md) and [validation procedure](docs/sprints/sprint-1-playback-validation.md).
 
 ## Name and license
 

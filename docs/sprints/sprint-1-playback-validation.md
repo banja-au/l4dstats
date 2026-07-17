@@ -1,14 +1,29 @@
-# Licensed playback validation gate
+# External reference validation
 
-These are the remaining external reference prerequisites before ADR 0003 permits Sprint 3 calibration. Decoder and detector tests do not substitute for independent framing validation or authentic game playback.
+These comparisons are pre-release scientific validation. They do not block Sprint 3 implementation or exploratory calibration, but they are mandatory before release, moderation use, or reconstruction-accuracy claims. Decoder and detector tests do not substitute for independent framing validation or authentic game playback.
 
-## Required environment
+## UntitledParser framing check — no L4D2 ownership required
+
+UntitledParser uses .NET 7 and its console project targets AnyCPU. On macOS or Linux, install a .NET 7 SDK, then run the repository helper:
+
+```bash
+./scripts/run-untitled-parser-check.sh data/sprint-1-corpus/extracted
+```
+
+With Docker Desktop, no host SDK is needed:
+
+```bash
+docker compose --profile tools run --rm reference
+```
+
+The helper pins commit `c7bd376e68cbf693071a652847eccb1d9d76eca7`, builds from source for the current machine, runs recursive demo dumps, and writes untracked outputs beneath `data/reference-validation/`. It also emits WitchWatch's deterministic corpus report for comparison. This check validates basic header/outer framing only: UntitledParser documents partial L4D2 network parsing and no L4D2 entity parsing.
+
+## Licensed playback check — pre-release
 
 - A licensed Left 4 Dead 2 installation compatible with protocol 2100 SourceTV demos.
 - The exact demo whose SHA-256 appears in `docs/sprints/sprint-1-corpus.json`.
 - The matching game build and map assets, recorded with hashes or immutable build identifiers.
 - An x86_64 runner capable of playing the demo and capturing authoritative entity state at selected ticks.
-- UntitledParser pinned to commit `c7bd376e68cbf693071a652847eccb1d9d76eca7` on a compatible runner.
 
 Raw demos, player names, and platform identifiers must remain outside Git. Record only pseudonymous entity epochs, numeric state, hashes, tool versions, and pass/fail differences.
 
@@ -82,8 +97,8 @@ redacted differences. Run export and comparison twice and require identical
 bytes and hashes before recording the gate as passed. `data/` remains ignored;
 do not add requests, exports, references, reports, demos, or identities to Git.
 
-The report must include demo hashes, UntitledParser commit/results, selected ticks, redacted comparisons, tolerances, game/build/map identifiers, instrumentation version, WitchWatch revision, and final report SHA-256. Any unexplained disagreement keeps P0 blocked and becomes a focused decoder fixture.
+The report must include demo hashes, UntitledParser commit/results, selected ticks, redacted comparisons, tolerances, game/build/map identifiers, instrumentation version, WitchWatch revision, and final report SHA-256. Any unexplained disagreement fails the pre-release gate and becomes a focused decoder fixture.
 
-## Why this cannot run in the current container
+## Environment limitation
 
-The development container is Linux arm64 and has neither a licensed L4D2 installation nor matching map/game assets. UntitledParser can independently check basic L4D2 framing on a compatible x86_64 runner, but explicitly does not provide the L4D2 entity-state oracle required here.
+The development container has neither a licensed L4D2 installation nor matching map/game assets, so authentic playback cannot run here. UntitledParser can be source-built independently and does not require the game, but it cannot provide an L4D2 entity-state oracle.

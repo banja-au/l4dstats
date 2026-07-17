@@ -89,3 +89,5 @@ The read-only re-audit independently reproduced that hash, verified formatting a
 - Continue Sprint 1 feasibility through NET/SVC messages, tables, event schemas, entities, and projection before Sprint 2.
 - Obtain authorized older-protocol and POV fixtures.
 - Run UntitledParser and licensed L4D2 playback on compatible x86_64 infrastructure for independent selected-tick validation.
+
+Recovery note: later Sprint 2 work completed and independently audited the real-corpus decoder, entity, identity, event, and deterministic-evidence gates. ADR 0003 now permits Sprint 3 development while retaining external comparison as pre-release validation.

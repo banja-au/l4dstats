@@ -9,7 +9,12 @@
   "scripts": {
     "build": "turbo run build",
     "check": "turbo run check",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@witchwatch/web",
+    "dev:container": "turbo run dev --filter=@witchwatch/web -- --host 0.0.0.0",
+    "dev:docker": "docker compose up --build web",
+    "dev:docker:down": "docker compose down",
+    "dev:cli": "pnpm --filter @witchwatch/cli dev",
+    "reference:untitled:docker": "docker compose --profile tools run --rm reference",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "turbo run test"
