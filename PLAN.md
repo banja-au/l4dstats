@@ -79,6 +79,8 @@ A held-out evaluation supports at least one useful review operating point with a
 
 **Outcome:** a reviewer can ingest, triage, inspect, annotate, compare, and export a reproducible case locally.
 
+**Status:** complete. See `docs/sprints/sprint-4-execution.md` for the real-boundary acceptance evidence and independent audit.
+
 ### Parallel tracks
 
 - **Jobs/API/storage:** SQLite persistent job state, content-addressed files, idempotent engine subprocesses, cancellation/retry, range endpoints, OpenAPI contracts, signed/local artifact access, SSE progress, audit events.

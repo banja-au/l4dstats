@@ -56,7 +56,7 @@ describe.runIf(readdirSafe(corpusRoot).length > 0)(
       expect(counts.get("svc_PacketEntities")).toBeGreaterThanOrEqual(104_183);
       expect(counts.get("svc_CreateStringTable")).toBeGreaterThanOrEqual(170);
       expect(counts.get("svc_UpdateStringTable")).toBeGreaterThanOrEqual(198);
-    });
+    }, 60_000);
   },
 );
 

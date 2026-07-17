@@ -1,0 +1,352 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WitchWatch Local Workbench API",
+    "version": "1.0.0",
+    "description": "Local evidence-review transport. Review states never trigger enforcement."
+  },
+  "servers": [{ "url": "http://localhost:8787" }],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": { "200": { "description": "Ready" } }
+      }
+    },
+    "/api/jobs": {
+      "post": {
+        "operationId": "createJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateJob" }
+            }
+          }
+        },
+        "responses": {
+          "202": { "$ref": "#/components/responses/Job" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/jobs/{jobId}": {
+      "get": {
+        "operationId": "getJob",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Job" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Job" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/retry": {
+      "post": {
+        "operationId": "retryJob",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Job" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/events": {
+      "get": {
+        "operationId": "jobEvents",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "200": {
+            "description": "Progress event stream",
+            "content": { "text/event-stream": {} }
+          }
+        }
+      }
+    },
+    "/api/cases": {
+      "get": {
+        "operationId": "listCases",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+          }
+        ],
+        "responses": { "200": { "description": "Bounded case summaries" } }
+      }
+    },
+    "/api/cases/{caseId}": {
+      "get": {
+        "operationId": "getCase",
+        "parameters": [{ "$ref": "#/components/parameters/CaseId" }],
+        "responses": {
+          "200": {
+            "description": "Case detail with the exact versioned presentation and derivation lineage used by the reviewer and report",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CaseDetail" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/cases/{caseId}/review-status": {
+      "patch": {
+        "operationId": "setReviewStatus",
+        "parameters": [{ "$ref": "#/components/parameters/CaseId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "$ref": "#/components/schemas/ReviewStatus" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Persisted status" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/cases/{caseId}/notes": {
+      "get": {
+        "operationId": "listNotes",
+        "parameters": [{ "$ref": "#/components/parameters/CaseId" }],
+        "responses": { "200": { "description": "Review notes" } }
+      },
+      "post": {
+        "operationId": "addNote",
+        "parameters": [{ "$ref": "#/components/parameters/CaseId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateNote" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Persisted note" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/cases/{caseId}/telemetry": {
+      "get": {
+        "operationId": "getTelemetryWindow",
+        "description": "Returns tick-clipped overlapping chunks; never a whole telemetry artifact. Stored chunks are limited to 600 ticks/256 KiB and responses to 16 chunks/512 KiB.",
+        "parameters": [
+          { "$ref": "#/components/parameters/CaseId" },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer", "minimum": 1 }
+          },
+          {
+            "name": "demo",
+            "in": "query",
+            "description": "Exact source demo SHA-256 for a corroborated case",
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "At most 3,000 requested ticks, 16 clipped chunks, and 512 KiB"
+          },
+          "416": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/cases/{caseId}/report": {
+      "get": {
+        "operationId": "exportReport",
+        "parameters": [{ "$ref": "#/components/parameters/CaseId" }],
+        "responses": {
+          "200": { "description": "Canonical JSON plus its SHA-256 digest" }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "operationId": "openApiDocument",
+        "responses": { "200": { "description": "This OpenAPI document" } }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "JobId": {
+        "name": "jobId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CaseId": {
+        "name": "caseId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1 }
+      }
+    },
+    "responses": {
+      "Job": {
+        "description": "Job state",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Job" }
+          }
+        }
+      },
+      "Error": {
+        "description": "Safe error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["error"],
+              "properties": { "error": { "type": "string" } }
+            }
+          }
+        }
+      },
+      "schemas": {
+        "CaseDetail": {
+          "type": "object",
+          "required": ["id", "status", "score", "presentation", "lineage"],
+          "properties": {
+            "id": { "type": "string" },
+            "status": { "$ref": "#/components/schemas/ReviewStatus" },
+            "score": { "type": "object" },
+            "lineage": { "type": "object" },
+            "presentation": {
+              "$ref": "#/components/schemas/CasePresentationV1"
+            }
+          }
+        },
+        "CasePresentationV1": {
+          "type": "object",
+          "required": [
+            "schemaVersion",
+            "id",
+            "alias",
+            "identityLabel",
+            "provenance",
+            "demos",
+            "evidence",
+            "association",
+            "summary"
+          ],
+          "properties": {
+            "schemaVersion": { "const": 1 },
+            "id": { "type": "string" },
+            "alias": { "type": "string" },
+            "identityLabel": { "type": "string" },
+            "provenance": { "type": "object" },
+            "demos": { "type": "array", "items": { "type": "object" } },
+            "evidence": {
+              "type": "array",
+              "items": { "type": "object" }
+            },
+            "association": {
+              "type": "object",
+              "required": ["kind", "corroboratingDemoCount", "explanation"]
+            },
+            "summary": { "type": "object" }
+          }
+        },
+        "ReviewStatus": {
+          "type": "string",
+          "enum": ["unreviewed", "in-review", "needs-context", "resolved"]
+        },
+        "CreateNote": {
+          "type": "object",
+          "required": ["body"],
+          "properties": {
+            "body": { "type": "string", "minLength": 1, "maxLength": 4000 },
+            "tick": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        },
+        "CreateJob": {
+          "type": "object",
+          "required": ["source", "idempotencyKey"],
+          "properties": {
+            "idempotencyKey": { "type": "string", "minLength": 1 },
+            "source": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["kind", "path"],
+                  "properties": {
+                    "kind": { "const": "local" },
+                    "path": { "type": "string" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["kind", "url"],
+                  "properties": {
+                    "kind": { "const": "remote" },
+                    "url": {
+                      "type": "string",
+                      "format": "uri",
+                      "pattern": "^https://"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "Job": {
+          "type": "object",
+          "required": ["id", "state", "progress", "source"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "state": {
+              "type": "string",
+              "enum": ["queued", "running", "succeeded", "failed", "cancelled"]
+            },
+            "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+            "message": { "type": ["string", "null"] },
+            "source": { "type": "object" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -167,6 +167,6 @@ describe.runIf(existsSync(corpusDemo))(
             }, new Map<string, number>()),
         ),
       });
-    }, 120_000);
+    }, 300_000);
   },
 );

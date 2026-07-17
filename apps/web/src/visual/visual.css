@@ -1,0 +1,223 @@
+.ww-ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #b8ef59;
+  overflow: hidden;
+}
+.ww-ambient svg {
+  width: 100%;
+  height: 100%;
+}
+.ww-scratch {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.12;
+  opacity: 0.2;
+}
+.ww-mote {
+  fill: currentColor;
+  opacity: 0.24;
+  animation: ww-drift 9s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ww-drift {
+  to {
+    transform: translate(2px, -7px) scale(1.5);
+    opacity: 0.08;
+  }
+}
+
+.ww-emblem {
+  width: 2.5rem;
+  color: #b8ef59;
+  overflow: visible;
+}
+.ww-emblem path,
+.ww-emblem circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.ww-emblem__ring {
+  opacity: 0.45;
+}
+.ww-emblem__core {
+  fill: currentColor !important;
+  stroke: none !important;
+}
+.ww-emblem__ticks {
+  opacity: 0.7;
+  stroke-width: 1 !important;
+}
+.ww-emblem--pulse .ww-emblem__core {
+  animation: ww-core-pulse 2.4s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ww-core-pulse {
+  50% {
+    transform: scale(0.65);
+    opacity: 0.45;
+  }
+}
+
+.ww-pulse {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  color: #b8ef59;
+}
+.ww-pulse__grid {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.5;
+  opacity: 0.1;
+}
+.ww-pulse__ghost {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.13;
+  vector-effect: non-scaling-stroke;
+}
+.ww-pulse__trace {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.ww-pulse__reveal {
+  animation: ww-scan 3.6s ease-in-out infinite;
+  transform-origin: left;
+}
+.ww-pulse__beacon {
+  fill: currentColor;
+  animation: ww-beacon 1.8s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ww-pulse--compact {
+  min-height: 2rem;
+}
+@keyframes ww-scan {
+  0% {
+    transform: scaleX(0);
+  }
+  55%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes ww-beacon {
+  70%,
+  100% {
+    transform: scale(3.6);
+    opacity: 0;
+  }
+}
+
+.ww-tactical {
+  display: block;
+  width: 100%;
+  color: #b8ef59;
+}
+.ww-tactical__ground {
+  fill: #0c1211;
+}
+.ww-tactical__structure {
+  fill: none;
+  stroke: #778077;
+  stroke-width: 14;
+  stroke-linecap: square;
+  stroke-linejoin: bevel;
+  opacity: 0.48;
+}
+.ww-tactical__structure path + path {
+  stroke-width: 5;
+  opacity: 0.6;
+}
+.ww-tactical__route {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-dasharray: 5 7;
+  opacity: 0.65;
+  animation: ww-route 12s linear infinite;
+}
+.ww-tactical__fov {
+  fill: currentColor;
+  opacity: 0.08;
+}
+.ww-tactical__survivor circle {
+  fill: #0c1211;
+  stroke: currentColor;
+  stroke-width: 3;
+}
+.ww-tactical__survivor path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.ww-tactical__signal {
+  color: #f2b84b;
+}
+.ww-tactical__signal circle:not(.ww-tactical__signal-wave) {
+  fill: currentColor;
+}
+.ww-tactical__signal path {
+  stroke: #0c1211;
+  stroke-width: 1.5;
+}
+.ww-tactical__signal-wave {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.25;
+}
+.ww-tactical__signal--active .ww-tactical__signal-wave {
+  animation: ww-radar 2.4s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ww-tactical__contacts {
+  fill: #de6258;
+}
+.ww-tactical__coordinates {
+  fill: #a5aaa4;
+  font:
+    8px ui-monospace,
+    monospace;
+  letter-spacing: 1.4px;
+}
+.ww-tactical__frame {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.15;
+}
+@keyframes ww-route {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+@keyframes ww-radar {
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ww-mote,
+  .ww-emblem__core,
+  .ww-pulse__reveal,
+  .ww-pulse__beacon,
+  .ww-tactical__route,
+  .ww-tactical__signal-wave {
+    animation: none !important;
+  }
+  .ww-pulse__reveal {
+    transform: scaleX(1);
+  }
+}

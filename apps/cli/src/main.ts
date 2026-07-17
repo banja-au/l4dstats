@@ -13,6 +13,7 @@ import {
   type PlaybackReference,
 } from "./playback-validation";
 import { stableJson, summarizeDemo, type DemoInspection } from "./report";
+import { buildEvidenceBundle } from "./evidence-bundle";
 import { parseControlledDataset, writeCalibrationArtifacts } from "./scoring";
 
 const inspect = async (path: string): Promise<DemoInspection> => {
@@ -44,7 +45,7 @@ const findDemos = async (root: string): Promise<string[]> => {
 
 const usage = (): never => {
   throw new Error(
-    "Usage: witchwatch inspect <demo.dem> | corpus <directory> | features <request.json> | detectors | calibrate <dataset.json> <output-directory> | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
+    "Usage: witchwatch inspect <demo.dem> | evidence-bundle <demo.dem> | corpus <directory> | features <request.json> | detectors | calibrate <dataset.json> <output-directory> | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
   );
 };
 
@@ -105,6 +106,19 @@ const main = async (): Promise<void> => {
   }
   if (commandName === "inspect") {
     process.stdout.write(stableJson(await inspect(resolve(target))));
+    return;
+  }
+  if (commandName === "evidence-bundle") {
+    const pseudonymKey = process.env.WITCHWATCH_PSEUDONYM_KEY;
+    if (!pseudonymKey)
+      throw new Error(
+        "WITCHWATCH_PSEUDONYM_KEY is required for evidence-bundle",
+      );
+    process.stdout.write(
+      stableJson(
+        buildEvidenceBundle(await readFile(resolve(target)), { pseudonymKey }),
+      ),
+    );
     return;
   }
   if (commandName === "corpus") {

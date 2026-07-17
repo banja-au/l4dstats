@@ -11,14 +11,15 @@
     "check": "turbo run check",
     "dev": "turbo run dev --filter=@witchwatch/web",
     "dev:container": "turbo run dev --filter=@witchwatch/web -- --host 0.0.0.0",
-    "dev:docker": "docker compose up --build web",
+    "dev:docker": "docker compose up --build",
     "dev:docker:down": "docker compose down",
     "dev:cli": "pnpm --filter @witchwatch/cli dev",
     "reference:untitled:docker": "docker compose --profile tools run --rm reference",
     "scoring:evaluate": "pnpm --filter @witchwatch/cli dev calibrate ../../packages/scoring/fixtures/controlled-v1.json ../../packages/scoring/models",
+    "test:e2e": "pnpm --filter @witchwatch/web test:e2e && pnpm --filter @witchwatch/web test:e2e:real",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "turbo run test"
+    "test": "turbo run test --concurrency=2"
   },
   "devDependencies": {
     "prettier": "3.6.2",

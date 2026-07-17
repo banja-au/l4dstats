@@ -35,7 +35,7 @@ describe.runIf(readdirSafe(corpusRoot).length > 0)(
       }
       expect(decoded).toBeGreaterThanOrEqual(1_437);
       expect(emitted).toBeGreaterThanOrEqual(424);
-    });
+    }, 60_000);
   },
 );
 

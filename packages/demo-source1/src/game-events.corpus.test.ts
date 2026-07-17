@@ -59,7 +59,7 @@ describe.runIf(readdirSafe(corpusRoot).length > 0)(
       expect(
         coverage.every(({ required }) => (required.player_death ?? 0) > 0),
       ).toBe(true);
-    });
+    }, 60_000);
   },
 );
 

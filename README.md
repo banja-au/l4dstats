@@ -14,6 +14,8 @@
 
 WitchWatch is an early-stage, local-first workbench for examining Left 4 Dead 2 demos. It will extract reproducible telemetry, surface anomalous moments, combine evidence across matches, and help a human reviewer reach the exact tick with the reasoning and counterevidence intact.
 
+![WitchWatch local review workbench](docs/assets/workbench-overview.jpg)
+
 > [!IMPORTANT]
 > A WitchWatch score is a **review priority**, not proof of cheating. Demo telemetry is incomplete, behavior is contextual, and skilled play can look extraordinary. The product will not automate bans or publish accusations.
 
@@ -52,6 +54,8 @@ The parser choice was deliberately conditional. The current corpus is homogeneou
 
 ```text
 apps/web/             evidence-workbench shell
+apps/api/             bounded local HTTP/SSE review API
+apps/worker/          single-process, retryable engine jobs
 apps/cli/             deterministic demo/corpus inspection
 packages/acquisition/ guarded discovery, download, and ZIP handling
 packages/contracts/   canonical cross-boundary types
@@ -59,13 +63,15 @@ packages/demo-source1 bounded Source 1 outer framing
 packages/detectors/   explainable evidence windows and encounters
 packages/l4d2-schema/ explicit-availability projection primitives
 packages/scoring/     capped aggregation, calibration, and policy
+packages/storage/     SQLite metadata + content-addressed artifacts
 docs/                 architecture, research, decisions, safety
 PLAN.md               five executable sprint workflows
 AGENTS.md              rules for coding agents
 CLAUDE.md              concise Claude entrypoint
 ```
 
-Later packages are introduced only when their sprint needs them. `storage` and the API/worker apps remain deferred until Sprint 4.
+The API, worker, and storage boundary remains deliberately local and lightweight:
+Node's built-in SQLite binding, a single polling worker, and bounded browser payloads.
 
 ## Start locally
 
@@ -74,12 +80,18 @@ Later packages are introduced only when their sprint needs them. `storage` and t
 Docker Desktop is the only host requirement. Dependencies, Node 24, pnpm, .NET 7, and Linux-native modules stay in named Docker volumes:
 
 ```bash
-docker compose up --build web
+docker compose up --build
 # or, if pnpm is already available on the host:
 pnpm dev:docker
 ```
 
-Open `http://localhost:5173`. Source files are bind-mounted for hot reload, while every workspace `node_modules` directory remains container-owned. Stop with `Ctrl+C`; remove the Compose containers with `docker compose down` or `pnpm dev:docker:down`.
+Open `http://localhost:5173`. Compose starts the web app, API, and local worker with
+a durable named SQLite volume. Demos under `data/sprint-1-corpus/extracted` are
+mounted read-only at `/data/inbox`; the ingest dialog accepts that container path
+or an allowlisted HTTPS URL. Source files are bind-mounted for hot reload, while
+every workspace `node_modules` directory remains container-owned. Stop with
+`Ctrl+C`; remove the Compose containers with `docker compose down` or
+`pnpm dev:docker:down`. See the [local workbench operations guide](docs/operations/local-workbench.md).
 
 To run the independent UntitledParser framing check inside the same image after placing demos under `data/sprint-1-corpus/extracted`:
 
@@ -99,7 +111,14 @@ Requirements: Node 24+ and Corepack.
 pnpm dev
 ```
 
-`pnpm dev` starts only the long-running web application; the CLI is intentionally one-shot. Run CLI commands with `pnpm dev:cli -- <command>` or `pnpm --filter @witchwatch/cli dev <command>`. `init.sh` installs container system prerequisites, Node 24 when needed, the pinned pnpm release, the frozen workspace, and runs every quality check. Set `SKIP_CHECKS=1` for a dependency-only setup or `SKIP_SYSTEM_DEPS=1` when the container image already has the native tools. Raw demos, archives, databases, and derived artifacts are ignored by Git.
+`pnpm dev` starts only the long-running web application; use Docker for the complete
+API/worker workflow. The CLI is intentionally one-shot. Run CLI commands with
+`pnpm dev:cli -- <command>` or `pnpm --filter @witchwatch/cli dev <command>`.
+`init.sh` installs container system prerequisites, Node 24, the pinned pnpm release,
+Chromium for Playwright, the frozen workspace, and runs every quality check. Set
+`SKIP_CHECKS=1` for dependency-only setup or `SKIP_SYSTEM_DEPS=1` when the image
+already has native tools. Raw demos, archives, databases, reports, and browser test
+artifacts are ignored by Git.
 
 Reproduce the controlled-fixture calibration and immutable Sprint 3 bundle with:
 
@@ -122,7 +141,17 @@ output is a research-only review priority and every artifact carries
 
 ## Status
 
-**Sprint 3's research calibration engine is implemented.** It hierarchically caps evidence, withholds numeric priority below independent-evidence or calibration gates, enforces the `highly-anomalous` corroboration rule, evaluates player-separated controlled fixtures, and emits hash-addressed model/report bundles. The passing held-out result validates machinery only; it does not establish real-player accuracy or moderation suitability. See the [Sprint 3 report](docs/sprints/sprint-3-execution.md), [model card](docs/scoring/MODEL_CARD.md), and [operating policy](docs/decisions/0005-scoring-operating-policy.md).
+**Sprint 4 is complete and independently audited.** The local workbench provides
+guarded local/allowlisted ingest, real evidence generation, privacy-stable cross-demo
+association, durable review, strictly bounded telemetry, and SHA-256-verifiable reports.
+Original cinematic key art and reduced-motion animation create a directly L4D2-inspired
+visual language without copying game assets. Reproduce the evidence from the
+[Sprint 4 report](docs/sprints/sprint-4-execution.md) and
+[storage decision](docs/decisions/0006-local-workbench-storage.md).
+
+The displayed example case is an invented controlled UI fixture. It demonstrates
+the workflow, not real-player accuracy or a cheating probability. Real-world
+decision support remains blocked on the validation described in Sprint 5.
 
 ## Name and license
 

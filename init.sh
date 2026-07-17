@@ -93,6 +93,8 @@ install_workspace() {
   log "Installing the locked workspace"
   cd "${SCRIPT_DIR}"
   pnpm install --frozen-lockfile
+  log "Installing the pinned Chromium browser used by Playwright"
+  pnpm --filter @witchwatch/web exec playwright install chromium
 }
 
 verify_workspace() {
@@ -107,6 +109,7 @@ verify_workspace() {
   pnpm check
   pnpm test
   pnpm build
+  pnpm test:e2e
 }
 
 main() {
