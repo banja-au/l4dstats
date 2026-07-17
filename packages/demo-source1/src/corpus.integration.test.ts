@@ -3,6 +3,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { decodeDemo } from "./decode";
+import { decodeL4d2DataTables, flattenServerClasses } from "./data-tables";
+import { decodeInstanceBaselines } from "./entities";
+import { decodeL4d2ServerInfo, identifyFirstNetworkMessage } from "./network";
+import { decodeL4d2UserInfo, decodeStringTableSnapshot } from "./string-tables";
 
 const corpusRoot = resolve(
   process.cwd(),
@@ -39,6 +43,29 @@ function stableSummary(result: ReturnType<typeof decodeDemo>): unknown {
 
 describe("quarantined Sprint 1 corpus", () => {
   it.runIf(existsSync(corpusRoot))(
+    "decodes send-table and 278-class schemas for every demo",
+    () => {
+      const summaries = findDemos(corpusRoot).map((path) => {
+        const d = decodeDemo(readFileSync(path));
+        const p = d.frames.find((f) => f.kind === "data-tables")?.payload;
+        expect(p).toBeDefined();
+        const schema = decodeL4d2DataTables(p!);
+        expect(schema.serverClasses).toHaveLength(278);
+        expect(schema.tables.length).toBeGreaterThan(100);
+        return {
+          demoSha256: createHash("sha256")
+            .update(readFileSync(path))
+            .digest("hex"),
+          tables: schema.tables.length,
+          props: schema.tables.reduce((n, t) => n + t.props.length, 0),
+          classes: schema.serverClasses.length,
+        };
+      });
+      console.info("Source 1 redacted data-table coverage", summaries);
+    },
+    60_000,
+  );
+  it.runIf(existsSync(corpusRoot))(
     "frames all ten real demos completely and deterministically",
     () => {
       const paths = findDemos(corpusRoot);
@@ -73,6 +100,159 @@ describe("quarantined Sprint 1 corpus", () => {
 
       // Hashes identify inputs without leaking archive names or player identities.
       console.info("Source 1 corpus framing summary", summaries);
+    },
+    60_000,
+  );
+
+  it.runIf(existsSync(corpusRoot))(
+    "decodes redacted ServerInfo for every demo",
+    () => {
+      const summaries = findDemos(corpusRoot).map((path) => {
+        const decoded = decodeDemo(readFileSync(path));
+        const frame = decoded.frames.find(
+          ({ payload }) =>
+            payload !== undefined &&
+            identifyFirstNetworkMessage(payload)?.id === 8,
+        );
+        expect(frame?.payload).toBeDefined();
+        const info = decodeL4d2ServerInfo(frame!.payload!);
+        expect(info.networkProtocol).toBe(2_100);
+        expect(info.isSourceTv).toBe(true);
+        expect(info.tickIntervalSeconds).toBeGreaterThan(0);
+        expect(info.tickIntervalSeconds).toBeLessThan(1);
+        return {
+          demoSha256: createHash("sha256")
+            .update(readFileSync(path))
+            .digest("hex"),
+          ...info,
+        };
+      });
+      expect(summaries).toHaveLength(10);
+      console.info("Source 1 redacted ServerInfo coverage", summaries);
+    },
+    60_000,
+  );
+
+  it.runIf(existsSync(corpusRoot))(
+    "reports the first NET/SVC identifier across all ten demos",
+    () => {
+      const coverage = new Map<string, number>();
+      let payloads = 0;
+      let emptyPayloads = 0;
+
+      for (const path of findDemos(corpusRoot)) {
+        const decoded = decodeDemo(readFileSync(path));
+        for (const frame of decoded.frames) {
+          if (
+            (frame.kind !== "packet" && frame.kind !== "signon") ||
+            frame.payload === undefined ||
+            frame.payload.byteLength === 0
+          )
+            continue;
+          payloads += 1;
+          const first = identifyFirstNetworkMessage(frame.payload);
+          if (first === undefined) emptyPayloads += 1;
+          else coverage.set(first.name, (coverage.get(first.name) ?? 0) + 1);
+        }
+      }
+
+      const stableCoverage = Object.fromEntries(
+        [...coverage].sort(([left], [right]) => left.localeCompare(right)),
+      );
+      expect(payloads).toBeGreaterThan(100_000);
+      expect(payloads).toBe(
+        emptyPayloads +
+          Object.values(stableCoverage).reduce((a, b) => a + b, 0),
+      );
+      // The first six-bit identifier is authoritative. Later boundaries remain
+      // experimental until each branch-specific message shape is corpus-proven.
+      console.info("Source 1 first NET/SVC identifier coverage", {
+        payloads,
+        emptyPayloads,
+        firstIdentifier: stableCoverage,
+      });
+    },
+    60_000,
+  );
+
+  it.runIf(existsSync(corpusRoot))(
+    "decodes redacted string-table and userinfo coverage for every demo",
+    () => {
+      const summaries = findDemos(corpusRoot).map((path) => {
+        const decoded = decodeDemo(readFileSync(path));
+        const frame = decoded.frames.find(
+          ({ kind }) => kind === "string-tables",
+        );
+        expect(frame?.payload).toBeDefined();
+        const snapshot = decodeStringTableSnapshot(frame!.payload!);
+        const userinfo = snapshot.tables.find(
+          ({ name }) => name === "userinfo",
+        );
+        const baselines = snapshot.tables.find(
+          ({ name }) => name === "instancebaseline",
+        );
+        const identities = (userinfo?.entries ?? [])
+          .filter((entry) => entry.data !== null)
+          .map((entry) => decodeL4d2UserInfo(entry.data!));
+        expect(snapshot.consumedBits).toBeLessThanOrEqual(
+          frame!.payload!.byteLength * 8,
+        );
+        expect(userinfo).toBeDefined();
+        expect(baselines).toBeDefined();
+        return {
+          demoSha256: createHash("sha256")
+            .update(readFileSync(path))
+            .digest("hex"),
+          tables: snapshot.tables.length,
+          userinfoEntries: userinfo!.entries.length,
+          identities: identities.length,
+          humanIdentities: identities.filter(({ fakePlayer }) => !fakePlayer)
+            .length,
+          baselineEntries: baselines!.entries.filter(
+            ({ data }) => data !== null,
+          ).length,
+          baselineBytes: baselines!.entries.reduce(
+            (total, { data }) => total + (data?.byteLength ?? 0),
+            0,
+          ),
+        };
+      });
+      expect(summaries).toHaveLength(10);
+      expect(summaries.every(({ identities }) => identities > 0)).toBe(true);
+      // No names, account IDs, GUIDs, or local paths are printed.
+      console.info("Source 1 redacted string-table coverage", summaries);
+    },
+    60_000,
+  );
+
+  it.runIf(existsSync(corpusRoot))(
+    "reproduces the known protocol-2100 instancebaseline blocker",
+    () => {
+      const decoded = decodeDemo(readFileSync(findDemos(corpusRoot)[0]!));
+      const dataTables = decoded.frames.find(
+        ({ kind }) => kind === "data-tables",
+      );
+      const stringTables = decoded.frames.find(
+        ({ kind }) => kind === "string-tables",
+      );
+      expect(dataTables?.payload).toBeDefined();
+      expect(stringTables?.payload).toBeDefined();
+
+      const classes = flattenServerClasses(
+        decodeL4d2DataTables(dataTables!.payload!),
+      );
+      const baselineTable = decodeStringTableSnapshot(
+        stringTables!.payload!,
+      ).tables.find(({ name }) => name === "instancebaseline");
+      expect(baselineTable).toBeDefined();
+      expect(classes[261]).toMatchObject({
+        className: "CWorld",
+        dataTableId: 261,
+      });
+      expect(classes[261]!.props).toHaveLength(63);
+      expect(() => decodeInstanceBaselines(baselineTable!, classes)).toThrow(
+        "property index 161 outside 63",
+      );
     },
     60_000,
   );

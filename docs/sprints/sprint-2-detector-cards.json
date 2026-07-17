@@ -1,0 +1,78 @@
+{
+  "detectors": [
+    {
+      "failureModes": [
+        "SourceTV quantization and interpolation",
+        "low tick rate",
+        "spectator state is not direct mouse input",
+        "target selection uncertainty"
+      ],
+      "id": "aim-dynamics",
+      "interpretation": "Highlights a rapid acquisition with abrupt acceleration and low post-movement target error; it does not infer input method.",
+      "kind": "aim",
+      "prerequisites": [
+        "monotonic demo time",
+        "networked eye angles",
+        "player and target position"
+      ],
+      "title": "Server-observed aim dynamics",
+      "version": "1.0.0"
+    },
+    {
+      "failureModes": [
+        "weapon upgrades or mode changes absent from state",
+        "tick quantization",
+        "event duplication"
+      ],
+      "id": "fire-cadence-invariant",
+      "interpretation": "Reports a cycle-time violation only when weapon and ammo state are authoritative.",
+      "kind": "invariant",
+      "prerequisites": [
+        "authoritative weapon state",
+        "shot time",
+        "weapon cycle time",
+        "ammo transition"
+      ],
+      "title": "Authoritative fire cadence invariant",
+      "version": "1.0.0"
+    },
+    {
+      "failureModes": [
+        "missing map collision",
+        "unmodeled callouts",
+        "sound propagation differs from distance",
+        "target-selection ambiguity"
+      ],
+      "id": "hidden-alignment",
+      "interpretation": "Surfaces close alignment only after the recorded information channels have been explicitly ruled out.",
+      "kind": "awareness",
+      "prerequisites": [
+        "authoritative line-of-sight trace",
+        "dynamic occluder resolution",
+        "audibility audit",
+        "prior-information audit",
+        "target alignment"
+      ],
+      "title": "Audited hidden-target alignment",
+      "version": "1.0.0"
+    },
+    {
+      "failureModes": [
+        "knockback or map triggers",
+        "unmodeled temporary modifiers",
+        "teleports"
+      ],
+      "id": "movement-invariant",
+      "interpretation": "Reports speed beyond the authoritative state-specific bound; it is an engine-data consistency check.",
+      "kind": "movement",
+      "prerequisites": [
+        "authoritative movement mode",
+        "observed speed",
+        "mode-specific allowed speed"
+      ],
+      "title": "Authoritative movement invariant",
+      "version": "1.0.0"
+    }
+  ],
+  "schemaVersion": 1
+}

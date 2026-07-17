@@ -87,7 +87,7 @@ pnpm dev
 
 ## Status
 
-**Sprint 1 feasibility completed with the documented parser pivot.** Safe acquisition, outer framing, canonical availability contracts, corpus inspection, provenance, and the CLI are implemented. Player/entity telemetry remains intentionally unavailable, and Sprint 2/scoring is blocked until the narrow decoder crosses that gate. See the [Sprint 1 report](docs/sprints/sprint-1-execution.md).
+**Sprint 2's evidence-engine surface is implemented, but the sprint exit is blocked by real entity telemetry.** Geometry/context primitives, four explainable detector families, encounter segmentation, evidence schema v1, detector cards, and a deterministic feature explorer are tested and build cleanly. They intentionally emit no player probability or combined score. The narrow decoder now reaches send tables, flattened server classes, string tables, baseline/property APIs, and packet-entity envelopes; however, a reproducible protocol-2100 `instancebaseline` mismatch prevents honest real-corpus entity reconstruction. See the [Sprint 2 report](docs/sprints/sprint-2-execution.md) and [ADR 0004](docs/decisions/0004-hold-sprint-2-at-real-telemetry-gate.md).
 
 ## Name and license
 

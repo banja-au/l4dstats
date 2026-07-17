@@ -24,6 +24,66 @@ export interface EvidenceEvent {
   readonly counterevidence: readonly string[];
 }
 
+export const evidenceSchemaVersion = 1 as const;
+
+export type FeatureValue = boolean | number | string | null;
+
+export interface ArtifactProvenance {
+  readonly demoSha256: string;
+  readonly observationArtifactSha256: string;
+  readonly observationSchemaVersion: number;
+  readonly detectorId: string;
+  readonly detectorVersion: string;
+  readonly configSha256: string;
+  readonly mapAssetSha256?: string;
+}
+
+export interface EvidenceEffect {
+  readonly value: number;
+  readonly unit: string;
+  readonly baseline: string;
+}
+
+export interface EvidenceQuality {
+  readonly value: number;
+  readonly basis: readonly string[];
+}
+
+export interface DetectorEvidence {
+  readonly schemaVersion: typeof evidenceSchemaVersion;
+  readonly id: string;
+  readonly playerEpochId: string;
+  readonly kind: EvidenceKind;
+  readonly tickRange: TickRange;
+  readonly rawFeatures: Readonly<Record<string, FeatureValue>>;
+  readonly effect: EvidenceEffect;
+  readonly contributionPlaceholder: null;
+  readonly quality: EvidenceQuality;
+  readonly explanation: string;
+  readonly limitations: readonly string[];
+  readonly counterevidence: readonly string[];
+  readonly provenance: ArtifactProvenance;
+}
+
+export interface DetectorSkip {
+  readonly detectorId: string;
+  readonly code:
+    | "empty-input"
+    | "missing-prerequisite"
+    | "insufficient-samples"
+    | "no-candidate";
+  readonly explanation: string;
+  readonly unavailableFields: readonly string[];
+}
+
+export interface EvidenceBundle {
+  readonly schemaVersion: typeof evidenceSchemaVersion;
+  readonly demoSha256: string;
+  readonly configSha256: string;
+  readonly findings: readonly DetectorEvidence[];
+  readonly skipped: readonly DetectorSkip[];
+}
+
 export interface ReviewScore {
   readonly playerId: string;
   readonly modelVersion: string;

@@ -26,6 +26,9 @@ importers:
       '@witchwatch/demo-source1':
         specifier: workspace:*
         version: link:../../packages/demo-source1
+      '@witchwatch/detectors':
+        specifier: workspace:*
+        version: link:../../packages/detectors
     devDependencies:
       '@types/node':
         specifier: 24.10.1
@@ -87,6 +90,22 @@ importers:
         version: 3.2.4(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.20.6)
 
   packages/demo-source1:
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.20.6)
+
+  packages/detectors:
+    dependencies:
+      '@witchwatch/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.20.6)
+
+  packages/geometry:
     devDependencies:
       vitest:
         specifier: 3.2.4

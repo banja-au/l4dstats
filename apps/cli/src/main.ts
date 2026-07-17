@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { decodeDemo, DemoParseError } from "@witchwatch/demo-source1";
+import { detectorCards, exploreFeatures, parseFeatureRequest } from "./explore";
 import { stableJson, summarizeDemo, type DemoInspection } from "./report";
 
 const inspect = async (path: string): Promise<DemoInspection> => {
@@ -35,15 +36,29 @@ const findDemos = async (root: string): Promise<string[]> => {
 
 const usage = (): never => {
   throw new Error(
-    "Usage: witchwatch inspect <demo.dem> | witchwatch corpus <directory>",
+    "Usage: witchwatch inspect <demo.dem> | corpus <directory> | features <request.json> | detectors",
   );
 };
 
 const main = async (): Promise<void> => {
   const [command, input, ...extra] = process.argv.slice(2);
   const commandName = command ?? usage();
+  if (commandName === "detectors") {
+    if (input !== undefined || extra.length > 0) usage();
+    process.stdout.write(
+      stableJson({ schemaVersion: 1, detectors: detectorCards() }),
+    );
+    return;
+  }
   const target = input ?? usage();
   if (extra.length > 0) usage();
+  if (commandName === "features") {
+    const request = parseFeatureRequest(
+      JSON.parse(await readFile(resolve(target), "utf8")),
+    );
+    process.stdout.write(stableJson(exploreFeatures(request)));
+    return;
+  }
   if (commandName === "inspect") {
     process.stdout.write(stableJson(await inspect(resolve(target))));
     return;

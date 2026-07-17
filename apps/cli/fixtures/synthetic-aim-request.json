@@ -1,0 +1,132 @@
+{
+  "detectorId": "aim-dynamics",
+  "detectorVersion": "1.0.0",
+  "maximumEncounterTickGap": 2,
+  "context": {
+    "playerEpochId": "synthetic-player:1",
+    "provenance": {
+      "demoSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "observationArtifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "observationSchemaVersion": 1,
+      "configSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  },
+  "input": [
+    {
+      "tick": 100,
+      "timeSeconds": { "availability": "observed", "value": 1 },
+      "eyeAngles": {
+        "availability": "observed",
+        "value": { "pitch": 0, "yaw": 0 }
+      },
+      "playerPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 0, "z": 0 }
+      },
+      "targetPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 100, "z": 0 }
+      },
+      "shot": { "availability": "observed", "value": false },
+      "targetVisible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetAudible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetPreviouslyKnown": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      }
+    },
+    {
+      "tick": 101,
+      "timeSeconds": { "availability": "observed", "value": 1.01 },
+      "eyeAngles": {
+        "availability": "observed",
+        "value": { "pitch": 0, "yaw": 10 }
+      },
+      "playerPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 0, "z": 0 }
+      },
+      "targetPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 100, "z": 0 }
+      },
+      "shot": { "availability": "observed", "value": false },
+      "targetVisible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetAudible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetPreviouslyKnown": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      }
+    },
+    {
+      "tick": 102,
+      "timeSeconds": { "availability": "observed", "value": 1.02 },
+      "eyeAngles": {
+        "availability": "observed",
+        "value": { "pitch": 0, "yaw": 90 }
+      },
+      "playerPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 0, "z": 0 }
+      },
+      "targetPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 100, "z": 0 }
+      },
+      "shot": { "availability": "observed", "value": true },
+      "targetVisible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetAudible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetPreviouslyKnown": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      }
+    },
+    {
+      "tick": 103,
+      "timeSeconds": { "availability": "observed", "value": 1.03 },
+      "eyeAngles": {
+        "availability": "observed",
+        "value": { "pitch": 0, "yaw": 89 }
+      },
+      "playerPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 0, "z": 0 }
+      },
+      "targetPosition": {
+        "availability": "observed",
+        "value": { "x": 0, "y": 100, "z": 0 }
+      },
+      "shot": { "availability": "observed", "value": false },
+      "targetVisible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetAudible": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      },
+      "targetPreviouslyKnown": {
+        "availability": "unavailable",
+        "reason": "not required by aim detector"
+      }
+    }
+  ]
+}

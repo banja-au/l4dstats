@@ -1,0 +1,132 @@
+{
+  "encounters": [
+    {
+      "evidence": [
+        {
+          "contributionPlaceholder": null,
+          "counterevidence": [
+            "A fast human flick can produce the same local shape."
+          ],
+          "effect": {
+            "baseline": "local movement; candidate floor 700 degrees/second",
+            "unit": "degrees/second",
+            "value": 7999.999999999993
+          },
+          "explanation": "View direction moved 8000.0°/s and ended 0.00° from the selected target near an observed shot.",
+          "id": "aim-dynamics:synthetic-player:1:102",
+          "kind": "aim",
+          "limitations": [
+            "SourceTV quantization and interpolation",
+            "low tick rate",
+            "spectator state is not direct mouse input",
+            "target selection uncertainty"
+          ],
+          "playerEpochId": "synthetic-player:1",
+          "provenance": {
+            "configSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "demoSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "detectorId": "aim-dynamics",
+            "detectorVersion": "1.0.0",
+            "observationArtifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "observationSchemaVersion": 1
+          },
+          "quality": {
+            "basis": [
+              "complete angle/position/time window",
+              "shot timing observed",
+              "server-observed rather than direct input"
+            ],
+            "value": 0.8
+          },
+          "rawFeatures": {
+            "accelerationDegreesPerSecondSquared": 699999.9999999987,
+            "acquisitionSeconds": 0.010000000000000009,
+            "deltaPitchDegrees": 0,
+            "deltaYawDegrees": 80,
+            "jerkDegreesPerSecondCubed": 59999999.99999983,
+            "nearestShotSeconds": 0,
+            "postCorrectionTrackingErrorDegrees": 1,
+            "postMovementErrorDegrees": 0,
+            "preAcquisitionErrorDegrees": 80,
+            "shotWithinWindow": true,
+            "speedDegreesPerSecond": 7999.999999999993
+          },
+          "schemaVersion": 1,
+          "tickRange": {
+            "end": 103,
+            "start": 101
+          }
+        }
+      ],
+      "id": "encounter:synthetic-player:1:aim-dynamics:101",
+      "playerEpochId": "synthetic-player:1",
+      "strongestEffect": {
+        "baseline": "local movement; candidate floor 700 degrees/second",
+        "unit": "degrees/second",
+        "value": 7999.999999999993
+      },
+      "tickRange": {
+        "end": 103,
+        "start": 101
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "contributionPlaceholder": null,
+      "counterevidence": [
+        "A fast human flick can produce the same local shape."
+      ],
+      "effect": {
+        "baseline": "local movement; candidate floor 700 degrees/second",
+        "unit": "degrees/second",
+        "value": 7999.999999999993
+      },
+      "explanation": "View direction moved 8000.0°/s and ended 0.00° from the selected target near an observed shot.",
+      "id": "aim-dynamics:synthetic-player:1:102",
+      "kind": "aim",
+      "limitations": [
+        "SourceTV quantization and interpolation",
+        "low tick rate",
+        "spectator state is not direct mouse input",
+        "target selection uncertainty"
+      ],
+      "playerEpochId": "synthetic-player:1",
+      "provenance": {
+        "configSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "demoSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "detectorId": "aim-dynamics",
+        "detectorVersion": "1.0.0",
+        "observationArtifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "observationSchemaVersion": 1
+      },
+      "quality": {
+        "basis": [
+          "complete angle/position/time window",
+          "shot timing observed",
+          "server-observed rather than direct input"
+        ],
+        "value": 0.8
+      },
+      "rawFeatures": {
+        "accelerationDegreesPerSecondSquared": 699999.9999999987,
+        "acquisitionSeconds": 0.010000000000000009,
+        "deltaPitchDegrees": 0,
+        "deltaYawDegrees": 80,
+        "jerkDegreesPerSecondCubed": 59999999.99999983,
+        "nearestShotSeconds": 0,
+        "postCorrectionTrackingErrorDegrees": 1,
+        "postMovementErrorDegrees": 0,
+        "preAcquisitionErrorDegrees": 80,
+        "shotWithinWindow": true,
+        "speedDegreesPerSecond": 7999.999999999993
+      },
+      "schemaVersion": 1,
+      "tickRange": {
+        "end": 103,
+        "start": 101
+      }
+    }
+  ],
+  "skipped": []
+}

@@ -1,25 +1,21 @@
 {
-  "name": "@witchwatch/cli",
+  "name": "@witchwatch/detectors",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "witchwatch": "./dist/main.js"
+  "exports": {
+    ".": "./src/index.ts"
   },
   "scripts": {
+    "benchmark": "vitest bench --run",
     "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
     "check": "tsc -p tsconfig.json --pretty false",
-    "dev": "tsx src/main.ts",
     "test": "vitest run"
   },
   "dependencies": {
-    "@witchwatch/contracts": "workspace:*",
-    "@witchwatch/demo-source1": "workspace:*",
-    "@witchwatch/detectors": "workspace:*"
+    "@witchwatch/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "24.10.1",
-    "tsx": "4.20.6",
     "vitest": "3.2.4"
   }
 }
