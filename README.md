@@ -126,6 +126,18 @@ pnpm maps:install
 pnpm maps:extract
 ```
 
+On a fresh x86-64 Ubuntu host, the idempotent setup script installs Docker from
+Docker's official apt repository, validates available storage, and runs both
+steps:
+
+```bash
+sudo ./scripts/setup-maps-ubuntu.sh
+```
+
+It is safe to rerun. It preserves the named source-assets and workbench-data
+volumes and never invokes volume cleanup. The resulting BSPs and derived
+geometry remain local to that Ubuntu installation.
+
 This is a substantial optional Steam download. The generated BSPs and geometry
 cache remain inside local named volumes. Extraction writes one analytical mesh
 for all 57 official campaign chapters plus a local `catalog.json`. The
