@@ -6,12 +6,13 @@ const webRoot = fileURLToPath(new URL("..", import.meta.url));
 const distRoot = join(webRoot, "dist");
 const kib = 1024;
 const budgets = {
-  total: 740 * kib,
-  javascript: 314 * kib,
-  css: 76 * kib,
+  total: 1240 * kib,
+  javascript: 320 * kib,
+  css: 86 * kib,
   hero: 230 * kib,
   backdrop: 150 * kib,
   brand: 75 * kib,
+  infected: 480 * kib,
   html: 8 * kib,
 };
 
@@ -45,6 +46,7 @@ const totals = {
   brand: sizeOf((file) =>
     ["art/infected-mark.webp", "favicon.png"].includes(file.path),
   ),
+  infected: sizeOf((file) => file.path.startsWith("art/si/")),
   html: sizeOf((file) => file.extension === ".html"),
 };
 
@@ -61,6 +63,8 @@ if (totals.backdrop === 0)
   );
 if (totals.brand === 0)
   failures.push("brand: expected infected-mark and favicon assets");
+if (measured.filter((file) => file.path.startsWith("art/si/")).length !== 8)
+  failures.push("infected: expected all eight realistic infected portraits");
 
 for (const category of Object.keys(budgets))
   process.stdout.write(

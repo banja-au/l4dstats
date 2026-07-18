@@ -574,6 +574,21 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   ).toBeVisible();
   await expect(page.getByText("Round progression").first()).toBeVisible();
   await expect(page.getByText("MVP unavailable")).toBeVisible();
+  await expect(page.locator(".overview-metrics .mini-bars")).toHaveCount(0);
+  if ((page.viewportSize()?.width ?? 0) > 700) {
+    const finalScoreBounds = await page
+      .locator(".game-result-final")
+      .boundingBox();
+    const firstMapBounds = await page
+      .locator(".map-score-strip > div")
+      .first()
+      .boundingBox();
+    expect(finalScoreBounds).not.toBeNull();
+    expect(firstMapBounds).not.toBeNull();
+    expect(finalScoreBounds!.x + finalScoreBounds!.width).toBeLessThanOrEqual(
+      firstMapBounds!.x + 1,
+    );
+  }
   if ((await page.evaluate(() => window.innerWidth)) <= 700) {
     const overviewMetrics = await page
       .locator(".overview-metrics .stat-card")
@@ -663,20 +678,6 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     page.getByRole("img", { name: /Sampled Survivor health on c2m3_coaster/ }),
   ).toBeVisible();
   await visualAudit(page, "players");
-  await expect(page.getByTitle("Open Steam profile").first()).toHaveAttribute(
-    "href",
-    "https://steamcommunity.com/profiles/76561198000000000",
-  );
-  await page
-    .getByRole("button", { name: "Player 9A72F0", exact: true })
-    .click();
-  const playerDetail = page
-    .locator(".player-drilldowns > details")
-    .filter({ hasText: "Player 9A72F0" })
-    .first();
-  if ((await playerDetail.getAttribute("open")) === null)
-    await playerDetail.locator("summary").click({ force: true });
-  await expect(playerDetail.getByText(/damage to tank/i)).toBeVisible();
   const mapToggle = page.locator(".map-toggle:not(.half-toggle)");
   await mapToggle.locator("summary").click();
   await mapToggle.locator("input").nth(1).uncheck();
@@ -751,6 +752,28 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   await expect(page.locator(".timeline-band.hit").first()).toBeVisible();
   await expect(page.locator(".timeline-band.pin").first()).toBeVisible();
   await expect(page.locator(".timeline-band.tank").first()).toBeVisible();
+  await expect(
+    page.locator('.infected-icon[data-infected-class="Hunter"]').first(),
+  ).toBeVisible();
+  await expect(
+    page.locator(".timeline-lane button.infected-marker").first(),
+  ).not.toContainText("HU");
+  const infectedMarker = page
+    .locator(".timeline-lane button.infected-marker")
+    .first();
+  const infectedMarkerStyle = await infectedMarker.evaluate((element) => {
+    const markerStyle = getComputedStyle(element);
+    const icon = element.querySelector(".infected-icon");
+    const iconStyle = icon ? getComputedStyle(icon) : null;
+    return {
+      background: markerStyle.backgroundColor,
+      iconWidth: iconStyle ? Number.parseFloat(iconStyle.width) : 0,
+      iconHeight: iconStyle ? Number.parseFloat(iconStyle.height) : 0,
+    };
+  });
+  expect(infectedMarkerStyle.background).toBe("rgba(0, 0, 0, 0)");
+  expect(infectedMarkerStyle.iconWidth).toBeGreaterThanOrEqual(28);
+  expect(infectedMarkerStyle.iconHeight).toBeGreaterThanOrEqual(28);
   const firstTimelineMarker = page.locator(".timeline-lane button").first();
   await firstTimelineMarker.click({ force: true });
   await expect(firstTimelineMarker).toHaveAttribute("aria-pressed", "true");
@@ -973,6 +996,27 @@ test("restores a complete grouped game and scopes every tab by enabled maps", as
       historyLength,
     );
   }
+  await page
+    .getByLabel("Statistics sections")
+    .getByRole("button", { name: "players", exact: true })
+    .click();
+  const playerLink = page.locator(".player-name-link").first();
+  await expect(playerLink).toHaveAttribute("href", /\/game\/game-1\/player\//);
+  await expect(
+    page.getByTitle(/Open .* Steam profile/).first(),
+  ).toHaveAttribute(
+    "href",
+    "https://steamcommunity.com/profiles/76561198000000000",
+  );
+  const playerName = (await playerLink.textContent())!.trim();
+  await playerLink.click();
+  await expect(page).toHaveURL(/\/game\/game-1\/player\//);
+  await expect(
+    page.getByRole("heading", { level: 2, name: playerName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("table", { name: "Map contributions" }),
+  ).toBeVisible();
 });
 
 test("moves a single completed upload onto its analysis URL", async ({

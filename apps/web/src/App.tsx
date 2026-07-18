@@ -33,6 +33,9 @@ import { halfScopeKey, scopeDemoStats } from "./demo-scope";
 import { rateGamePlayers } from "./player-rating";
 import { gameCampaignName, orderGameAnalyses } from "./campaign-metadata";
 import { reconstructVersusScores } from "./score-reconstruction";
+import { PlayerProfile } from "./PlayerProfile";
+import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
+import { InfectedIcon } from "./visual";
 
 type UploadItem = {
   key: string;
@@ -62,7 +65,9 @@ const TABS: Tab[] = [
 const analysisRouteParts = () =>
   window.location.pathname.match(/^\/analysis\/([^/]+)(?:\/([^/]+))?\/?$/);
 const gameRouteParts = () =>
-  window.location.pathname.match(/^\/game\/([^/]+)(?:\/([^/]+))?\/?$/);
+  window.location.pathname.match(
+    /^\/game\/([^/]+)(?:\/(overview|players|combat|timeline|signals|quality))?\/?$/,
+  );
 const routeTab = (): Tab => {
   const candidate = gameRouteParts()?.[2] ?? analysisRouteParts()?.[2];
   return TABS.includes(candidate as Tab) ? (candidate as Tab) : "overview";
@@ -109,29 +114,6 @@ function MvpMark() {
   );
 }
 
-function MiniBars({ values }: { values: number[] }) {
-  const max = Math.max(...values, 1);
-  return (
-    <svg
-      className="mini-bars"
-      viewBox={`0 0 ${values.length * 12} 48`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      {values.map((value, index) => (
-        <rect
-          key={index}
-          x={index * 12 + 2}
-          y={48 - (value / max) * 44}
-          width="8"
-          height={(value / max) * 44}
-          rx="2"
-        />
-      ))}
-    </svg>
-  );
-}
-
 function Ring({ value, label }: { value: number; label: string }) {
   const radius = 34;
   const circumference = Math.PI * 2 * radius;
@@ -155,12 +137,18 @@ function Ring({ value, label }: { value: number; label: string }) {
 }
 
 function App() {
+  const requestedPlayerProfile = parsePlayerProfilePath(
+    window.location.pathname,
+  );
   const input = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<UploadItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>(routeTab);
   const [selectedGame, setSelectedGame] = useState<string | null>(
-    gameRouteParts()?.[1] ? decodeURIComponent(gameRouteParts()![1]!) : null,
+    parsePlayerProfilePath(window.location.pathname)?.gameId ??
+      (gameRouteParts()?.[1]
+        ? decodeURIComponent(gameRouteParts()![1]!)
+        : null),
   );
   const [gameConfidence, setGameConfidence] = useState<
     "provisional" | "high" | "unassociated" | null
@@ -278,15 +266,17 @@ function App() {
   }
 
   useEffect(() => {
+    const playerMatch = parsePlayerProfilePath(window.location.pathname);
     const gameMatch = gameRouteParts();
-    if (gameMatch) {
-      const id = decodeURIComponent(gameMatch[1]!);
-      if (!TABS.includes(gameMatch[2] as Tab))
-        window.history.replaceState(
-          {},
-          "",
-          `/game/${encodeURIComponent(id)}/overview`,
-        );
+    if (gameMatch || playerMatch) {
+      const id = playerMatch?.gameId ?? decodeURIComponent(gameMatch![1]!);
+      if (!TABS.includes(gameMatch?.[2] as Tab))
+        if (!playerMatch)
+          window.history.replaceState(
+            {},
+            "",
+            `/game/${encodeURIComponent(id)}/overview`,
+          );
       void workbenchApi.game(id).then(
         (game) => {
           setSelectedGame(game.id);
@@ -476,6 +466,14 @@ function App() {
   const scopedAnalyses = activeEntries.map((entry) => entry.analysis);
   const stats = activeEntries.map((entry) => entry.stats);
   const players = aggregateGamePlayers(stats);
+  const playerProfileRoute = requestedPlayerProfile;
+  const profilePlayer = playerProfileRoute
+    ? players.find((player) => player.id === playerProfileRoute.playerId)
+    : undefined;
+  useEffect(() => {
+    if (profilePlayer && selectedCampaignName)
+      document.title = `${profilePlayer.alias} · ${selectedCampaignName} | L4DStats`;
+  }, [profilePlayer, selectedCampaignName]);
   const scopedRanges = new Map(
     activeEntries.flatMap(({ analysis, stats: value }) => {
       const ranges = value.competitive?.halves.map((half) => half.tickRange);
@@ -889,7 +887,28 @@ function App() {
               </div>
             </div>
 
-            {selectedGame && (
+            {playerProfileRoute && selectedGame && profilePlayer && (
+              <PlayerProfile
+                gameId={selectedGame}
+                player={profilePlayer}
+                players={players}
+                stats={stats}
+                analyses={scopedAnalyses}
+              />
+            )}
+            {playerProfileRoute && !profilePlayer && (
+              <section className="player-profile-missing" role="alert">
+                <h2>Player not found</h2>
+                <p>This identity is not present in the selected game data.</p>
+                <a
+                  href={`/game/${encodeURIComponent(selectedGame ?? playerProfileRoute.gameId)}/players`}
+                >
+                  Back to players
+                </a>
+              </section>
+            )}
+
+            {!playerProfileRoute && selectedGame && (
               <aside className="game-grouping-note">
                 <strong>
                   {gameAnalyses.length} maps grouped as one game
@@ -912,8 +931,9 @@ function App() {
               </aside>
             )}
 
-            {tab === "overview" && (
+            {!playerProfileRoute && tab === "overview" && (
               <Overview
+                gameId={selectedGame}
                 stats={stats}
                 totals={totals}
                 players={players}
@@ -924,25 +944,26 @@ function App() {
                 )}
               />
             )}
-            {tab === "players" && (
+            {!playerProfileRoute && tab === "players" && (
               <Players
+                gameId={selectedGame}
                 players={players}
                 stats={stats}
                 analyses={scopedAnalyses}
                 onOpenTimeline={openTimeline}
               />
             )}
-            {tab === "combat" && (
+            {!playerProfileRoute && tab === "combat" && (
               <Combat
                 stats={stats}
                 analyses={scopedAnalyses}
                 onOpenTimeline={openTimeline}
               />
             )}
-            {tab === "timeline" && (
+            {!playerProfileRoute && tab === "timeline" && (
               <Timeline stats={stats} analyses={scopedAnalyses} />
             )}
-            {tab === "signals" && (
+            {!playerProfileRoute && tab === "signals" && (
               <Signals
                 analyses={scopedAnalyses}
                 stats={stats}
@@ -952,7 +973,7 @@ function App() {
                 }}
               />
             )}
-            {tab === "quality" && (
+            {!playerProfileRoute && tab === "quality" && (
               <Quality stats={stats} analyses={scopedAnalyses} />
             )}
           </section>
@@ -967,13 +988,11 @@ function StatCard({
   label,
   value,
   detail,
-  values,
 }: {
   icon: typeof Activity;
   label: string;
   value: string;
   detail: string;
-  values?: number[];
 }) {
   return (
     <article className="stat-card">
@@ -983,12 +1002,12 @@ function StatCard({
       <span className="stat-label">{label}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
-      {values && <MiniBars values={values} />}
     </article>
   );
 }
 
 function Overview({
+  gameId,
   stats,
   totals,
   players,
@@ -996,6 +1015,7 @@ function Overview({
   scoreStats,
   scoreAnalyses,
 }: {
+  gameId: string | null;
   stats: DemoStats[];
   totals: {
     demos: number;
@@ -1268,6 +1288,18 @@ function Overview({
           <div className="overview-mvp-scores">
             {mvpPlayers.map((player) => (
               <span key={player.playerId}>
+                {gameId &&
+                  (() => {
+                    const statsPlayer = players.find(
+                      (candidate) => candidate.id === player.playerId,
+                    );
+                    return statsPlayer ? (
+                      <PlayerIdentityLinks
+                        gameId={gameId}
+                        player={statsPlayer}
+                      />
+                    ) : null;
+                  })()}
                 <b>{player.rating?.toFixed(2) ?? "N/A"}</b>
                 <small>
                   Survivor {player.survivor.score?.toFixed(2) ?? "N/A"} ·
@@ -1393,35 +1425,24 @@ function Overview({
           label="Play time"
           value={duration(totals.duration)}
           detail={`across ${totals.demos} demo${totals.demos === 1 ? "" : "s"}`}
-          values={stats.map((value) => value.durationSeconds)}
         />
         <StatCard
           icon={Users}
           label="Players"
           value={whole.format(totals.players)}
           detail="unique competitive participants"
-          values={stats.map(
-            (value) =>
-              new Set(
-                value.players.map(
-                  (player) => player.identity?.steamId64 ?? player.id,
-                ),
-              ).size,
-          )}
         />
         <StatCard
           icon={Activity}
           label="Special Infected killed"
           value={whole.format(siKilled)}
           detail="attributed death events"
-          values={stats.map((value) => value.match?.specialInfectedDeaths ?? 0)}
         />
         <StatCard
           icon={ShieldAlert}
           label="Survivor deaths"
           value={whole.format(survivorDeaths)}
           detail="across selected rounds"
-          values={stats.map((value) => value.match?.survivorDeaths ?? 0)}
         />
       </div>
       <div className="overview-summary-grid">
@@ -1435,29 +1456,28 @@ function Overview({
           </div>
           {winningPlayers.length ? (
             <div className="winning-team-list">
-              {winningPlayers.map((player, index) => (
-                <a
-                  href={
-                    player.playerId.match(/^\d{17}$/)
-                      ? `https://steamcommunity.com/profiles/${player.playerId}`
-                      : playersPath
-                  }
-                  target={
-                    player.playerId.match(/^\d{17}$/) ? "_blank" : undefined
-                  }
-                  rel={
-                    player.playerId.match(/^\d{17}$/) ? "noreferrer" : undefined
-                  }
-                  key={player.playerId}
-                >
-                  <i>{index + 1}</i>
-                  <strong>{player.playerAlias}</strong>
-                  <span>
-                    {player.rating?.toFixed(2) ?? "N/A"}
-                    <small>L4DStats</small>
-                  </span>
-                </a>
-              ))}
+              {winningPlayers.map((player, index) => {
+                const statsPlayer = players.find(
+                  (candidate) => candidate.id === player.playerId,
+                );
+                return (
+                  <div className="winning-player-row" key={player.playerId}>
+                    <i>{index + 1}</i>
+                    {gameId && statsPlayer ? (
+                      <PlayerIdentityLinks
+                        gameId={gameId}
+                        player={statsPlayer}
+                      />
+                    ) : (
+                      <a href={playersPath}>{player.playerAlias}</a>
+                    )}
+                    <span>
+                      {player.rating?.toFixed(2) ?? "N/A"}
+                      <small>L4DStats</small>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="muted">
@@ -1528,7 +1548,11 @@ function Overview({
                 award.leaders.map(({ player, value }, index) => (
                   <div key={player.id}>
                     <i>{index + 1}</i>
-                    <strong>{player.alias}</strong>
+                    {gameId ? (
+                      <PlayerIdentityLinks gameId={gameId} player={player} />
+                    ) : (
+                      <strong>{player.alias}</strong>
+                    )}
                     <b>
                       {award.format?.(value) ?? whole.format(value)}
                       <small>{award.unit}</small>
@@ -1686,11 +1710,13 @@ function DistanceProgression({
 }
 
 function Players({
+  gameId,
   players: gamePlayers,
   stats,
   analyses,
   onOpenTimeline,
 }: {
+  gameId: string | null;
   players: PlayerStats[];
   stats: DemoStats[];
   analyses: JobAnalysis[];
@@ -1700,7 +1726,6 @@ function Players({
     "overall" | "survivor" | "infected"
   >("overall");
   const [mapScope, setMapScope] = useState("all");
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const selectedIndexes = analyses.flatMap((analysis, index) =>
     mapScope === "all" || analysis.demoSha256 === mapScope ? [index] : [],
   );
@@ -1713,26 +1738,6 @@ function Players({
       (b.specialInfectedKills ?? 0) - (a.specialInfectedKills ?? 0) ||
       b.sampleCount - a.sampleCount,
   );
-  const selectedPlayer = sorted.find(
-    (player) => player.id === selectedPlayerId,
-  );
-  const mapRowsFor = (player: PlayerStats) =>
-    displayStats.flatMap((demo, demoIndex) => {
-      const local = demo.players.find((candidate) =>
-        player.identity?.steamId64
-          ? candidate.identity?.steamId64 === player.identity.steamId64
-          : player.id === `${demoIndex}:${candidate.id}`,
-      );
-      if (!local) return [];
-      return [
-        {
-          mapName:
-            displayAnalyses[demoIndex]?.engineResult.demo.mapName ??
-            `Map ${demoIndex + 1}`,
-          player: local,
-        },
-      ];
-    });
   const ratings = useMemo(
     () => rateGamePlayers(displayStats, players),
     [displayStats, players],
@@ -1871,7 +1876,7 @@ function Players({
           ))}
         </div>
       </div>
-      <PlayerRatings ratings={ratings} />
+      <PlayerRatings ratings={ratings} gameId={gameId} players={players} />
       <div className="table-wrap consolidated-player-table">
         <table>
           <thead>
@@ -1900,23 +1905,10 @@ function Players({
                   <span className="player-cell">
                     <i>{String(index + 1).padStart(2, "0")}</i>
                     <span>
-                      <button
-                        type="button"
-                        className="player-select"
-                        aria-pressed={selectedPlayer?.id === player.id}
-                        onClick={() => setSelectedPlayerId(player.id)}
-                      >
-                        {player.alias}
-                      </button>
-                      {player.identity?.steamId64 && (
-                        <a
-                          href={player.identity.steamProfileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open Steam profile"
-                        >
-                          {player.identity.steamId64} <ExternalLink />
-                        </a>
+                      {gameId ? (
+                        <PlayerIdentityLinks gameId={gameId} player={player} />
+                      ) : (
+                        <strong>{player.alias}</strong>
                       )}
                       {player.identity?.inference === "unique-slot-v1" && (
                         <small title="The entity slot exposed one unique human identity later in this demo.">
@@ -1948,166 +1940,6 @@ function Players({
           </tbody>
         </table>
       </div>
-      <div className="player-drilldowns">
-        {selectedPlayer &&
-          [selectedPlayer].map((player) => (
-            <details key={`detail-${player.id}`} open>
-              <summary>
-                <span>
-                  <strong>{player.alias}</strong>
-                  <small>
-                    {player.specialInfectedKills ?? 0} SI ·{" "}
-                    {player.checkpointInfectedKills ?? 0} total infected ·{" "}
-                    {duration(player.pinSeconds ?? 0)} pin time
-                  </small>
-                </span>
-                <ChevronDown />
-              </summary>
-              <div className="player-detail-grid">
-                <section className="player-map-breakdown">
-                  <span className="eyebrow">Map contribution</span>
-                  <div className="player-map-table" role="table">
-                    <div role="row" className="player-map-head">
-                      <span role="columnheader">Map</span>
-                      <span role="columnheader">SI</span>
-                      <span role="columnheader">All kills</span>
-                      <span role="columnheader">Revives</span>
-                      <span role="columnheader">SI incaps</span>
-                      <span role="columnheader">Pin</span>
-                      <span role="columnheader">Tracked</span>
-                    </div>
-                    {mapRowsFor(player).map(({ mapName, player: local }) => (
-                      <div role="row" key={mapName}>
-                        <strong role="cell">{mapName}</strong>
-                        <span role="cell">
-                          {local.specialInfectedKills ?? "N/A"}
-                        </span>
-                        <span role="cell">
-                          {local.checkpointInfectedKills ?? "N/A"}
-                        </span>
-                        <span role="cell">{local.revives ?? "N/A"}</span>
-                        <span role="cell">{local.specialIncaps ?? "N/A"}</span>
-                        <span role="cell">
-                          {local.pinSeconds === undefined
-                            ? "N/A"
-                            : duration(local.pinSeconds)}
-                        </span>
-                        <span role="cell">
-                          {duration(local.durationSeconds)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                <section>
-                  <span className="eyebrow">Survivor half</span>
-                  <dl>
-                    <div>
-                      <dt>Special killed</dt>
-                      <dd>{player.specialInfectedKills ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Checkpoint infected kills</dt>
-                      <dd>{player.checkpointInfectedKills ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Deaths</dt>
-                      <dd>{player.survivorDeaths ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Revives</dt>
-                      <dd>{player.revives ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Incaps suffered</dt>
-                      <dd>{player.survivorIncaps ?? "N/A"}</dd>
-                    </div>
-                    <div title="Lower bound from observed network health drops">
-                      <dt>Observed health lost</dt>
-                      <dd>
-                        {whole.format(
-                          Math.round(player.observedHealthLost ?? 0),
-                        )}
-                      </dd>
-                    </div>
-                  </dl>
-                </section>
-                <section>
-                  <span className="eyebrow">Infected half</span>
-                  <dl>
-                    <div>
-                      <dt>Survivors incapped</dt>
-                      <dd>{player.specialIncaps ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>SI deaths</dt>
-                      <dd>{player.infectedDeaths ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Pounces</dt>
-                      <dd>{player.pounces ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Best pounce damage</dt>
-                      <dd>{player.highestPounceDamage ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Longest Jockey ride</dt>
-                      <dd>{player.longestJockeyRide ?? "N/A"}</dd>
-                    </div>
-                    <div>
-                      <dt>Ghost / pin time</dt>
-                      <dd>
-                        {duration(player.ghostSeconds ?? 0)} /{" "}
-                        {duration(player.pinSeconds ?? 0)}
-                      </dd>
-                    </div>
-                  </dl>
-                </section>
-                <section>
-                  <span className="eyebrow">Kill attribution</span>
-                  <div className="attribution-list">
-                    {Object.entries(player.killsByInfectedClass ?? {}).map(
-                      ([name, count]) => (
-                        <span key={name}>
-                          {name}
-                          <b>{count}</b>
-                        </span>
-                      ),
-                    )}
-                    {Object.entries(player.killsByWeapon ?? {}).map(
-                      ([name, count]) => (
-                        <span key={name}>
-                          {name.replaceAll("_", " ")}
-                          <b>{count}</b>
-                        </span>
-                      ),
-                    )}
-                    {!Object.keys(player.killsByWeapon ?? {}).length && (
-                      <em>No attributed kills</em>
-                    )}
-                  </div>
-                </section>
-                <section className="network-counters">
-                  <span className="eyebrow">Checkpoint counters</span>
-                  <div className="counter-grid">
-                    {Object.entries(player.counters ?? {})
-                      .filter(([, value]) => value !== 0)
-                      .map(([name, value]) => (
-                        <span key={name} title={name}>
-                          {counterLabel(name)}
-                          <b>{whole.format(value)}</b>
-                        </span>
-                      ))}
-                    {!Object.values(player.counters ?? {}).some(Boolean) && (
-                      <em>No non-zero checkpoint counters</em>
-                    )}
-                  </div>
-                </section>
-              </div>
-            </details>
-          ))}
-      </div>
       <details className="advanced-player-data">
         <summary>
           <span>
@@ -2135,8 +1967,12 @@ function Players({
 
 function PlayerRatings({
   ratings,
+  gameId,
+  players,
 }: {
   ratings: ReturnType<typeof rateGamePlayers>;
+  gameId: string | null;
+  players: PlayerStats[];
 }) {
   const ranked = [...ratings.players].sort(
     (left, right) =>
@@ -2169,7 +2005,16 @@ function PlayerRatings({
             <summary>
               <i>{String(index + 1).padStart(2, "0")}</i>
               <span>
-                <strong>{player.playerAlias}</strong>
+                {(() => {
+                  const statsPlayer = players.find(
+                    (candidate) => candidate.id === player.playerId,
+                  );
+                  return gameId && statsPlayer ? (
+                    <PlayerIdentityLinks gameId={gameId} player={statsPlayer} />
+                  ) : (
+                    <strong>{player.playerAlias}</strong>
+                  );
+                })()}
                 <small>
                   {player.confidence} confidence · {pct(player.coverage)} model
                   coverage
@@ -4151,19 +3996,17 @@ function Timeline({
     { name: "Deaths + incaps", types: ["death", "incap"] },
     { name: "Support", types: ["revive"] },
   ];
-  const infectedCode = (name?: string) =>
-    (
-      ({
-        Smoker: "SM",
-        Boomer: "BO",
-        Hunter: "HU",
-        Spitter: "SP",
-        Jockey: "JO",
-        Charger: "CH",
-        Tank: "TA",
-        Witch: "WI",
-      }) as Record<string, string>
-    )[name ?? ""];
+  const hasInfectedIcon = (name?: string) =>
+    [
+      "Smoker",
+      "Boomer",
+      "Hunter",
+      "Spitter",
+      "Jockey",
+      "Charger",
+      "Tank",
+      "Witch",
+    ].includes(name ?? "");
   return (
     <div
       className={`tab-panel timeline-panel ${fullscreen ? "is-fullscreen" : ""}`}
@@ -4446,7 +4289,9 @@ function Timeline({
                                 </span>
                               ))}
                               {packed.map(({ event, key, position, row }) => {
-                                const code = infectedCode(event.infectedClass);
+                                const infectedMarker = hasInfectedIcon(
+                                  event.infectedClass,
+                                );
                                 const time =
                                   source.demo.tickRate === null
                                     ? "time unavailable"
@@ -4454,7 +4299,7 @@ function Timeline({
                                 return (
                                   <button
                                     key={key}
-                                    className={`${event.type} ${active?.key === key ? "active" : ""} ${code ? "infected-marker" : ""}`}
+                                    className={`${event.type} ${active?.key === key ? "active" : ""} ${infectedMarker ? "infected-marker" : ""}`}
                                     style={{
                                       left: `${position}%`,
                                       top: `${17 + bandArea + row * 42}px`,
@@ -4501,7 +4346,13 @@ function Timeline({
                                     aria-label={`${source.mapName}, tick ${event.tick}, ${event.type.replaceAll("_", " ")}: ${event.detail}`}
                                   >
                                     <b>
-                                      {code ?? event.type.replaceAll("_", " ")}
+                                      {infectedMarker && event.infectedClass ? (
+                                        <InfectedIcon
+                                          infectedClass={event.infectedClass}
+                                        />
+                                      ) : (
+                                        event.type.replaceAll("_", " ")
+                                      )}
                                     </b>
                                     {(event.actor || event.subject) && (
                                       <small>

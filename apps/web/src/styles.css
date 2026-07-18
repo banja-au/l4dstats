@@ -37,6 +37,230 @@
 * {
   box-sizing: border-box;
 }
+
+.player-identity-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 0;
+}
+.player-name-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+.player-name-link:hover,
+.player-name-link:focus-visible {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.steam-profile-link {
+  display: inline-grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 3%);
+}
+.steam-profile-link:hover,
+.steam-profile-link:focus-visible {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.steam-profile-link svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: currentColor;
+}
+
+.player-profile-page {
+  display: grid;
+  gap: clamp(1rem, 2vw, 1.75rem);
+  padding-block: 0.75rem 2rem;
+}
+.player-profile-back {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-weight: 650;
+  text-decoration: none;
+}
+.player-profile-back:hover,
+.player-profile-back:focus-visible {
+  color: var(--green);
+}
+.player-profile-back svg {
+  width: 1rem;
+}
+.player-profile-hero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 85% 0, rgb(167 255 56 / 12%), transparent 38%),
+    var(--panel);
+}
+.player-profile-hero h2 {
+  margin: 0.25rem 0 0.35rem;
+  font-size: clamp(2rem, 6vw, 4.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+.player-profile-identity .player-name-link {
+  display: none;
+}
+.player-profile-rating {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+.player-profile-rating > span,
+.player-profile-rating small {
+  color: var(--muted);
+}
+.player-profile-rating strong {
+  color: var(--green);
+  font-size: clamp(2.4rem, 7vw, 5rem);
+  line-height: 0.95;
+}
+.player-profile-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+.player-profile-kpis article {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--panel);
+}
+.player-profile-kpis svg {
+  width: 1.1rem;
+  color: var(--green);
+  flex: 0 0 auto;
+}
+.player-profile-kpis span {
+  display: grid;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.player-profile-kpis strong {
+  color: var(--ink);
+  font-size: 1.3rem;
+}
+.player-profile-section {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.player-profile-section h3 {
+  margin: 0.15rem 0 1rem;
+}
+.player-profile-map-table {
+  overflow-x: auto;
+}
+.player-profile-map-table > div {
+  display: grid;
+  min-width: 650px;
+  grid-template-columns: minmax(190px, 2fr) repeat(5, minmax(76px, 1fr));
+  border-top: 1px solid var(--line);
+}
+.player-profile-map-table span,
+.player-profile-map-table strong {
+  padding: 0.72rem 0.5rem;
+}
+.player-profile-map-head {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.player-profile-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.player-profile-section dl {
+  margin: 0;
+}
+.player-profile-section dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--line);
+}
+.player-profile-section dt {
+  color: var(--muted);
+}
+.player-profile-section dd {
+  margin: 0;
+  font-weight: 700;
+}
+.player-profile-counters {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.player-profile-counters summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.player-profile-counters > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.player-profile-counters span {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem;
+  background: var(--panel-2);
+}
+.player-profile-counters small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.player-profile-missing {
+  padding: 3rem;
+  text-align: center;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+@media (max-width: 760px) {
+  .player-profile-hero {
+    align-items: start;
+    flex-direction: column;
+  }
+  .player-profile-rating {
+    justify-items: start;
+    text-align: left;
+  }
+  .player-profile-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .player-profile-kpis article:last-child {
+    grid-column: 1 / -1;
+  }
+  .player-profile-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
 html {
   scroll-behavior: smooth;
 }
@@ -671,7 +895,7 @@ main {
 }
 .game-result {
   display: grid;
-  grid-template-columns: minmax(260px, 0.34fr) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 0.34fr) minmax(0, 1fr);
   margin-bottom: 12px;
   border: 1px solid var(--line);
   border-left: 4px solid var(--green);
@@ -688,9 +912,10 @@ main {
   display: flex;
   gap: 12px;
   align-items: baseline;
-  font-size: clamp(42px, 5vw, 70px);
-  line-height: 0.9;
-  letter-spacing: -0.08em;
+  min-width: 0;
+  font-size: clamp(36px, 4vw, 56px);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
 }
 .game-result-final > strong i {
   color: var(--subtle);
@@ -925,11 +1150,8 @@ main {
   font-size: 11px;
   margin-top: 2px;
 }
-.mini-bars {
-  height: 35px;
-  width: 100%;
-  margin-top: auto;
-  fill: rgba(167, 255, 56, 0.32);
+.overview-metrics .stat-card {
+  min-height: 154px;
 }
 .overview-grid,
 .overview-summary-grid,
@@ -946,7 +1168,7 @@ main {
   display: grid;
   gap: 7px;
 }
-.winning-team-list a {
+.winning-player-row {
   display: grid;
   grid-template-columns: 32px 1fr auto;
   align-items: center;
@@ -962,9 +1184,14 @@ main {
     border-color 160ms ease,
     background 160ms ease;
 }
-.winning-team-list a:hover {
+.winning-player-row:hover {
   border-color: rgba(167, 255, 56, 0.35);
   background: #131d17;
+}
+.winning-player-row > a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
 }
 .winning-team-list i {
   color: var(--subtle);
@@ -2908,10 +3135,14 @@ td small {
   outline: none;
 }
 .timeline-lane button.infected-marker {
-  min-width: 34px;
-  width: 34px;
-  border-color: #7d9a86;
-  background: radial-gradient(circle at 35% 30%, #33483a, #101812 72%);
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  border-color: transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #c9f47d;
+  box-shadow: none;
 }
 .timeline-lane button.death,
 .timeline-lane button.clear {
@@ -2935,6 +3166,9 @@ td small {
 .timeline-lane button.witch_end {
   background: #d58cff;
 }
+.timeline-lane button.infected-marker {
+  background: transparent;
+}
 .timeline-lane button.active {
   z-index: 5;
   transform: translateX(-50%) scale(1.25);
@@ -2951,9 +3185,35 @@ td small {
   letter-spacing: 0.04em;
 }
 .timeline-lane button.infected-marker > b {
+  display: grid;
+  height: 100%;
   padding: 0;
-  font-size: 11px;
-  text-align: center;
+  place-items: center;
+}
+.timeline-lane button.infected-marker .infected-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 0 #020503)
+    drop-shadow(0 2px 3px rgba(0, 0, 0, 0.92));
+}
+.timeline-lane button.infected-marker[data-timeline-active="true"],
+.timeline-lane button.infected-marker:hover,
+.timeline-lane button.infected-marker:focus-visible {
+  color: #edffc9;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 0 7px rgba(167, 255, 56, 0.5));
+}
+.timeline-lane button.infected-marker:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.timeline-lane button.infected-marker > small {
+  top: 37px;
 }
 .timeline-lane button > small {
   position: absolute;
