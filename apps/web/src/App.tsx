@@ -712,7 +712,15 @@ function App() {
               </span>
             </a>
             <div>
-              <span>ANALYSIS COMPLETE</span>
+              <span className="results-kicker">
+                ANALYSIS COMPLETE
+                <span className="results-parser-help">
+                  <HeaderHelp
+                    label="Parser provenance"
+                    description={parserProvenance}
+                  />
+                </span>
+              </span>
               <h1>
                 {selectedGame
                   ? (selectedCampaignName ??
@@ -731,12 +739,6 @@ function App() {
             </button>
           </div>
           <section className="results">
-            <aside className="legacy-analysis" aria-label="Parser provenance">
-              <div>
-                <strong>Parser provenance</strong>
-                <span>{parserProvenance}</span>
-              </div>
-            </aside>
             {(hasLegacyAnalysis || hasOutdatedCompetitive) && (
               <aside className="legacy-analysis" role="status">
                 <div>

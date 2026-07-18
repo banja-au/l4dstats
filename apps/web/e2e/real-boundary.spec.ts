@@ -45,7 +45,11 @@ test("uploads and analyzes real demos through the browser, API, worker, and stor
   await expect(page.getByRole("button", { name: "players" })).toBeVisible({
     timeout: 10 * 60_000,
   });
-  await expect(page.getByLabel("Parser provenance")).toContainText(
+  const parserProvenance = page.getByRole("button", {
+    name: /Parser provenance:/,
+  });
+  await parserProvenance.hover();
+  await expect(page.getByRole("tooltip")).toContainText(
     /Rust native \d+\.\d+\.\d+ · build [a-f0-9]{8}/,
   );
   const parserAttestations = await page.evaluate(async () => {

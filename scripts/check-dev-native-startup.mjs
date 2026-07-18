@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const compose = readFileSync("compose.yaml", "utf8");
 const dockerfile = readFileSync("Dockerfile.dev", "utf8");
+const prepareScript = readFileSync("scripts/prepare-native-parser.sh", "utf8");
 
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
@@ -35,5 +36,9 @@ for (const obsolete of [
 requireCondition(
   dockerfile.includes("COPY scripts/prepare-native-parser.sh"),
   "development image must include the native preparation contract",
+);
+requireCondition(
+  prepareScript.includes('export PATH="${native_cargo_home}/bin:${PATH}"'),
+  "native preparation must restore Cargo after login-shell PATH replacement",
 );
 process.stdout.write("Development native parser startup contract passed.\n");
