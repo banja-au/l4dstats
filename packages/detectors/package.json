@@ -4,13 +4,17 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "production": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "benchmark": "vitest bench --run",
     "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
     "check": "tsc -p tsconfig.json --pretty false",
-    "test": "vitest run"
+    "test": "vitest run --maxWorkers=1",
+    "test:real": "WITCHWATCH_REAL_CORPUS=1 vitest run src/real-evidence.test.ts --pool=forks --maxWorkers=1"
   },
   "dependencies": {
     "@witchwatch/contracts": "workspace:*",
@@ -18,6 +22,6 @@
   },
   "devDependencies": {
     "@witchwatch/demo-source1": "workspace:*",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   }
 }

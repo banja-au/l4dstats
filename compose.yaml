@@ -6,10 +6,18 @@ services:
     command: bash -lc "pnpm install --frozen-lockfile && pnpm --filter @witchwatch/api dev"
     environment: &workbench-environment
       CI: "true"
+      TURBO_TELEMETRY_DISABLED: "1"
       WITCHWATCH_DB: /var/lib/witchwatch/workbench.sqlite
+      WITCHWATCH_UPLOAD_ROOT: /var/lib/witchwatch/uploads
+      WITCHWATCH_GEOMETRY_ROOT: /var/lib/witchwatch/geometry
       WITCHWATCH_LOCAL_ROOTS: /data/inbox
       WITCHWATCH_ALLOWED_HOSTS: cedapug.com
-      WITCHWATCH_SEED_EXAMPLE: "true"
+      WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}
+      WITCHWATCH_AUTH_FAILURE_LIMIT: "20"
+      WITCHWATCH_AUTH_FAILURE_WINDOW_MS: "300000"
+      WITCHWATCH_MUTATION_RATE_LIMIT: "120"
+      WITCHWATCH_MUTATION_RATE_WINDOW_MS: "60000"
+      WITCHWATCH_SEED_EXAMPLE: "false"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8787/health"]
       interval: 3s
@@ -17,7 +25,7 @@ services:
       retries: 20
     init: true
     ports:
-      - "8787:8787"
+      - "0.0.0.0:8787:8787"
     volumes: &workspace-volumes
       - .:/workspace
       - pnpm-store:/pnpm/store
@@ -31,10 +39,12 @@ services:
       - demo-source1-node-modules:/workspace/packages/demo-source1/node_modules
       - detectors-node-modules:/workspace/packages/detectors/node_modules
       - geometry-node-modules:/workspace/packages/geometry/node_modules
+      - map-source1-node-modules:/workspace/packages/map-source1/node_modules
       - l4d2-schema-node-modules:/workspace/packages/l4d2-schema/node_modules
       - scoring-node-modules:/workspace/packages/scoring/node_modules
       - storage-node-modules:/workspace/packages/storage/node_modules
       - workbench-data:/var/lib/witchwatch
+      - l4d2-server-assets:/opt/l4d2
       - ./data/sprint-1-corpus/extracted:/data/inbox:ro
 
   worker:
@@ -59,13 +69,18 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        restart: true
     environment:
       CI: "true"
+      TURBO_TELEMETRY_DISABLED: "1"
       CHOKIDAR_USEPOLLING: "true"
       WITCHWATCH_API_URL: http://api:8787
+      WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}
+      WITCHWATCH_WEB_USERNAME: ${WITCHWATCH_WEB_USERNAME:-}
+      WITCHWATCH_WEB_PASSWORD: ${WITCHWATCH_WEB_PASSWORD:-}
     init: true
     ports:
-      - "5173:5173"
+      - "0.0.0.0:5173:5173"
     volumes: *workspace-volumes
 
   reference:
@@ -81,6 +96,39 @@ services:
     init: true
     volumes: *workspace-volumes
 
+  maps-install:
+    profiles: ["maps"]
+    image: steamcmd/steamcmd@sha256:5a8173f2e8d3e871a01509096e492f639e428879719eb7b33c219478d9c30f3e
+    platform: linux/amd64
+    command:
+      [
+        "+force_install_dir",
+        "/opt/l4d2",
+        "+login",
+        "anonymous",
+        "+app_update",
+        "222860",
+        "validate",
+        "+quit",
+      ]
+    volumes:
+      - l4d2-server-assets:/opt/l4d2
+
+  maps-extract:
+    profiles: ["maps"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command:
+      [
+        "bash",
+        "-lc",
+        'pnpm install --frozen-lockfile && manifest=/opt/l4d2/steamapps/appmanifest_222860.acf; args=(/opt/l4d2 /var/lib/witchwatch/geometry); [[ ! -f "$$manifest" ]] || args+=("$$manifest"); pnpm --filter @witchwatch/map-source1 extract-installation "$${args[@]}"',
+      ]
+    environment:
+      CI: "true"
+    volumes: *workspace-volumes
+
 volumes:
   pnpm-store:
   root-node-modules:
@@ -91,9 +139,11 @@ volumes:
   demo-source1-node-modules:
   detectors-node-modules:
   geometry-node-modules:
+  map-source1-node-modules:
   l4d2-schema-node-modules:
   scoring-node-modules:
   api-node-modules:
   worker-node-modules:
   storage-node-modules:
   workbench-data:
+  l4d2-server-assets:

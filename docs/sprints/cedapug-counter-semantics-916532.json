@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-07-18",
+  "gameId": 916532,
+  "source": {
+    "statsUrl": "https://cedapug.com/stats?export=1&gameid=916532",
+    "statsSha256": "5663c1c7a56c66878c0b72af66e557d4c05b54b8f3822fd01002820352546d83"
+  },
+  "maps": [
+    {
+      "map": "c8m1_apartment",
+      "demoSha256": "29a01c50379ab0b631861bcdbd7e91f86cd0374f9d917e00dcbaab347c41cf2c"
+    },
+    {
+      "map": "c8m2_subway",
+      "demoSha256": "f0631582fec956a27e67c2bf6758db5a519b4863ecda25e4e18dc73082de7b20"
+    },
+    {
+      "map": "c8m3_sewers",
+      "demoSha256": "2d1b6e6039ab9e7477c745e665ea788cbeaccada65408b8f9e97134a350d0947"
+    }
+  ],
+  "participants": [
+    {
+      "id": "participant-1",
+      "checkpointInfectedKills": 70,
+      "attributedSiKills": 5,
+      "cedapugGunCommonKills": 65,
+      "excess": 5,
+      "excessEqualsAttributedSiKills": true,
+      "checkpointPillsUsed": 3,
+      "cedapugPillsUsed": 3,
+      "checkpointMeleeKills": 18,
+      "cedapugMeleeCommonKills": 17
+    },
+    {
+      "id": "participant-2",
+      "checkpointInfectedKills": 190,
+      "attributedSiKills": 24,
+      "cedapugGunCommonKills": 166,
+      "excess": 24,
+      "excessEqualsAttributedSiKills": true,
+      "checkpointPillsUsed": 3,
+      "cedapugPillsUsed": 3,
+      "checkpointMeleeKills": 27,
+      "cedapugMeleeCommonKills": 27
+    },
+    {
+      "id": "participant-3",
+      "checkpointInfectedKills": 172,
+      "attributedSiKills": 18,
+      "cedapugGunCommonKills": 154,
+      "excess": 18,
+      "excessEqualsAttributedSiKills": true,
+      "checkpointPillsUsed": 3,
+      "cedapugPillsUsed": 3,
+      "checkpointMeleeKills": 20,
+      "cedapugMeleeCommonKills": 20
+    },
+    {
+      "id": "participant-4",
+      "checkpointInfectedKills": 61,
+      "attributedSiKills": 5,
+      "cedapugGunCommonKills": 56,
+      "excess": 5,
+      "excessEqualsAttributedSiKills": true,
+      "checkpointPillsUsed": 1,
+      "cedapugPillsUsed": 1,
+      "checkpointMeleeKills": 0,
+      "cedapugMeleeCommonKills": 0
+    },
+    {
+      "id": "participant-5",
+      "checkpointInfectedKills": 235,
+      "attributedSiKills": 19,
+      "cedapugGunCommonKills": 216,
+      "excess": 19,
+      "excessEqualsAttributedSiKills": true,
+      "checkpointPillsUsed": 1,
+      "cedapugPillsUsed": 1,
+      "checkpointMeleeKills": 13,
+      "cedapugMeleeCommonKills": 13
+    },
+    {
+      "id": "participant-6",
+      "checkpointInfectedKills": 90,
+      "attributedSiKills": 11,
+      "cedapugGunCommonKills": 78,
+      "excess": 12,
+      "excessEqualsAttributedSiKills": false,
+      "checkpointPillsUsed": 1,
+      "cedapugPillsUsed": 1,
+      "checkpointMeleeKills": 4,
+      "cedapugMeleeCommonKills": 4
+    },
+    {
+      "id": "participant-7",
+      "checkpointInfectedKills": 86,
+      "attributedSiKills": 10,
+      "cedapugGunCommonKills": 69,
+      "excess": 17,
+      "excessEqualsAttributedSiKills": false,
+      "checkpointPillsUsed": 0,
+      "cedapugPillsUsed": 0,
+      "checkpointMeleeKills": 0,
+      "cedapugMeleeCommonKills": 0
+    },
+    {
+      "id": "participant-8",
+      "checkpointInfectedKills": 129,
+      "attributedSiKills": 17,
+      "cedapugGunCommonKills": 112,
+      "excess": 17,
+      "excessEqualsAttributedSiKills": true,
+      "checkpointPillsUsed": 4,
+      "cedapugPillsUsed": 4,
+      "checkpointMeleeKills": 7,
+      "cedapugMeleeCommonKills": 7
+    }
+  ],
+  "summary": {
+    "participants": 8,
+    "checkpointKillExcessEqualsAttributedSiKills": 6,
+    "pillsExact": 8,
+    "meleeExact": 7,
+    "maximumMeleeDifference": 1
+  },
+  "conclusions": [
+    "m_checkpointZombieKills includes Special Infected and is not a Common Infected counter.",
+    "Incomplete SourceTV SI death attribution prevents a safe Common Infected total by subtraction.",
+    "m_checkpointPillsUsed matched the independently exported plugin value for all eight participants.",
+    "m_checkpointMeleeKills remains broadly scoped melee kills, not melee Common Infected kills."
+  ]
+}

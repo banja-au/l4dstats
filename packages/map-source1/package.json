@@ -1,0 +1,32 @@
+{
+  "name": "@witchwatch/map-source1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "production": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "check": "tsc -p tsconfig.json --pretty false",
+    "test": "vitest run",
+    "extract": "tsx src/extract.ts",
+    "extract-all": "tsx src/extract-directory.ts",
+    "extract-installation": "tsx src/extract-installation.ts",
+    "validate-installation": "tsx src/validate-installation.ts",
+    "validate-demo-alignment": "tsx src/validate-demo-alignment.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.21.0",
+    "vitest": "3.2.6"
+  },
+  "dependencies": {
+    "@napi-rs/lzma": "1.5.1",
+    "@witchwatch/demo-source1": "workspace:*",
+    "@witchwatch/l4d2-schema": "workspace:*"
+  }
+}

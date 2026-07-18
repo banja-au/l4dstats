@@ -1,4 +1,5 @@
 import type { DemoDecodeResult } from "@witchwatch/demo-source1";
+import { createHash } from "node:crypto";
 
 export interface DemoInspection {
   readonly schemaVersion: 1;
@@ -16,7 +17,12 @@ export interface DemoInspection {
     | "playbackFrames"
     | "signonLength"
   >;
+  readonly headerLabelSha256: {
+    readonly serverName: string;
+    readonly clientName: string;
+  };
   readonly commandCounts: Readonly<Record<string, number>>;
+  readonly commandSequenceSha256: string;
   readonly issues: DemoDecodeResult["issues"];
   readonly telemetryAvailability: {
     readonly playerIdentity: "not-evaluated-by-lightweight-inspect";
@@ -52,11 +58,26 @@ export const summarizeDemo = (
       playbackFrames: result.header.playbackFrames,
       signonLength: result.header.signonLength,
     },
+    headerLabelSha256: {
+      serverName: createHash("sha256")
+        .update(result.header.serverName)
+        .digest("hex"),
+      clientName: createHash("sha256")
+        .update(result.header.clientName)
+        .digest("hex"),
+    },
     commandCounts: Object.fromEntries(
       Object.entries(commandCounts).sort(([left], [right]) =>
         left.localeCompare(right),
       ),
     ),
+    commandSequenceSha256: createHash("sha256")
+      .update(
+        result.frames
+          .map((frame) => `${frame.tick ?? "null"}\t${frame.kind}\n`)
+          .join(""),
+      )
+      .digest("hex"),
     issues: result.issues,
     telemetryAvailability: {
       playerIdentity: "not-evaluated-by-lightweight-inspect",

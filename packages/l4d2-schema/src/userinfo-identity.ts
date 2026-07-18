@@ -9,7 +9,7 @@ import {
   unwrapL4d2StringTableData,
   type DemoStringTable,
 } from "@witchwatch/demo-source1";
-import type { ProjectableUserInfo } from "./entity-projection";
+import type { ProjectableUserInfo } from "./entity-projection.js";
 
 export interface UserInfoPrivacyOptions {
   /** Secret deployment/review key. It is never included in returned data. */
@@ -18,7 +18,20 @@ export interface UserInfoPrivacyOptions {
 
 export interface UserInfoProjectionResult {
   readonly mappings: readonly ProjectableUserInfo[];
+  /** Display identity is kept separate from the privacy-safe join mapping. */
+  readonly displayIdentities: readonly DisplayUserInfoIdentity[];
   readonly rejectedEntries: number;
+}
+
+export interface DisplayUserInfoIdentity {
+  readonly entityIndex: number;
+  readonly userInfoSlot: number;
+  readonly userId: number;
+  readonly effectiveTick?: number;
+  readonly displayName: string;
+  readonly fakePlayer: boolean;
+  /** Decimal SteamID64 suitable for a steamcommunity.com/profiles URL. */
+  readonly steamId64?: string;
 }
 
 /** Collects privacy-safe, tick-timed initial and dynamic userinfo mappings. */
@@ -29,7 +42,9 @@ export function collectL4d2UserInfoTimeline(
   const demo = decodeDemo(bytes);
   const key = keyBytes(options.pseudonymKey);
   const mappings: ProjectableUserInfo[] = [];
+  const displayIdentities: DisplayUserInfoIdentity[] = [];
   let snapshotMappings: readonly ProjectableUserInfo[] = [];
+  let snapshotDisplayIdentities: readonly DisplayUserInfoIdentity[] = [];
   const touchedSlots = new Set<number>();
   let rejectedEntries = 0;
   const schemas: Array<{
@@ -50,6 +65,7 @@ export function collectL4d2UserInfoTimeline(
       options,
     );
     snapshotMappings = initial.mappings;
+    snapshotDisplayIdentities = initial.displayIdentities;
     rejectedEntries += initial.rejectedEntries;
   }
   for (const frame of demo.frames) {
@@ -85,6 +101,7 @@ export function collectL4d2UserInfoTimeline(
           frame.tick ?? 0,
           key,
           mappings,
+          displayIdentities,
           () => rejectedEntries++,
           false,
           false,
@@ -109,6 +126,7 @@ export function collectL4d2UserInfoTimeline(
           frame.tick ?? 0,
           key,
           mappings,
+          displayIdentities,
           () => rejectedEntries++,
           true,
           true,
@@ -128,7 +146,23 @@ export function collectL4d2UserInfoTimeline(
       `${mapping.entityIndex}:${mapping.effectiveTick ?? "initial"}`,
       mapping,
     );
-  return { mappings: [...deduplicated.values()], rejectedEntries };
+  const reconciledDisplay = [
+    ...snapshotDisplayIdentities
+      .filter(({ userInfoSlot }) => !touchedSlots.has(userInfoSlot))
+      .map((identity) => ({ ...identity, effectiveTick: 0 })),
+    ...displayIdentities,
+  ];
+  const displayDeduplicated = new Map<string, DisplayUserInfoIdentity>();
+  for (const identity of reconciledDisplay)
+    displayDeduplicated.set(
+      `${identity.entityIndex}:${identity.effectiveTick ?? "initial"}`,
+      identity,
+    );
+  return {
+    mappings: [...deduplicated.values()],
+    displayIdentities: [...displayDeduplicated.values()],
+    rejectedEntries,
+  };
 }
 
 /** Applies the no-time-travel policy used for final demo snapshots. */
@@ -151,6 +185,7 @@ function applyTimedChanges(
   tick: number,
   key: Uint8Array,
   output: ProjectableUserInfo[],
+  displayOutput: DisplayUserInfoIdentity[],
   reject: () => void,
   clearMissingData: boolean,
   emit: boolean,
@@ -181,6 +216,17 @@ function applyTimedChanges(
           ? { stableIdentityToken: token(identity.steamId64, key) }
           : {}),
       });
+      displayOutput.push({
+        entityIndex: change.entryIndex + 1,
+        userInfoSlot: change.entryIndex,
+        userId: identity.userId,
+        effectiveTick: tick,
+        displayName: identity.displayName,
+        fakePlayer: identity.fakePlayer,
+        ...(!identity.fakePlayer && identity.steamId64 !== 0n
+          ? { steamId64: identity.steamId64.toString(10) }
+          : {}),
+      });
     } catch {
       reject();
     }
@@ -200,9 +246,10 @@ export function projectUserInfoIdentities(
   options: UserInfoPrivacyOptions,
 ): UserInfoProjectionResult {
   if (!table || table.name !== "userinfo")
-    return { mappings: [], rejectedEntries: 0 };
+    return { mappings: [], displayIdentities: [], rejectedEntries: 0 };
   const key = keyBytes(options.pseudonymKey);
   const mappings: ProjectableUserInfo[] = [];
+  const displayIdentities: DisplayUserInfoIdentity[] = [];
   let rejectedEntries = 0;
   for (let slot = 0; slot < table.entries.length; slot += 1) {
     const data = table.entries[slot]?.data;
@@ -219,11 +266,21 @@ export function projectUserInfoIdentities(
         userId: identity.userId,
         ...(stableIdentityToken === undefined ? {} : { stableIdentityToken }),
       });
+      displayIdentities.push({
+        entityIndex: slot + 1,
+        userInfoSlot: slot,
+        userId: identity.userId,
+        displayName: identity.displayName,
+        fakePlayer: identity.fakePlayer,
+        ...(!identity.fakePlayer && identity.steamId64 !== 0n
+          ? { steamId64: identity.steamId64.toString(10) }
+          : {}),
+      });
     } catch {
       rejectedEntries += 1;
     }
   }
-  return { mappings, rejectedEntries };
+  return { mappings, displayIdentities, rejectedEntries };
 }
 
 const token = (steamId: bigint, key: Uint8Array): string =>

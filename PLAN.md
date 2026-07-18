@@ -10,7 +10,7 @@ Every sprint runs unit, contract, integration, corruption/adversarial, and end-t
 
 ---
 
-## Sprint 1 — Prove the telemetry
+## Sprint 1: Prove the telemetry
 
 **Outcome:** deterministically turn heterogeneous CEDAPug archives into validated player/tick observations, or make a documented parser pivot.
 
@@ -31,7 +31,7 @@ All ten demos recover stable player epochs, core events, positions, eye angles, 
 
 ---
 
-## Sprint 2 — Build an evidence engine
+## Sprint 2: Build an evidence engine
 
 **Outcome:** emit explainable, independently testable evidence windows without claiming a probability.
 
@@ -52,7 +52,7 @@ Every detector produces tick range, raw features, effect size/contribution place
 
 ---
 
-## Sprint 3 — Calibrate across demos
+## Sprint 3: Calibrate across demos
 
 **Outcome:** turn evidence into an honest, measured review priority with an insufficient-data state.
 
@@ -75,7 +75,7 @@ A held-out evaluation supports at least one useful review operating point with a
 
 ---
 
-## Sprint 4 — Ship the review workbench
+## Sprint 4: Ship the review workbench
 
 **Outcome:** a reviewer can ingest, triage, inspect, annotate, compare, and export a reproducible case locally.
 
@@ -98,9 +98,30 @@ From an allowlisted URL or local file, a reviewer reaches any finding, sees five
 
 ---
 
-## Sprint 5 — Harden and validate in shadow mode
+## Sprint 5: Harden and validate in shadow mode
 
 **Outcome:** prove operational safety and scientific stability before any real moderation workflow relies on the tool.
+
+**Status:** active. Local checksum-backed backup/restore tooling, a
+non-overlapping single-worker execution guard, API bearer authentication,
+single- and multi-user web authentication, role enforcement, identity-aware
+mutation quotas and auth-failure limiting,
+compiled production services, a hardened static/proxy server, transactional
+retention, checksummed backup/restore tooling, a pinned production Compose
+stack and a clean dependency audit are implemented. Database readiness, worker
+liveness, a compiled-stack failure-propagation test and an incident-response
+runbook and automated recovery drill are also implemented. The parser now runs
+as a direct compiled process with a minimal environment, output/time limits,
+Linux rlimits, Node permissions, a fail-closed no-network seccomp launcher and
+process-group TERM-to-KILL cleanup; the production container is read-only and
+capability-free. A live Docker restore drill, hosted monitoring integration and
+prospective shadow validation remain open. Private production operation is
+supported; public hosted readiness remains withheld pending those live drills
+and an external identity/monitoring layer.
+
+Independent outer framing is now validated: pinned UntitledParser matched all
+22 current SourceTV demos across 231,337 commands, including exact command
+order and ticks. Licensed selected-tick player-state playback remains open.
 
 ### Parallel tracks
 

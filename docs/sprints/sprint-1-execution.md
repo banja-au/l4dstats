@@ -1,6 +1,6 @@
 # Sprint 1 execution
 
-- Status: complete — feasibility failed at the entity layer and the declared narrow-decoder pivot was approved
+- Status: complete - feasibility failed at the entity layer and the declared narrow-decoder pivot was approved
 - Started from revision: `810230c`
 - Current tested revision: `810230c` plus this uncommitted Sprint 1 diff
 - Selected because: explicitly requested; no prior Sprint 1 report existed
@@ -54,7 +54,7 @@ Ten ignored CEDAPug fixtures total 91,468,097 DEM bytes. The public index contai
 
 Real fixtures falsified the initial generic protocol-4 framing model. L4D2 uses four 76-byte split-screen command-info blocks and a tick-only Stop command without a slot. Correcting those branch rules produced exact EOF traversal for all ten demos: 104,253 frames, 104,183 packets, no outer issues, and one Stop per demo.
 
-`demofile` was rejected as CS:GO-specific. `@nekz/sdp` parsed a real header but failed deterministically when message parsing began. UntitledParser supports basic L4D2 framing but not entities and its published Linux binary is x86_64.
+`demofile` was rejected as CS:GO-specific. `@nekz/sdp` parsed a real header but failed deterministically when message parsing began. UntitledParser supports basic L4D2 framing but not entities. Its published Linux binary is x86_64, but its AnyCPU source later built and ran successfully on Linux arm64.
 
 ## Reproducible evidence
 
@@ -88,6 +88,6 @@ The read-only re-audit independently reproduced that hash, verified formatting a
 
 - Continue Sprint 1 feasibility through NET/SVC messages, tables, event schemas, entities, and projection before Sprint 2.
 - Obtain authorized older-protocol and POV fixtures.
-- Run UntitledParser and licensed L4D2 playback on compatible x86_64 infrastructure for independent selected-tick validation.
+- Licensed L4D2 playback with matching game/map assets remains required for independent selected-tick entity validation. The separate UntitledParser framing gate passed across 22 demos and 231,337 commands on Linux arm64 on 2026-07-18.
 
 Recovery note: later Sprint 2 work completed and independently audited the real-corpus decoder, entity, identity, event, and deterministic-evidence gates. ADR 0003 now permits Sprint 3 development while retaining external comparison as pre-release validation.

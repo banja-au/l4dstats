@@ -11,4 +11,4 @@ pnpm test
 pnpm build
 ```
 
-Security problems—especially unsafe archive handling, identifier exposure, or a way to turn scores into automatic enforcement—should not be filed with real player data. Provide a minimal synthetic reproduction privately to the maintainers once a security channel exists.
+Security problems, especially unsafe archive handling, identifier exposure, or a way to turn scores into automatic enforcement, should not be filed with real player data. Provide a minimal synthetic reproduction privately to the maintainers once a security channel exists.

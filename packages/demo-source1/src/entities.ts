@@ -1,10 +1,10 @@
-import { BitReader } from "./bit-reader";
+import { BitReader } from "./bit-reader.js";
 import {
   SendPropFlag,
   type FlattenedSendProp,
   type FlattenedServerClass,
-} from "./data-tables";
-import type { DemoStringTable } from "./string-tables";
+} from "./data-tables.js";
+import type { DemoStringTable } from "./string-tables.js";
 
 const MAX_EDICTS = 2_048;
 const MAX_STRING_BYTES = 512;

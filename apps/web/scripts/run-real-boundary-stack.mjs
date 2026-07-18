@@ -1,17 +1,24 @@
 import { spawn } from "node:child_process";
-import { rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 const root = process.env.WITCHWATCH_E2E_ROOT;
 if (!root) throw new Error("WITCHWATCH_E2E_ROOT is required");
 process.once("exit", () => rmSync(root, { recursive: true, force: true }));
 const database = `${root}/workbench.sqlite`;
 const artifacts = `${root}/artifacts`;
+const localGeometryRoot = [
+  process.env.WITCHWATCH_GEOMETRY_ROOT,
+  "/tmp/l4d2-geometry-all",
+  "/tmp/l4d2-geometry",
+].find((candidate) => candidate && existsSync(`${candidate}/catalog.json`));
 
 const common = {
   ...process.env,
   WITCHWATCH_DB: database,
   WITCHWATCH_ARTIFACT_ROOT: artifacts,
+  WITCHWATCH_WORKER_HEARTBEAT: `${root}/worker-heartbeat.json`,
   WITCHWATCH_LOCAL_ROOTS: "/workspace/data",
   WITCHWATCH_PSEUDONYM_KEY: "playwright-stable-integration-key",
+  ...(localGeometryRoot ? { WITCHWATCH_GEOMETRY_ROOT: localGeometryRoot } : {}),
 };
 const children = [];
 children.push(
@@ -46,14 +53,18 @@ function stop() {
   stopping = true;
   for (const child of children) if (child.pid) child.kill("SIGTERM");
 }
+process.once("exit", stop);
 process.once("SIGINT", stop);
 process.once("SIGTERM", stop);
 process.once("SIGHUP", stop);
 await new Promise((resolve, reject) => {
   for (const child of children)
-    child.once("exit", (code) =>
-      stopping || code === 0
-        ? resolve()
-        : reject(new Error(`real boundary process exited ${code}`)),
-    );
+    child.once("exit", (code) => {
+      if (stopping || code === 0) {
+        resolve();
+        return;
+      }
+      stop();
+      reject(new Error(`real boundary process exited ${code}`));
+    });
 });

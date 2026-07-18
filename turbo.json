@@ -7,7 +7,17 @@
       "outputs": ["dist/**"]
     },
     "check": { "dependsOn": ["^check"] },
-    "dev": { "cache": false, "persistent": true },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "CHOKIDAR_USEPOLLING",
+        "WITCHWATCH_API_TOKEN",
+        "WITCHWATCH_API_URL",
+        "WITCHWATCH_WEB_PASSWORD",
+        "WITCHWATCH_WEB_USERNAME"
+      ]
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": []

@@ -1,0 +1,57 @@
+# ADR 0008: Reconstruct games from demo-internal continuity evidence
+
+Status: accepted
+
+## Decision
+
+Treat an L4D2 game as an ordered collection of per-map SourceTV demos. Do not
+use filenames as identity evidence. L4D2 SourceTV demos do not expose a
+universal match UUID, so grouping remains an explicit reconstruction with a
+confidence label and retained reasons.
+
+Each artifact retains:
+
+- an HMAC of the embedded SourceTV server identity;
+- a hash of the sorted privacy-safe stable-human-roster tokens;
+- the Source `svc_ServerInfo.serverCount` generation value;
+- the campaign code and chapter ordinal parsed from the embedded map name; and
+- the extraction rules that supplied those values.
+
+Two maps join when server token, roster token, and campaign agree and their
+server-generation values are adjacent. A single map is provisional. Two or
+more compatible maps are high confidence. Missing identity evidence produces
+an unassociated one-map game rather than a speculative merge.
+
+Game identifiers are local random UUIDs. The API exposes the ordered aggregate
+at `/api/games/:id`; the web report uses `/game/:id/:tab`. Map inclusion is a
+view scope, so disabling a map recalculates every tab without changing the
+stored game.
+
+## Real sample proof
+
+The eight demos in the ignored `tmp/demos` corpus produce exactly three groups
+without reading their filenames:
+
+| Embedded maps                               | Source server counts | Result                   |
+| ------------------------------------------- | -------------------- | ------------------------ |
+| `c7m1_docks`, `c7m2_barge`                  | 4, 5                 | one high-confidence game |
+| `c4m1_milltown_a` through `c4m4_milltown_b` | 2, 3, 4, 5           | one high-confidence game |
+| `c10m1_caves`, `c10m2_drainage`             | 2, 3                 | one high-confidence game |
+
+Within each group the eight-person stable roster and protected server token are
+identical. Both tokens differ across the three groups.
+
+## Limits
+
+- A server hostname alone is never sufficient because server slots are reused.
+- An identical roster alone is never sufficient because rematches happen.
+- Missing maps can prevent automatic joining when generation values are not
+  adjacent.
+- A same-roster rematch on the same server and campaign can be ambiguous when
+  no trustworthy recording timestamp is available. The system must prefer a
+  separate or provisional group over silently combining overlapping campaign
+  sequences.
+- Team names and roster-to-score-index mapping remain separately unvalidated.
+
+These limitations must stay visible in `DEMO-DATA.md` whenever the grouping
+rules change.

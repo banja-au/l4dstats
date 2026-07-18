@@ -1,16 +1,21 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "WitchWatch Local Workbench API",
+    "title": "L4DStats Local Demo Analytics API",
     "version": "1.0.0",
     "description": "Local evidence-review transport. Review states never trigger enforcement."
   },
   "servers": [{ "url": "http://localhost:8787" }],
+  "security": [{ "bearerAuth": [] }],
   "paths": {
     "/health": {
       "get": {
         "operationId": "health",
-        "responses": { "200": { "description": "Ready" } }
+        "security": [],
+        "responses": {
+          "200": { "description": "API and SQLite are ready" },
+          "503": { "description": "SQLite readiness check failed" }
+        }
       }
     },
     "/api/jobs": {
@@ -27,6 +32,73 @@
         "responses": {
           "202": { "$ref": "#/components/responses/Job" },
           "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/games/{gameId}": {
+      "get": {
+        "operationId": "getGame",
+        "description": "Returns every analyzed map reconstructed as one L4D2 game, ordered by embedded chapter and Source server continuity.",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Game aggregate with ordered demo analyses and grouping evidence"
+          },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/uploads": {
+      "post": {
+        "operationId": "uploadDemo",
+        "description": "Streams one .dem file into local storage and enqueues it for analysis.",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "pattern": "\\.dem$" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": { "type": "string", "format": "binary" }
+            }
+          }
+        },
+        "responses": {
+          "202": { "description": "Upload metadata and queued job" },
+          "416": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/maps/{map}/geometry": {
+      "get": {
+        "operationId": "getMapGeometry",
+        "description": "Returns a locally derived, versioned BSP geometry artifact. The source BSP is never served. Map-name resolution does not prove exact revision equivalence to the recorded server.",
+        "parameters": [
+          {
+            "name": "map",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[A-Za-z0-9_]+$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Local analytical map mesh with source-BSP provenance"
+          },
+          "404": { "description": "Matching local geometry is unavailable" },
+          "416": { "$ref": "#/components/responses/Error" }
         }
       }
     },
@@ -57,6 +129,17 @@
         "responses": {
           "200": { "$ref": "#/components/responses/Job" },
           "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/jobs/{jobId}/reanalyze": {
+      "post": {
+        "operationId": "reanalyzeJob",
+        "description": "Queues a fresh analysis of the stored source with the current engine.",
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "202": { "$ref": "#/components/responses/Job" },
+          "404": { "$ref": "#/components/responses/Error" }
         }
       }
     },
@@ -209,6 +292,9 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer" }
+    },
     "parameters": {
       "JobId": {
         "name": "jobId",

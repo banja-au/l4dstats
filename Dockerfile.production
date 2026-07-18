@@ -1,0 +1,33 @@
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS build
+
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends ca-certificates curl util-linux gcc libc6-dev \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable \
+  && corepack prepare pnpm@11.13.1 --activate \
+  && mkdir -p /workspace /var/lib/witchwatch /data/inbox \
+  && chown -R node:node /workspace /var/lib/witchwatch /data/inbox
+
+WORKDIR /workspace
+COPY --chown=node:node . .
+
+USER node
+RUN pnpm install --frozen-lockfile && pnpm build
+
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends ca-certificates curl util-linux \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /workspace /var/lib/witchwatch /data/inbox \
+  && chown -R node:node /workspace /var/lib/witchwatch /data/inbox
+
+WORKDIR /workspace
+COPY --from=build --chown=node:node /workspace /workspace
+
+USER node
+
+ENV NODE_ENV=production
+ENV NODE_OPTIONS=--conditions=production
+
+EXPOSE 5173

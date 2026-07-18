@@ -5,7 +5,11 @@ import type {
 } from "@witchwatch/demo-source1";
 import { describe, expect, it } from "vitest";
 
-import { L4d2PlayerProjector } from "./entity-projection";
+import {
+  L4d2PlayerProjector,
+  l4d2WeaponIdentity,
+  type L4d2WitchObservation,
+} from "./entity-projection";
 
 const hash = "a".repeat(64);
 const classes = [
@@ -19,6 +23,24 @@ const classes = [
     className: "CWeaponRifle",
     dataTableId: 1,
     dataTableName: "DT_WeaponRifle",
+    props: [],
+  },
+  {
+    className: "Witch",
+    dataTableId: 2,
+    dataTableName: "DT_Witch",
+    props: [],
+  },
+  {
+    className: "CTerrorPlayerResource",
+    dataTableId: 3,
+    dataTableName: "DT_TerrorPlayerResource",
+    props: [],
+  },
+  {
+    className: "CTerrorGameRulesProxy",
+    dataTableId: 4,
+    dataTableName: "DT_TerrorGameRulesProxy",
     props: [],
   },
 ] satisfies readonly FlattenedServerClass[];
@@ -55,6 +77,40 @@ function frame(
 }
 
 describe("L4D2 player entity projection", () => {
+  it("streams bounded Witch state with tick and provenance-preserving gaps", () => {
+    const observations: L4d2WitchObservation[] = [];
+    const projector = new L4d2PlayerProjector({
+      demoSha256: hash,
+      userInfo: [],
+      tickIntervalSeconds: 0.03,
+      onWitchObservation: (value) => observations.push(value),
+    });
+    projector.visit(
+      frame(100, [
+        entity(31, 2, 4, {
+          m_vecOrigin: [10, 20],
+          "m_vecOrigin[2]": 30,
+          m_rage: 0.75,
+          m_wanderrage: 0.2,
+          m_bIsBurning: 1,
+        }),
+      ]),
+    );
+    expect(observations).toEqual([
+      {
+        entityIndex: 31,
+        lifetime: 4,
+        tick: 100,
+        timeSeconds: 3,
+        cellRelativeOrigin: { x: 10, y: 20, z: 30 },
+        rage: 0.75,
+        wanderRage: 0.2,
+        burning: true,
+      },
+    ]);
+    expect(projector.finish().playerEpochs).toEqual([]);
+  });
+
   it("binds a reused slot to the identity effective for each lifetime", () => {
     const projector = new L4d2PlayerProjector({
       demoSha256: hash,
@@ -125,8 +181,20 @@ describe("L4D2 player entity projection", () => {
           "DT_BaseEntity.m_iTeamNum": 2,
           "DT_TerrorPlayer.m_zombieClass": 3,
           "DT_BaseCombatCharacter.m_hActiveWeapon": 12,
+          "DT_BasePlayer.m_iAmmo.003": 210,
         }),
-        entity(12, 1, 9),
+        entity(12, 1, 9, {
+          "DT_LocalWeaponData.m_iPrimaryAmmoType": 3,
+          "DT_BaseCombatWeapon.m_iClip1": 27,
+          "DT_BaseCombatWeapon.m_bInReload": 1,
+          "DT_TerrorWeapon.m_iExtraPrimaryAmmo": 30,
+          "DT_TerrorWeapon.m_nUpgradedPrimaryAmmoLoaded": 5,
+        }),
+        entity(50, 3, 1, {
+          "m_primaryWeapon.002": 26,
+          "m_firstAidSlot.002": 12,
+          "m_pillsSlot.002": 23,
+        }),
       ]),
     );
     const result = projector.finish();
@@ -145,7 +213,7 @@ describe("L4D2 player entity projection", () => {
             value: { pitch: 4, yaw: 90, roll: 1 },
           },
           team: { availability: "observed", value: 2 },
-          playerClass: { availability: "observed", value: "zombie-class:3" },
+          playerClass: { availability: "observed", value: "Hunter" },
           weapon: { availability: "observed", value: "CWeaponRifle" },
           buttons: { availability: "unavailable" },
         },
@@ -153,6 +221,22 @@ describe("L4D2 player entity projection", () => {
           position: { source: "network-send-property" },
           demoTimeSeconds: { source: "derived-engine-tick" },
           buttons: { source: "unavailable" },
+        },
+        l4d2: {
+          loadout: {
+            primaryWeaponId: 26,
+            firstAidSlotId: 12,
+            pillsSlotId: 23,
+          },
+          activeWeaponAmmo: {
+            weaponClass: "CWeaponRifle",
+            primaryAmmoType: 3,
+            clip: 27,
+            reserve: 210,
+            reloading: true,
+            extraPrimaryAmmo: 30,
+            upgradedAmmoLoaded: 5,
+          },
         },
       },
     ]);
@@ -173,6 +257,95 @@ describe("L4D2 player entity projection", () => {
         position: { observed: 1, derived: 0, unavailable: 0 },
         buttons: { observed: 0, derived: 0, unavailable: 1 },
       },
+    });
+  });
+
+  it("names network weapon IDs without treating an empty slot as an item", () => {
+    expect(l4d2WeaponIdentity(0)).toEqual({
+      id: 0,
+      name: "Empty",
+      category: "unknown",
+    });
+    expect(l4d2WeaponIdentity(12)).toEqual({
+      id: 12,
+      name: "First Aid Kit",
+      category: "medical",
+    });
+    expect(l4d2WeaponIdentity(26)).toEqual({
+      id: 26,
+      name: "AK-47",
+      category: "primary",
+    });
+    expect(l4d2WeaponIdentity(44)).toEqual({
+      id: 44,
+      name: "Jockey Claw",
+      category: "infected",
+    });
+  });
+
+  it("retains setup and vote-restart state with score changes", () => {
+    const projector = new L4d2PlayerProjector({
+      demoSha256: hash,
+      userInfo: [],
+    });
+    projector.visit(
+      frame(40, [
+        entity(50, 3, 1, { m_nRoundSetupTimeRemaining: 9 }),
+        entity(60, 4, 1, {
+          "m_iCampaignScore.000": 100,
+          "m_iCampaignScore.001": 90,
+          m_bInSecondHalfOfRound: 1,
+          m_bIsVersusVoteRestarting: 1,
+        }),
+      ]),
+    );
+    expect(projector.finish().matchStates).toMatchObject([
+      {
+        tick: 40,
+        campaignScores: [100, 90],
+        secondHalf: true,
+        voteRestarting: true,
+        roundSetupTimeRemaining: 9,
+      },
+    ]);
+  });
+
+  it("distinguishes unavailable game-rule booleans from observed false values", () => {
+    const projector = new L4d2PlayerProjector({
+      demoSha256: hash,
+      userInfo: [],
+    });
+    projector.visit(
+      frame(40, [
+        entity(60, 4, 1, {
+          "m_iCampaignScore.000": 100,
+          "m_iCampaignScore.001": 90,
+        }),
+      ]),
+    );
+    projector.visit(
+      frame(41, [
+        entity(60, 4, 1, {
+          "m_iCampaignScore.000": 100,
+          "m_iCampaignScore.001": 90,
+          m_bAreTeamsFlipped: 0,
+          m_bInSecondHalfOfRound: 0,
+          m_bIsVersusVoteRestarting: 0,
+        }),
+      ]),
+    );
+
+    const [unavailable, observedFalse] = projector.finish().matchStates;
+    expect(unavailable).not.toHaveProperty("teamsFlipped");
+    expect(unavailable).not.toHaveProperty("secondHalf");
+    expect(unavailable).not.toHaveProperty("voteRestarting");
+    expect(unavailable?.teamsFlipped).toBeUndefined();
+    expect(unavailable?.secondHalf).toBeUndefined();
+    expect(unavailable?.voteRestarting).toBeUndefined();
+    expect(observedFalse).toMatchObject({
+      teamsFlipped: false,
+      secondHalf: false,
+      voteRestarting: false,
     });
   });
 

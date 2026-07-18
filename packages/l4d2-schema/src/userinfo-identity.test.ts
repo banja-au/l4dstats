@@ -14,7 +14,8 @@ import {
 const entry = (steamId: bigint, userId: number, fake = false) => {
   const data = new Uint8Array(140);
   const view = new DataView(data.buffer);
-  view.setBigUint64(0, steamId, true);
+  view.setBigUint64(0, steamId, false);
+  data.set(new TextEncoder().encode("Ellis Main"), 8);
   view.setInt32(40, userId, true);
   data[116] = fake ? 1 : 0;
   return { name: "raw name must be ignored", data };
@@ -71,7 +72,17 @@ describe("projectUserInfoIdentities", () => {
     expect(first.mappings[0]!.stableIdentityToken).toMatch(
       /^hmac-sha256:[a-f\d]{64}$/,
     );
-    expect(JSON.stringify(first)).not.toContain("76561198000000001");
+    expect(first.displayIdentities).toEqual([
+      {
+        entityIndex: 1,
+        userInfoSlot: 0,
+        userId: 7,
+        displayName: "Ellis Main",
+        fakePlayer: false,
+        steamId64: "76561198000000001",
+      },
+    ]);
+    expect(JSON.stringify(first.mappings)).not.toContain("76561198000000001");
     expect(JSON.stringify(first)).not.toContain("raw name");
     expect(
       projectUserInfoIdentities(table, { pseudonymKey: "fedcba9876543210" }),
@@ -89,13 +100,22 @@ describe("projectUserInfoIdentities", () => {
     });
     expect(result).toEqual({
       mappings: [{ entityIndex: 1, userInfoSlot: 0, userId: 2 }],
+      displayIdentities: [
+        {
+          entityIndex: 1,
+          userInfoSlot: 0,
+          userId: 2,
+          displayName: "Ellis Main",
+          fakePlayer: true,
+        },
+      ],
       rejectedEntries: 1,
     });
     expect(
       projectUserInfoIdentities(undefined, {
         pseudonymKey: new Uint8Array(16),
       }),
-    ).toEqual({ mappings: [], rejectedEntries: 0 });
+    ).toEqual({ mappings: [], displayIdentities: [], rejectedEntries: 0 });
     expect(() =>
       projectUserInfoIdentities(table, { pseudonymKey: "short" }),
     ).toThrow(/16 bytes/);
@@ -104,7 +124,7 @@ describe("projectUserInfoIdentities", () => {
 
 const corpusRoot = join(process.cwd(), "../../data/sprint-1-corpus/extracted");
 it.runIf(existsSync(corpusRoot))(
-  "projects every real-corpus initial userinfo snapshot without exposing identifiers",
+  "projects every real-corpus identity while keeping stable joins pseudonymous",
   () => {
     const demos = readdirSync(corpusRoot, {
       recursive: true,
@@ -134,7 +154,7 @@ it.runIf(existsSync(corpusRoot))(
           ({ stableIdentityToken }) => stableIdentityToken !== undefined,
         ),
       ).toBe(true);
-      expect(JSON.stringify(result)).not.toMatch(/7656119\d{10}/);
+      expect(JSON.stringify(result.mappings)).not.toMatch(/7656119\d{10}/);
       const timeline = collectL4d2UserInfoTimeline(bytes, {
         pseudonymKey: "corpus-test-key-only",
       });
@@ -143,7 +163,19 @@ it.runIf(existsSync(corpusRoot))(
           ({ effectiveTick }) => effectiveTick !== undefined,
         ),
       ).toBe(true);
-      expect(JSON.stringify(timeline)).not.toMatch(/7656119\d{10}/);
+      expect(JSON.stringify(timeline.mappings)).not.toMatch(/7656119\d{10}/);
+      expect(
+        timeline.displayIdentities.some(
+          ({ displayName }) => displayName.length > 0,
+        ),
+      ).toBe(true);
+      const humanSteamIds = timeline.displayIdentities.flatMap(
+        ({ steamId64 }) => (steamId64 === undefined ? [] : [steamId64]),
+      );
+      expect(humanSteamIds.length).toBeGreaterThan(0);
+      expect(
+        humanSteamIds.every((steamId) => /^7656119\d{10}$/.test(steamId)),
+      ).toBe(true);
       dynamicCounts.push(
         timeline.mappings.filter(
           ({ effectiveTick }) => (effectiveTick ?? 0) !== (frame?.tick ?? 0),

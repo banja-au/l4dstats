@@ -2,7 +2,7 @@
 
 These comparisons are pre-release scientific validation. They do not block Sprint 3 implementation or exploratory calibration, but they are mandatory before release, moderation use, or reconstruction-accuracy claims. Decoder and detector tests do not substitute for independent framing validation or authentic game playback.
 
-## UntitledParser framing check — no L4D2 ownership required
+## UntitledParser framing check - no L4D2 ownership required
 
 UntitledParser uses .NET 7 and its console project targets AnyCPU. On macOS or Linux, install a .NET 7 SDK, then run the repository helper:
 
@@ -16,9 +16,20 @@ With Docker Desktop, no host SDK is needed:
 docker compose --profile tools run --rm reference
 ```
 
-The helper pins commit `c7bd376e68cbf693071a652847eccb1d9d76eca7`, builds from source for the current machine, runs recursive demo dumps, and writes untracked outputs beneath `data/reference-validation/`. It also emits WitchWatch's deterministic corpus report for comparison. This check validates basic header/outer framing only: UntitledParser documents partial L4D2 network parsing and no L4D2 entity parsing.
+The helper pins commit `c7bd376e68cbf693071a652847eccb1d9d76eca7`, builds from source for the current machine, runs recursive demo dumps, emits WitchWatch's deterministic corpus report, and fails unless the automated comparison passes. Outputs remain untracked beneath `data/reference-validation/`. This check validates basic header/outer framing only: UntitledParser documents partial L4D2 network parsing and no L4D2 entity parsing.
 
-## Licensed playback check — pre-release
+### Completed framing result
+
+On 2026-07-18, the pinned source built and ran under .NET SDK 7.0.410 on
+Linux arm64. All 22 protocol-2100 SourceTV demos passed across 231,337 outer
+commands. The comparison requires equal common header fields, command counts,
+command order, every command tick, and final STOP position. Playback time is
+compared as the exact IEEE-754 float32 value after round-tripping the
+reference's shortest decimal representation. There were no missing dumps and
+no unexplained differences. The privacy-safe tracked result is
+`sprint-1-independent-framing.json`; raw dumps and header labels remain ignored.
+
+## Licensed playback check - pre-release
 
 - A licensed Left 4 Dead 2 installation compatible with protocol 2100 SourceTV demos.
 - The exact demo whose SHA-256 appears in `docs/sprints/sprint-1-corpus.json`.
@@ -30,7 +41,7 @@ Raw demos, player names, and platform identifiers must remain outside Git. Recor
 ## Acceptance procedure
 
 1. Verify every demo SHA-256 and record all tool versions.
-2. Run UntitledParser over all ten demos and compare header values, outer command counts/order, stop position, and malformed/truncated disposition with WitchWatch. Record its exact commit, command, output hash, and every explained branch-support difference. Any unexplained framing disagreement fails the gate; UntitledParser is not an entity-state oracle.
+2. Run UntitledParser over the complete corpus and compare header values, outer command counts/order, every command tick, and stop position with WitchWatch. Record its exact commit, command, output hash, and every explained branch-support difference. Any unexplained framing disagreement fails the gate; UntitledParser is not an entity-state oracle. This step passed for all 22 current demos on 2026-07-18.
 3. Before licensed playback, record the game/build/map identifiers.
 4. Select at least three ticks from each of three demos: an entity-enter tick, an ordinary delta tick, and a leave/delete or lifetime-change tick. Include survivor and infected entities where present.
 5. At every selected tick, capture entity slot/lifetime, team, class, origin XYZ, eye pitch/yaw, and active weapon from licensed playback/reference instrumentation. Never substitute the spectator camera pose.

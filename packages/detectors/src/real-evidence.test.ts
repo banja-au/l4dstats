@@ -8,7 +8,11 @@ import {
 } from "@witchwatch/l4d2-schema";
 import { decodeDemo } from "@witchwatch/demo-source1";
 import { describe, expect, it } from "vitest";
-import { buildRealAimEvidence, canonicalJson } from "./real-evidence.js";
+import {
+  buildRealAimEvidence,
+  canonicalJson,
+  sha256Canonical,
+} from "./real-evidence.js";
 
 const demoSha256 = "a".repeat(64);
 const field = <T>(value: T) => ({ availability: "observed" as const, value });
@@ -32,6 +36,7 @@ const observation = (
     weapon: { availability: "unavailable", reason: "fixture" },
     buttons: { availability: "unavailable", reason: "fixture" },
   },
+  l4d2: { entityIndex: 1 },
   provenance: {} as ProjectedPlayerObservation["provenance"],
 });
 
@@ -93,6 +98,9 @@ describe("real projected observation evidence", () => {
       },
     });
     expect(canonicalJson({ b: -0, a: 1 })).toBe('{"a":1,"b":0}');
+    expect(sha256Canonical({ b: -0, a: 1 })).toBe(
+      createHash("sha256").update('{"a":1,"b":0}').digest("hex"),
+    );
   });
 
   it("rejects observations from a different demo hash rather than dropping them", () => {
@@ -110,63 +118,75 @@ const corpusDemo = resolve(
   "../../data/sprint-1-corpus/extracted/901780_c2m1_highway/901780_c2m1_highway.dem",
 );
 
-describe.runIf(existsSync(corpusDemo))(
-  "real-corpus detector integration",
-  () => {
-    it("produces byte-reproducible evidence or structured skips", () => {
-      const bytes = readFileSync(corpusDemo);
-      const hash = createHash("sha256").update(bytes).digest("hex");
-      const header = decodeDemo(bytes).header;
-      const projected: ProjectedPlayerObservation[] = [];
-      projectL4d2PlayerObservations(bytes, {
-        demoSha256: hash,
-        tickIntervalSeconds: header.playbackTimeSeconds / header.playbackTicks,
-        userInfo: [],
-        onObservation: (value) => projected.push(value),
-      });
-      const first = buildRealAimEvidence({
-        demoSha256: hash,
-        observations: projected,
-      });
-      const second = buildRealAimEvidence({
-        demoSha256: hash,
-        observations: projected,
-      });
-      expect(second).toEqual(first);
-      expect(first.artifact.players.length).toBeGreaterThanOrEqual(8);
-      expect(
-        first.artifact.players.every(({ sampleCount }) => sampleCount > 0),
-      ).toBe(true);
-      expect(
-        first.artifact.players.every(
-          ({ result }) =>
-            result.evidence.length > 0 || result.skipped.length > 0,
-        ),
-      ).toBe(true);
-      expect(first.evidenceArtifactSha256).toMatch(/^[a-f\d]{64}$/);
-      console.info("real evidence artifact", {
-        demoSha256: hash,
-        observationArtifactSha256: first.artifact.observationArtifactSha256,
-        evidenceArtifactSha256: first.evidenceArtifactSha256,
-        projectedObservations: projected.length,
-        players: first.artifact.players.length,
-        completeSamples: first.artifact.players.reduce(
-          (count, player) => count + player.completeSampleCount,
-          0,
-        ),
-        evidence: first.artifact.players.reduce(
-          (count, player) => count + player.result.evidence.length,
-          0,
-        ),
-        skipCodes: Object.fromEntries(
-          first.artifact.players
-            .flatMap((player) => player.result.skipped)
-            .reduce((counts, skip) => {
-              counts.set(skip.code, (counts.get(skip.code) ?? 0) + 1);
-              return counts;
-            }, new Map<string, number>()),
-        ),
-      });
-    }, 300_000);
-  },
-);
+describe.runIf(
+  process.env.WITCHWATCH_REAL_CORPUS === "1" && existsSync(corpusDemo),
+)("real-corpus detector integration", () => {
+  let hash = "";
+  let projected: ProjectedPlayerObservation[] = [];
+  let first: ReturnType<typeof buildRealAimEvidence>;
+
+  it("projects real observations without manufacturing rows", async () => {
+    const bytes = readFileSync(corpusDemo);
+    hash = createHash("sha256").update(bytes).digest("hex");
+    const header = decodeDemo(bytes).header;
+    projected = [];
+    // Let Vitest acknowledge the task-start update before the synchronous
+    // Source parser occupies this worker for a large real demo.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    projectL4d2PlayerObservations(bytes, {
+      demoSha256: hash,
+      tickIntervalSeconds: header.playbackTimeSeconds / header.playbackTicks,
+      userInfo: [],
+      onObservation: (value) => projected.push(value),
+    });
+    expect(projected.length).toBeGreaterThan(100_000);
+  }, 300_000);
+
+  it("produces evidence or structured skips", () => {
+    first = buildRealAimEvidence({
+      demoSha256: hash,
+      observations: projected,
+    });
+    expect(first.artifact.players.length).toBeGreaterThanOrEqual(8);
+    expect(
+      first.artifact.players.every(({ sampleCount }) => sampleCount > 0),
+    ).toBe(true);
+    expect(
+      first.artifact.players.every(
+        ({ result }) => result.evidence.length > 0 || result.skipped.length > 0,
+      ),
+    ).toBe(true);
+    expect(first.evidenceArtifactSha256).toMatch(/^[a-f\d]{64}$/);
+  }, 300_000);
+
+  it("reproduces the evidence artifact byte for byte", () => {
+    const second = buildRealAimEvidence({
+      demoSha256: hash,
+      observations: projected,
+    });
+    expect(second).toEqual(first);
+    console.info("real evidence artifact", {
+      demoSha256: hash,
+      observationArtifactSha256: first.artifact.observationArtifactSha256,
+      evidenceArtifactSha256: first.evidenceArtifactSha256,
+      projectedObservations: projected.length,
+      players: first.artifact.players.length,
+      completeSamples: first.artifact.players.reduce(
+        (count, player) => count + player.completeSampleCount,
+        0,
+      ),
+      evidence: first.artifact.players.reduce(
+        (count, player) => count + player.result.evidence.length,
+        0,
+      ),
+      skipCodes: Object.fromEntries(
+        first.artifact.players
+          .flatMap((player) => player.result.skipped)
+          .reduce((counts, skip) => {
+            counts.set(skip.code, (counts.get(skip.code) ?? 0) + 1);
+            return counts;
+          }, new Map<string, number>()),
+      ),
+    });
+  }, 300_000);
+});

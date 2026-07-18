@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "reference": {
+    "name": "UncraftedName/UntitledParser",
+    "commit": "c7bd376e68cbf693071a652847eccb1d9d76eca7",
+    "runtime": ".NET 7.0.410 linux-arm64"
+  },
+  "comparisonSemantics": {
+    "playbackTimeSeconds": "exact IEEE-754 float32 value after round trip"
+  },
+  "comparedFields": [
+    "header common fields",
+    "command counts",
+    "command order",
+    "command ticks",
+    "final stop position"
+  ],
+  "summary": {
+    "demos": 22,
+    "passed": 22,
+    "failed": 0,
+    "missingReferenceDumps": []
+  },
+  "results": [
+    {
+      "fixture": "891158_c8m3_sewers.dem",
+      "demoSha256": "b86d0a6695579a5955f47f25598c95188e7c162c77411a0a580f13d1e28a2bf4",
+      "referenceDumpSha256": "c7fbcb09a96fe6e65491944f543b9c8c8e1bd0a156bde9b7025f2a2d522742e0",
+      "commandSequenceSha256": "d6bc91a8394ea05c74e670a554323689593dc0404716e3949ac9e35040b7d296",
+      "commands": 14883,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "893904_c11m1_greenhouse.dem",
+      "demoSha256": "30c05fd4c1c6d7ef1999cde616d40cdd5d2d7d6a85a2d4a24d61cba4f4c8125f",
+      "referenceDumpSha256": "c74120101f7c7d3084a6c8f2a6105e8811c17a3d060ff90e6e47ee971f56c838",
+      "commandSequenceSha256": "1506c881bc9d8da293362c705b2ba5336d5f6d7f8f4e5e17417a092a5cb57d66",
+      "commands": 10609,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "896516_c3m3_shantytown.dem",
+      "demoSha256": "9e0203279aa5dbaed421f4ca65246b1b2c29f3a36a8831569e5dc9df3f9d95ee",
+      "referenceDumpSha256": "c8ab523ca778d4db9352fdd492a0601d930e3fbf2d15d5a2139b7a0034c76a79",
+      "commandSequenceSha256": "1b8c8bd58541422f920020db56f2ca4bb24ab5bd1f3a57af5358d0ccf44d90f0",
+      "commands": 8102,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "899189_c9m1_alleys.dem",
+      "demoSha256": "4c7e0454bf955d02a07951826fab89899d31f934fcec47479ef8f2be614fcd9b",
+      "referenceDumpSha256": "9e730de91fbc2baa0c87d2b34e0990c512a0b77c52012284afae10d5c907dc84",
+      "commandSequenceSha256": "9ae9a403a9405de6353d1abeea29c35fce5296f3d225dc32ba6946c74e8d79b5",
+      "commands": 12943,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "901780_c2m1_highway.dem",
+      "demoSha256": "299019bf3e956176034230b3ad28b634016ec8fe0334ca6c6b95cc0597ac483d",
+      "referenceDumpSha256": "43b423ca15ccec816e5c22de710f22d5df70cd091a77a35bf9f061cdf4c87360",
+      "commandSequenceSha256": "4abd60beecccd494fedd825a24a70589718bbeb6ab74592ae2606298fea040fa",
+      "commands": 17344,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "904378_c2m4_barns.dem",
+      "demoSha256": "5cbb37e82ff9fd84b5c1d98e8ec8619d7d6bf128f797cff1124e900cd6525881",
+      "referenceDumpSha256": "65fb5a90401d027f310b2216a602278556e3fcefab460c119b926e8183a577fa",
+      "commandSequenceSha256": "d91c16e22599b4b1d0dfba2efbe01921d1791a13fc88a69f7639dead8e4df192",
+      "commands": 10733,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "907079_c5m1_waterfront.dem",
+      "demoSha256": "370f61dab8b0dfcd0d56f79541dd3d3be0172f783ebec0c40bbf3c19ae750734",
+      "referenceDumpSha256": "594ea5ad9723b54f555b3799056de1cf88f12917fe9cc45ea7800d9e3b35dbcf",
+      "commandSequenceSha256": "9e61d15b2dea266a6b0f00d29d5f3e7b1a35df90165fdb458a51c0f22d898ea1",
+      "commands": 6387,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "909662_c12m4_barn.dem",
+      "demoSha256": "0c0bad09157300c6797d8d498683ee0453b517f7fcbd59fa4deddaaff83dc065",
+      "referenceDumpSha256": "027c5d2190d5c0b362b50480d75a98d620d316aecc21e62839b17dd0770e8a86",
+      "commandSequenceSha256": "364c2e4eac30d2f75cf2b4b8a3f6333c618e9db8bdbf378fe488cbad83e4c208",
+      "commands": 7178,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "912290_c8m4_interior.dem",
+      "demoSha256": "7bb8447b084db909d3e3f1a9e61025a5bc197fa3fabf5e08221b710be0cbc89b",
+      "referenceDumpSha256": "96be33cb161bc41cdae2c7e057f4e0bf2c10c5b46592dd911e691fd582381245",
+      "commandSequenceSha256": "466ebc698635b0022a27a995842b8f6e58bd968549eb2af48106953deb8fb86f",
+      "commands": 8031,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "914948_c2m1_highway.dem",
+      "demoSha256": "64fadac7ba7bdcfc2ebf8cd1d21c90ced85007dab67f159196852c4394a41249",
+      "referenceDumpSha256": "014487a90c81f8c5c40344c5cbaf0f75168939b7bcbf79bcccb66c3549cf924a",
+      "commandSequenceSha256": "6ba7a01289afbd5da76e41bcd0b0266130396bd63a36053e1266fbbf3e83f099",
+      "commands": 8043,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915153_c2m4_barns.dem",
+      "demoSha256": "e91904677d8513e6a63e44c2161e8892aaccf3361f90e8df2868b3418c6a1283",
+      "referenceDumpSha256": "1c0b665a6cdddecd7603102125544f07669bd741953299271d4a33be90667bf3",
+      "commandSequenceSha256": "ced5f03c24374adb62161e72028df1472072f6bc5ffcc46ab6e5b6e643104f3e",
+      "commands": 10121,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915176_c5m3_cemetery.dem",
+      "demoSha256": "7da7ac37332cf15e502a65b04da8ec0cd152ec391f2279f1a893783ef0081de4",
+      "referenceDumpSha256": "218ad0e6d7005434b50fedc44b0d44ad2c95bbd78c93df44c88940a6d3581324",
+      "commandSequenceSha256": "70d67998326296a1ea57f1eb02db187712847535c5484384e41a7c1a2f86d372",
+      "commands": 15590,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915177_dprm4_milltown_b.dem",
+      "demoSha256": "3090362db0d0791cbe8ff69ea9949a729d5614903fe5f2b450d1b984bdc01eab",
+      "referenceDumpSha256": "875539d89baa8014e3adc039e117a3a0ecc614ddc6d3661928a0ea0a68d2b172",
+      "commandSequenceSha256": "09937eacf34dd588231c68cc9be343c7298b90cb328e664c50e481af87059f23",
+      "commands": 7870,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915178_c8m4_interior.dem",
+      "demoSha256": "6522abe1413a4a5cb99a24b76f5f91d1e7eadc5dfe14a08d51aca2708eab0482",
+      "referenceDumpSha256": "324c387c9e43d0635a275dfa25f7fca3670b031b3592c9ee27982f3e450505b4",
+      "commandSequenceSha256": "c2d18215257cdd79ffda0e40614b78090975997c6f7e4d7b34ea3f2cd243394c",
+      "commands": 9571,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915186_c10m3_ranchhouse.dem",
+      "demoSha256": "4ed3c6c0139b967b9de18cdd429038ebf6e2bf20ecaeea4cfa05e580ac5a8868",
+      "referenceDumpSha256": "77d0876b30835a7560719d3191aefd7a544f8b15545ecd27f860431e3b9d9303",
+      "commandSequenceSha256": "7f27969674edd8e8ecfd7bf06427574eb1b2b6c78583b8bc9c2566f97b9ec6d3",
+      "commands": 7285,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915187_c5m3_cemetery.dem",
+      "demoSha256": "27e03968c89fc68f9d7aace01532bf12a4af24c1c93479cb3c962ce2c1912361",
+      "referenceDumpSha256": "d383ea28c122e89792e5b4a2eacca6177da94bb4e2d6c1ba2ca0943abdf7b5c0",
+      "commandSequenceSha256": "25ef3596d9728a8c73edb0c65fa09af7281f99fcbdb1aa77417296067b1ebc54",
+      "commands": 12704,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915214_c6m2_bedlam.dem",
+      "demoSha256": "efd184df20c7d6200d2c57f1565dc3c0a3753f3efc680fb358c88b28a718efe3",
+      "referenceDumpSha256": "36dd5d11b83dd9db52f7e99bd113b4f2aec186701a397bba85ad5374d4be9163",
+      "commandSequenceSha256": "87512808434c85f2f30262050bce6c27912fdc49f7f295de107b493f8c924064",
+      "commands": 14786,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915226_c2m1_highway.dem",
+      "demoSha256": "13ce18b072f24dc8483798a3f21ec475c49d625ad81be0da9a5f54cd972f5c49",
+      "referenceDumpSha256": "a548150bc1145647ae670becf277281b75b4580aea22a849ca745056962d7179",
+      "commandSequenceSha256": "dd94d75ec6ed0b9ac118fa3d67a84969f2239cc0f6b2e4f16984078c1257baeb",
+      "commands": 12851,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915227_c6m1_riverbank.dem",
+      "demoSha256": "24d0322bfabdce2ec55703a30d00d2be20a63c6cf6c6f33b0201624af76003a1",
+      "referenceDumpSha256": "23d8a1a5820887eb5bf236161e0f359eb9ea16624e34c6bb2e5839fb20f1f7d0",
+      "commandSequenceSha256": "c100a2ac9eb59573cd45f639e4351d499dd7123b241bf9edcbc33d521e9d0792",
+      "commands": 12066,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915231_c1m1_hotel.dem",
+      "demoSha256": "8dc269b9d83044abda305cbb0b116465a411e8608a30f492180a923f84625369",
+      "referenceDumpSha256": "6a01f181782375a37f7a6a736b1af4b3b190097c21300ea9ef9326f49218cad9",
+      "commandSequenceSha256": "23d8f06fc2d08bbcd1af764bc65888c110d90705a631a54e4374650958905243",
+      "commands": 8941,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915232_c2m1_highway.dem",
+      "demoSha256": "3a4a7dca2b59d5833fee859d26a4e2471eb48b47440b36908797d447de5bf41e",
+      "referenceDumpSha256": "19a1a68b23d64a053b3e7f70d0e9fa82bd21266eb15c61305d0c46a6a9ad6f45",
+      "commandSequenceSha256": "0765cb6afd1ad78b7a5437f483eb8b01d25757825f54647300cc4fd171cf4d7a",
+      "commands": 10270,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "fixture": "915238_c1m1_hotel.dem",
+      "demoSha256": "9943f45801689961a6e66ddab5d995d2be7c953d29d45f35b2d9d00ad12fd45c",
+      "referenceDumpSha256": "b858960b1706b1f61867cca1e91739f7cb80248ae6f307d34b1377f26b273108",
+      "commandSequenceSha256": "0729658e3f898bc5f6e7e0ca7821604c3edae438906d474256e5274bae0687c1",
+      "commands": 5029,
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

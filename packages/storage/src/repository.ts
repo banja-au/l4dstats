@@ -109,6 +109,30 @@ export interface TelemetryChunk {
   payload: unknown;
 }
 
+export interface GameAnalysis {
+  id: string;
+  confidence: "provisional" | "high" | "unassociated";
+  evidence: string[];
+  createdAt: string;
+  updatedAt: string;
+  analyses: unknown[];
+}
+
+export interface RetentionPurgeResult {
+  cutoff: string;
+  dryRun: boolean;
+  jobs: number;
+  cases: number;
+  games: number;
+  localPaths: string[];
+  artifactHashes: string[];
+}
+
+export interface OperationalMetrics {
+  jobs: Record<JobState, number>;
+  oldestQueuedAgeSeconds: number | null;
+}
+
 const migrations = [
   `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS jobs (
@@ -151,6 +175,18 @@ const migrations = [
    );
    INSERT OR IGNORE INTO telemetry_windows_v2(case_id,demo_sha256,start_tick,end_tick,payload_json)
      SELECT case_id,'',start_tick,end_tick,payload_json FROM telemetry_windows;`,
+  `CREATE TABLE IF NOT EXISTS games (
+     id TEXT PRIMARY KEY, server_token TEXT, roster_token TEXT, campaign TEXT,
+     confidence TEXT NOT NULL, evidence_json TEXT NOT NULL,
+     created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS game_demos (
+     game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+     job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id), demo_sha256 TEXT NOT NULL,
+     map_name TEXT NOT NULL, server_count INTEGER, chapter INTEGER,
+     PRIMARY KEY(game_id,job_id)
+   );
+   CREATE INDEX IF NOT EXISTS game_demos_game_idx ON game_demos(game_id,chapter,server_count);`,
 ] as const;
 
 function now(): string {
@@ -181,6 +217,43 @@ export class WorkbenchRepository {
   }
   public close(): void {
     this.db.close();
+  }
+  public isReady(): boolean {
+    try {
+      return this.db.prepare("SELECT 1 AS ready").get() !== undefined;
+    } catch {
+      return false;
+    }
+  }
+  public operationalMetrics(at = new Date()): OperationalMetrics {
+    const jobs: Record<JobState, number> = {
+      queued: 0,
+      running: 0,
+      succeeded: 0,
+      failed: 0,
+      cancelled: 0,
+    };
+    const rows = this.db
+      .prepare("SELECT state,COUNT(*) AS count FROM jobs GROUP BY state")
+      .all() as { state: JobState; count: number }[];
+    for (const row of rows) {
+      if (row.state in jobs) jobs[row.state] = Number(row.count);
+    }
+    const oldest = this.db
+      .prepare(
+        "SELECT MIN(created_at) AS created_at FROM jobs WHERE state='queued'",
+      )
+      .get() as { created_at: string | null };
+    return {
+      jobs,
+      oldestQueuedAgeSeconds:
+        oldest.created_at === null
+          ? null
+          : Math.max(
+              0,
+              (at.getTime() - new Date(oldest.created_at).getTime()) / 1_000,
+            ),
+    };
   }
   private migrate(): void {
     this.db.exec(
@@ -591,6 +664,168 @@ export class WorkbenchRepository {
       demoSha256: input.demoSha256,
       engineResultSha256: input.engineResultSha256,
     });
+    this.assignGame(input);
+  }
+
+  private assignGame(input: {
+    jobId: string;
+    demoSha256: string;
+    engineResult: unknown;
+  }): string {
+    const result = input.engineResult as {
+      demo?: {
+        mapName?: unknown;
+        session?: {
+          serverToken?: unknown;
+          rosterToken?: unknown;
+          serverCount?: unknown;
+          campaign?: unknown;
+          chapter?: unknown;
+          evidence?: unknown;
+        };
+      };
+    };
+    const session = result.demo?.session;
+    const serverToken =
+      typeof session?.serverToken === "string" ? session.serverToken : null;
+    const rosterToken =
+      typeof session?.rosterToken === "string" ? session.rosterToken : null;
+    const campaign =
+      typeof session?.campaign === "string" ? session.campaign : null;
+    const serverCount =
+      typeof session?.serverCount === "number" ? session.serverCount : null;
+    const chapter =
+      typeof session?.chapter === "number" ? session.chapter : null;
+    const evidence = Array.isArray(session?.evidence)
+      ? session.evidence.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+    const possibleCandidates =
+      serverToken && rosterToken
+        ? (this.db
+            .prepare(
+              `SELECT DISTINCT g.id,g.created_at FROM games g
+               JOIN game_demos d ON d.game_id=g.id
+               WHERE g.server_token=? AND g.roster_token=? AND g.campaign IS ?
+                 AND (? IS NULL OR d.server_count IS NULL OR ABS(d.server_count-?)<=1)
+                 AND (? IS NULL OR d.chapter IS NULL OR ABS(d.chapter-?)<=1)
+               ORDER BY g.created_at,g.id`,
+            )
+            .all(
+              serverToken,
+              rosterToken,
+              campaign,
+              serverCount,
+              serverCount,
+              chapter,
+              chapter,
+            ) as Array<{ id: string; created_at: string }>)
+        : [];
+    const candidates = possibleCandidates.filter((candidate) => {
+      const existing = this.db
+        .prepare(
+          "SELECT demo_sha256,server_count,chapter FROM game_demos WHERE game_id=?",
+        )
+        .all(candidate.id) as Array<{
+        demo_sha256: string;
+        server_count: number | null;
+        chapter: number | null;
+      }>;
+      if (existing.some((row) => row.demo_sha256 === input.demoSha256))
+        return true;
+      return !existing.some(
+        (row) =>
+          (serverCount !== null && row.server_count === serverCount) ||
+          (chapter !== null && row.chapter === chapter),
+      );
+    });
+    const gameId = candidates[0]?.id ?? randomUUID();
+    const timestamp = now();
+    if (!candidates.length)
+      this.db
+        .prepare("INSERT INTO games VALUES(?,?,?,?,?,?,?,?)")
+        .run(
+          gameId,
+          serverToken,
+          rosterToken,
+          campaign,
+          serverToken && rosterToken ? "provisional" : "unassociated",
+          JSON.stringify(evidence),
+          timestamp,
+          timestamp,
+        );
+    for (const duplicate of candidates.slice(1)) {
+      this.db
+        .prepare("UPDATE game_demos SET game_id=? WHERE game_id=?")
+        .run(gameId, duplicate.id);
+      this.db.prepare("DELETE FROM games WHERE id=?").run(duplicate.id);
+    }
+    this.db
+      .prepare("INSERT INTO game_demos VALUES(?,?,?,?,?,?)")
+      .run(
+        gameId,
+        input.jobId,
+        input.demoSha256,
+        String(result.demo?.mapName ?? "unknown"),
+        serverCount,
+        chapter,
+      );
+    const count = Number(
+      (
+        this.db
+          .prepare("SELECT COUNT(*) AS count FROM game_demos WHERE game_id=?")
+          .get(gameId) as { count: number }
+      ).count,
+    );
+    this.db
+      .prepare("UPDATE games SET confidence=?,updated_at=? WHERE id=?")
+      .run(
+        serverToken && rosterToken && count > 1
+          ? "high"
+          : serverToken && rosterToken
+            ? "provisional"
+            : "unassociated",
+        timestamp,
+        gameId,
+      );
+    return gameId;
+  }
+
+  public getGameIdForJob(jobId: string): string | null {
+    const row = this.db
+      .prepare("SELECT game_id FROM game_demos WHERE job_id=?")
+      .get(jobId) as { game_id: string } | undefined;
+    return row?.game_id ?? null;
+  }
+
+  public getGame(gameId: string): GameAnalysis {
+    const game = this.db
+      .prepare("SELECT * FROM games WHERE id=?")
+      .get(gameId) as Record<string, unknown> | undefined;
+    if (!game) throw new Error("game not found");
+    const rows = this.db
+      .prepare(
+        `SELECT a.* FROM game_demos d JOIN job_analyses a ON a.job_id=d.job_id
+         WHERE d.game_id=? ORDER BY COALESCE(d.chapter,2147483647),COALESCE(d.server_count,2147483647),d.job_id`,
+      )
+      .all(gameId) as Record<string, unknown>[];
+    return {
+      id: gameId,
+      confidence: game.confidence as GameAnalysis["confidence"],
+      evidence: JSON.parse(String(game.evidence_json)) as string[],
+      createdAt: String(game.created_at),
+      updatedAt: String(game.updated_at),
+      analyses: rows.map((row) => ({
+        jobId: String(row.job_id),
+        demoSha256: String(row.demo_sha256),
+        sourceManifest: JSON.parse(String(row.source_manifest_json)) as unknown,
+        engineResult: JSON.parse(String(row.engine_result_json)) as unknown,
+        engineResultSha256: String(row.engine_result_sha256),
+        createdAt: String(row.created_at),
+        gameId,
+      })),
+    };
   }
   public getJobAnalysis(jobId: string): unknown {
     const row = this.db
@@ -603,8 +838,222 @@ export class WorkbenchRepository {
       sourceManifest: JSON.parse(String(row.source_manifest_json)) as unknown,
       engineResult: JSON.parse(String(row.engine_result_json)) as unknown,
       engineResultSha256: String(row.engine_result_sha256),
+      gameId: this.getGameIdForJob(jobId),
       createdAt: String(row.created_at),
     };
+  }
+
+  public purgeTerminalJobsBefore(
+    cutoff: string,
+    dryRun = true,
+  ): RetentionPurgeResult {
+    if (!Number.isFinite(Date.parse(cutoff)))
+      throw new RangeError("retention cutoff must be an ISO timestamp");
+    const jobs = this.db
+      .prepare(
+        `SELECT id,source_json FROM jobs
+         WHERE state IN ('succeeded','failed','cancelled') AND updated_at < ?
+         ORDER BY updated_at,id`,
+      )
+      .all(cutoff) as Array<{ id: string; source_json: string }>;
+    if (!jobs.length)
+      return {
+        cutoff,
+        dryRun,
+        jobs: 0,
+        cases: 0,
+        games: 0,
+        localPaths: [],
+        artifactHashes: [],
+      };
+    const jobIds = jobs.map(({ id }) => id);
+    const placeholders = jobIds.map(() => "?").join(",");
+    const analyses = this.db
+      .prepare(
+        `SELECT job_id,demo_sha256,engine_result_sha256 FROM job_analyses
+         WHERE job_id IN (${placeholders})`,
+      )
+      .all(...jobIds) as Array<{
+      job_id: string;
+      demo_sha256: string;
+      engine_result_sha256: string;
+    }>;
+    const removedHashes = new Set(
+      analyses.flatMap(({ demo_sha256, engine_result_sha256 }) => [
+        demo_sha256,
+        engine_result_sha256,
+      ]),
+    );
+    const remainingAnalyses = this.db
+      .prepare(
+        `SELECT demo_sha256,engine_result_sha256 FROM job_analyses
+         WHERE job_id NOT IN (${placeholders})`,
+      )
+      .all(...jobIds) as Array<{
+      demo_sha256: string;
+      engine_result_sha256: string;
+    }>;
+    const remainingHashes = new Set(
+      remainingAnalyses.flatMap(({ demo_sha256, engine_result_sha256 }) => [
+        demo_sha256,
+        engine_result_sha256,
+      ]),
+    );
+    const artifactHashes = [...removedHashes]
+      .filter((hash) => !remainingHashes.has(hash))
+      .sort();
+    const retainedDemoHashes = new Set(
+      remainingAnalyses.map(({ demo_sha256 }) => demo_sha256),
+    );
+    const removedDemoHashes = new Set(
+      analyses
+        .map(({ demo_sha256 }) => demo_sha256)
+        .filter((hash) => !retainedDemoHashes.has(hash)),
+    );
+    const cases = (
+      this.db
+        .prepare("SELECT case_id,presentation_json FROM case_presentations")
+        .all() as Array<{ case_id: string; presentation_json: string }>
+    )
+      .filter(({ presentation_json }) => {
+        const presentation = JSON.parse(
+          presentation_json,
+        ) as CasePresentationV1;
+        return presentation.demos.some(({ sha256 }) =>
+          removedDemoHashes.has(sha256),
+        );
+      })
+      .map(({ case_id }) => case_id)
+      .sort();
+    const affectedGames = this.db
+      .prepare(
+        `SELECT DISTINCT game_id FROM game_demos WHERE job_id IN (${placeholders})`,
+      )
+      .all(...jobIds) as Array<{ game_id: string }>;
+    const games = affectedGames.filter(({ game_id }) => {
+      const remaining = this.db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM game_demos
+           WHERE game_id=? AND job_id NOT IN (${placeholders})`,
+        )
+        .get(game_id, ...jobIds) as { count: number };
+      return Number(remaining.count) === 0;
+    }).length;
+    const candidatePaths = jobs.flatMap(({ source_json }) => {
+      const source = JSON.parse(source_json) as IngestSource;
+      return source.kind === "local" ? [source.path] : [];
+    });
+    const retainedPaths = new Set(
+      (
+        this.db
+          .prepare(
+            `SELECT source_json FROM jobs WHERE id NOT IN (${placeholders})`,
+          )
+          .all(...jobIds) as Array<{ source_json: string }>
+      ).flatMap(({ source_json }) => {
+        const source = JSON.parse(source_json) as IngestSource;
+        return source.kind === "local" ? [source.path] : [];
+      }),
+    );
+    const localPaths = [...new Set(candidatePaths)]
+      .filter((path) => !retainedPaths.has(path))
+      .sort();
+    const result: RetentionPurgeResult = {
+      cutoff,
+      dryRun,
+      jobs: jobs.length,
+      cases: cases.length,
+      games,
+      localPaths,
+      artifactHashes,
+    };
+    if (dryRun) return result;
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      if (cases.length) {
+        const casePlaceholders = cases.map(() => "?").join(",");
+        for (const table of [
+          "notes",
+          "telemetry_windows",
+          "telemetry_windows_v2",
+          "case_lineage",
+          "case_presentations",
+        ])
+          this.db
+            .prepare(
+              `DELETE FROM ${table} WHERE case_id IN (${casePlaceholders})`,
+            )
+            .run(...cases);
+        this.db
+          .prepare(`DELETE FROM cases WHERE id IN (${casePlaceholders})`)
+          .run(...cases);
+        this.db
+          .prepare(
+            `DELETE FROM audit_events WHERE subject_id IN (${casePlaceholders})`,
+          )
+          .run(...cases);
+      }
+      this.db
+        .prepare(
+          `DELETE FROM audit_events WHERE subject_id IN (${placeholders})`,
+        )
+        .run(...jobIds);
+      this.db
+        .prepare(`DELETE FROM game_demos WHERE job_id IN (${placeholders})`)
+        .run(...jobIds);
+      this.db
+        .prepare(`DELETE FROM job_analyses WHERE job_id IN (${placeholders})`)
+        .run(...jobIds);
+      this.db
+        .prepare(`DELETE FROM jobs WHERE id IN (${placeholders})`)
+        .run(...jobIds);
+      this.db
+        .prepare(
+          "DELETE FROM games WHERE id NOT IN (SELECT game_id FROM game_demos)",
+        )
+        .run();
+      for (const { game_id } of affectedGames) {
+        const row = this.db
+          .prepare(
+            `SELECT g.server_token,g.roster_token,COUNT(d.job_id) AS count
+             FROM games g LEFT JOIN game_demos d ON d.game_id=g.id
+             WHERE g.id=? GROUP BY g.id`,
+          )
+          .get(game_id) as
+          | {
+              server_token: string | null;
+              roster_token: string | null;
+              count: number;
+            }
+          | undefined;
+        if (row)
+          this.db
+            .prepare("UPDATE games SET confidence=?,updated_at=? WHERE id=?")
+            .run(
+              row.server_token && row.roster_token && Number(row.count) > 1
+                ? "high"
+                : row.server_token && row.roster_token
+                  ? "provisional"
+                  : "unassociated",
+              now(),
+              game_id,
+            );
+      }
+      this.audit("retention.purged", "retention", {
+        cutoff,
+        jobs: result.jobs,
+        cases: result.cases,
+        games: result.games,
+        artifacts: result.artifactHashes.length,
+        localPaths: result.localPaths.length,
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return result;
   }
   public getWindow(
     caseId: string,

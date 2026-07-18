@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { createRequire } from "node:module";
+import { extname, resolve } from "node:path";
 import { acquire, extractEntry, inspectZip } from "@witchwatch/acquisition";
 import {
   type CasePresentationV1,
@@ -14,6 +16,9 @@ import type { JobHandler } from "./worker.js";
 
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 const TIMEOUT_MS = 5 * 60 * 1000;
+const TERMINATION_GRACE_MS = 1_000;
+const MAX_OLD_SPACE_MIB = 4_096;
+const MAX_ADDRESS_SPACE_BYTES = 5 * 1024 * 1024 * 1024;
 const REMOTE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 const ZIP_LIMITS = {
   maxEntries: 64,
@@ -44,7 +49,20 @@ export interface EngineCaseResult {
 
 export interface EngineAnalysisResult {
   schemaVersion: 1;
-  demo: { sha256: string; mapName: string; bytes: number };
+  demo: {
+    sha256: string;
+    mapName: string;
+    bytes: number;
+    session?: {
+      serverToken: string | null;
+      rosterToken: string | null;
+      serverCount: number | null;
+      campaign: string | null;
+      chapter: number | null;
+      evidence: string[];
+    };
+    stats?: unknown;
+  };
   cases: EngineCaseResult[];
 }
 
@@ -63,20 +81,69 @@ export interface EngineDependencies {
   /** Test/embedded transport hook; production defaults to global fetch. */
   remoteFetch?: typeof globalThis.fetch;
   commandForDemo?: (path: string) => { command: string; args: string[] };
+  processLimits?: {
+    timeoutMs?: number;
+    maxOutputBytes?: number;
+    terminationGraceMs?: number;
+  };
   analyze?: (
     demo: PreparedDemo,
     context: { isCancelled(): boolean },
   ) => Promise<EngineAnalysisResult>;
 }
 
-export function engineCommand(path: string): {
+export function engineCommand(
+  path: string,
+  production = process.env.NODE_ENV === "production",
+): {
   command: string;
   args: string[];
 } {
-  return {
-    command: "pnpm",
-    args: ["--filter", "@witchwatch/cli", "dev", "evidence-bundle", path],
-  };
+  const entrypoint = production
+    ? ["apps/cli/dist/main.js"]
+    : [
+        "--import",
+        createRequire(import.meta.url).resolve("tsx"),
+        "apps/cli/src/main.ts",
+      ];
+  const nodeArgs = [
+    `--max-old-space-size=${MAX_OLD_SPACE_MIB}`,
+    ...(production && process.platform === "linux"
+      ? [
+          "--permission",
+          "--allow-fs-read=/workspace",
+          `--allow-fs-read=${resolve(path)}`,
+        ]
+      : []),
+    ...entrypoint,
+    "evidence-bundle",
+    path,
+  ];
+  // The tsx development loader initializes a WebAssembly parser whose virtual
+  // reservation is incompatible with a useful RLIMIT_AS. Production executes
+  // compiled JavaScript and keeps the stricter OS limits below.
+  if (production && process.platform === "linux") {
+    const sandbox =
+      process.env.WITCHWATCH_PARSER_SANDBOX ??
+      "/workspace/apps/worker/dist/parser-no-network";
+    if (!existsSync(sandbox))
+      throw new Error(`Production parser sandbox is unavailable: ${sandbox}`);
+    const sandboxed = [sandbox, process.execPath, ...nodeArgs];
+    if (!existsSync("/usr/bin/prlimit"))
+      return { command: sandboxed[0]!, args: sandboxed.slice(1) };
+    return {
+      command: "/usr/bin/prlimit",
+      args: [
+        `--as=${MAX_ADDRESS_SPACE_BYTES}`,
+        "--cpu=300",
+        "--nofile=64:64",
+        "--core=0:0",
+        "--",
+        ...sandboxed,
+      ],
+    };
+  }
+  return { command: process.execPath, args: nodeArgs };
 }
 
 function canonical(value: unknown): string {
@@ -169,59 +236,138 @@ function sanitizeUrl(value: string): string {
 /** Run the versioned CLI boundary without a shell, cancelling the child promptly. */
 async function analyzeWithCli(
   demo: PreparedDemo,
-  context: { isCancelled(): boolean },
+  context: {
+    isCancelled(): boolean;
+    progress(value: number, message: string): void;
+  },
   commandForDemo: EngineDependencies["commandForDemo"] = engineCommand,
   pseudonymKey = "witchwatch-dev-only-local-key-v1",
+  limits: NonNullable<EngineDependencies["processLimits"]> = {},
 ): Promise<EngineAnalysisResult> {
   const invocation = commandForDemo(demo.path);
+  const timeoutMs = limits.timeoutMs ?? TIMEOUT_MS;
+  const maxOutputBytes = limits.maxOutputBytes ?? MAX_OUTPUT_BYTES;
+  const terminationGraceMs = limits.terminationGraceMs ?? TERMINATION_GRACE_MS;
   const inspection = await new Promise<Record<string, unknown>>(
     (resolve, reject) => {
+      const childEnvironment = Object.fromEntries(
+        ["HOME", "LANG", "LC_ALL", "PATH", "TMPDIR", "TZ"]
+          .map((key) => [key, process.env[key]])
+          .filter((entry): entry is [string, string] => entry[1] !== undefined),
+      );
       const child = spawn(invocation.command, invocation.args, {
         cwd: "/workspace",
         env: {
-          ...process.env,
+          ...childEnvironment,
           CI: "true",
+          ...(process.env.NODE_ENV === "production"
+            ? {
+                NODE_ENV: "production",
+                NODE_OPTIONS: "--conditions=production",
+              }
+            : {}),
           WITCHWATCH_PSEUDONYM_KEY: pseudonymKey,
         },
+        detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "pipe"],
       });
       const chunks: Buffer[] = [];
+      let stderrBuffer = "";
+      let reportedProgress = 0.2;
+      let phaseCeiling = 0.223;
+      let phaseMessage = "Reading SourceTV demo stream";
       let outputBytes = 0,
-        settled = false;
+        settled = false,
+        terminalError: Error | undefined,
+        forceKill: NodeJS.Timeout | undefined;
       const finish = (error?: Error, value?: Record<string, unknown>) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
         clearInterval(cancellation);
+        clearInterval(heartbeat);
+        if (forceKill) clearTimeout(forceKill);
         if (error) reject(error);
         else resolve(value!);
       };
+      const signalChild = (signal: NodeJS.Signals) => {
+        try {
+          if (child.pid && process.platform !== "win32")
+            process.kill(-child.pid, signal);
+          else child.kill(signal);
+        } catch {
+          child.kill(signal);
+        }
+      };
+      const terminate = (error: Error) => {
+        if (terminalError) return;
+        terminalError = error;
+        clearTimeout(timeout);
+        clearInterval(cancellation);
+        clearInterval(heartbeat);
+        child.stdout.pause();
+        child.stderr.pause();
+        signalChild("SIGTERM");
+        forceKill = setTimeout(
+          () => signalChild("SIGKILL"),
+          terminationGraceMs,
+        );
+      };
       const timeout = setTimeout(() => {
-        child.kill("SIGTERM");
-        finish(new Error("Engine exceeded the five-minute local job limit"));
-      }, TIMEOUT_MS);
+        terminate(new Error("Engine exceeded the local job time limit"));
+      }, timeoutMs);
       const cancellation = setInterval(() => {
         if (context.isCancelled()) {
-          child.kill("SIGTERM");
-          finish(new Error("Engine cancelled by reviewer"));
+          terminate(new Error("Engine cancelled by reviewer"));
         }
       }, 50);
+      const heartbeat = setInterval(() => {
+        if (reportedProgress >= phaseCeiling) return;
+        reportedProgress = Math.min(phaseCeiling, reportedProgress + 0.008);
+        context.progress(reportedProgress, phaseMessage);
+      }, 650);
       child.stdout.on("data", (chunk: Buffer) => {
         outputBytes += chunk.byteLength;
-        if (outputBytes > MAX_OUTPUT_BYTES) {
-          child.kill("SIGTERM");
-          finish(new Error("Engine output exceeded the 16-megabyte limit"));
+        if (outputBytes > maxOutputBytes) {
+          terminate(new Error("Engine output exceeded the configured limit"));
         } else chunks.push(chunk);
       });
       child.stderr.on("data", (chunk: Buffer) => {
         outputBytes += chunk.byteLength;
-        if (outputBytes > MAX_OUTPUT_BYTES) {
-          child.kill("SIGTERM");
-          finish(new Error("Engine output exceeded the 16-megabyte limit"));
+        if (outputBytes > maxOutputBytes) {
+          terminate(new Error("Engine output exceeded the configured limit"));
+          return;
+        }
+        stderrBuffer += chunk.toString("utf8");
+        const lines = stderrBuffer.split("\n");
+        stderrBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("WITCHWATCH_PROGRESS ")) continue;
+          try {
+            const update = JSON.parse(line.slice(20)) as {
+              progress: number;
+              message: string;
+            };
+            const mapped =
+              0.2 + Math.max(0, Math.min(1, update.progress)) * 0.7;
+            const nextMilestone = [
+              0.14, 0.25, 0.62, 0.7, 0.78, 0.86, 0.96, 1,
+            ].find((value) => value > update.progress)!;
+            reportedProgress = Math.max(reportedProgress, mapped);
+            phaseCeiling = Math.min(0.9, 0.2 + nextMilestone * 0.7 - 0.005);
+            phaseMessage = update.message;
+            context.progress(reportedProgress, phaseMessage);
+          } catch {
+            // Progress telemetry is advisory and must never fail analysis.
+          }
         }
       });
       child.once("error", (error) => finish(error));
       child.once("exit", (code) => {
+        if (terminalError) {
+          finish(terminalError);
+          return;
+        }
         if (code !== 0)
           finish(new Error(`Engine exited with status ${code ?? "signal"}`));
         else {
@@ -411,16 +557,20 @@ export function createEngineJobHandler(
       context.progress(0.05, "Acquiring content-addressed demo artifact");
       const prepared = await prepareDemo(job, dependencies, abort.signal);
       if (context.isCancelled()) return;
-      context.progress(0.2, "Running versioned evidence engine");
+      context.progress(0.2, "Reading SourceTV demo stream");
       const result = dependencies.analyze
         ? await dependencies.analyze(prepared, {
             isCancelled: context.isCancelled,
           })
         : await analyzeWithCli(
             prepared,
-            { isCancelled: context.isCancelled },
+            {
+              isCancelled: context.isCancelled,
+              progress: context.progress,
+            },
             dependencies.commandForDemo,
             dependencies.pseudonymKey,
+            dependencies.processLimits,
           );
       if (context.isCancelled()) return;
       await persistAnalysis(

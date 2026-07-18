@@ -21,6 +21,7 @@ readonly OUTPUT_PATH="$REPOSITORY_ROOT/data/reference-validation/output"
 readonly DUMP_PATH="$OUTPUT_PATH/untitled-parser-dumps"
 
 mkdir -p "$(dirname "$TOOL_PATH")" "$DUMP_PATH"
+find "$DUMP_PATH" -maxdepth 1 -type f -name '*--demo-dump.txt' -delete
 
 if [[ ! -d "$TOOL_PATH/.git" ]]; then
   git clone "$REPOSITORY_URL" "$TOOL_PATH"
@@ -45,6 +46,12 @@ pnpm --dir "$REPOSITORY_ROOT" --filter @witchwatch/cli dev corpus "$CORPUS_PATH"
 
 git -C "$TOOL_PATH" rev-parse HEAD >"$OUTPUT_PATH/untitled-parser.commit"
 
+node "$REPOSITORY_ROOT/scripts/compare-untitled-framing.mjs" \
+  "$DUMP_PATH" \
+  "$OUTPUT_PATH/witchwatch-corpus.json" \
+  "$OUTPUT_PATH/untitled-parser.commit" \
+  >"$OUTPUT_PATH/untitled-framing-report.json"
+
 if command -v sha256sum >/dev/null 2>&1; then
   while IFS= read -r artifact; do
     sha256sum "$artifact"
@@ -58,4 +65,4 @@ else
 fi
 
 echo "Reference outputs: $OUTPUT_PATH"
-echo "Review UntitledParser dumps against witchwatch-corpus.json; unexplained header or outer-framing differences should become fixtures."
+echo "Independent outer-framing comparison passed. See untitled-framing-report.json."

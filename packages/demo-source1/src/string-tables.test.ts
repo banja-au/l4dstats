@@ -74,17 +74,25 @@ describe("demo string table snapshots", () => {
     ).toThrow(RangeError);
   });
 
-  it("extracts stable identity fields without exposing names", () => {
+  it("extracts bounded player identity fields", () => {
     const data = new Uint8Array(140);
     const view = new DataView(data.buffer);
-    view.setBigUint64(0, 76561198000000000n, true);
+    view.setBigUint64(0, 76561198000000000n, false);
     view.setInt32(40, 42, true);
     data[116] = 1;
+    data.set(new TextEncoder().encode("Coach Main"), 8);
     expect(decodeL4d2UserInfo(data)).toEqual({
       steamId64: 76561198000000000n,
+      displayName: "Coach Main",
       userId: 42,
       fakePlayer: true,
       sourceBytes: 140,
     });
+  });
+
+  it("normalizes the high-byte user ID shape emitted by SourceTV", () => {
+    const data = new Uint8Array(140);
+    new DataView(data.buffer).setInt32(40, 5 << 24, true);
+    expect(decodeL4d2UserInfo(data).userId).toBe(5);
   });
 });

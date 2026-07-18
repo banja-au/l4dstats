@@ -1,4 +1,4 @@
-import { BitReadError, BitReader } from "./bit-reader";
+import { BitReadError, BitReader } from "./bit-reader.js";
 import { uncompress } from "snappyjs";
 
 export interface DemoStringTableEntry {
@@ -177,12 +177,13 @@ function readEntries(
 
 export interface UserInfoIdentity {
   readonly steamId64: bigint;
+  readonly displayName: string;
   readonly userId: number;
   readonly fakePlayer: boolean;
   readonly sourceBytes: number;
 }
 
-/** Extracts identity fields only; names and GUID strings are deliberately omitted. */
+/** Extracts the bounded identity fields used by L4DStats; GUID text is omitted. */
 export function decodeL4d2UserInfo(data: Uint8Array): UserInfoIdentity {
   // Protocol-4 L4D2 player_info_t is at least 140 bytes including alignment.
   if (data.byteLength < 140)
@@ -195,11 +196,26 @@ export function decodeL4d2UserInfo(data: Uint8Array): UserInfoIdentity {
     );
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   return {
-    steamId64: view.getBigUint64(0, true),
-    userId: view.getInt32(40, true),
+    // Protocol-2100 serializes XUID in network order even though adjacent
+    // player_info_t scalar fields are little-endian.
+    steamId64: view.getBigUint64(0, false),
+    displayName: decodeNullTerminatedUtf8(data.subarray(8, 40)),
+    userId: normalizeL4d2UserId(view.getInt32(40, true)),
     fakePlayer: data[116] !== 0,
     sourceBytes: data.byteLength,
   };
+}
+
+function decodeNullTerminatedUtf8(bytes: Uint8Array): string {
+  const end = bytes.indexOf(0);
+  return new TextDecoder("utf-8", { fatal: false })
+    .decode(end < 0 ? bytes : bytes.subarray(0, end))
+    .trim();
+}
+
+/** Normalize the unambiguous high-byte user-ID shape seen in L4D2 SourceTV. */
+function normalizeL4d2UserId(value: number): number {
+  return value > 0xffff && (value & 0x00ffffff) === 0 ? value >>> 24 : value;
 }
 
 function limit(

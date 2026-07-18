@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, type Hash } from "node:crypto";
 import type { AvailableValue, PlayerObservation } from "@witchwatch/contracts";
 import type { ProjectedPlayerObservation } from "@witchwatch/l4d2-schema";
 import { createAimDetector, defaultAimConfig, type AimConfig } from "./aim.js";
@@ -61,7 +61,15 @@ export function buildRealAimEvidence(
 
   const config = options.aimConfig ?? defaultAimConfig;
   const normalized = normalizeInputs(options.demoSha256, options.observations);
-  const observationArtifactSha256 = sha256Canonical(normalized);
+  // Samples are a deterministic projection of these exact source rows under
+  // targetSelectionRule. Hashing both copies made large SourceTV demos pay the
+  // canonicalization cost twice without strengthening lineage.
+  const observationArtifactSha256 = sha256Canonical({
+    integrationVersion: normalized.integrationVersion,
+    demoSha256: normalized.demoSha256,
+    targetSelectionRule: normalized.targetSelectionRule,
+    sourceObservations: normalized.sourceObservations,
+  });
   const configSha256 = sha256Canonical({
     aimConfig: config,
     integrationVersion,
@@ -242,7 +250,74 @@ function isCompleteAimSample(sample: Sample): boolean {
 }
 
 export function sha256Canonical(value: unknown): string {
-  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+  const hash = createHash("sha256");
+  const sink = { buffer: "" };
+  writeCanonical(hash, value, sink);
+  if (sink.buffer) hash.update(sink.buffer);
+  return hash.digest("hex");
+}
+
+function writeCanonical(
+  hash: Hash,
+  value: unknown,
+  sink: { buffer: string },
+): void {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "string"
+  ) {
+    emitCanonical(hash, sink, JSON.stringify(value));
+    return;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value))
+      throw new TypeError(
+        "canonical artifacts cannot contain non-finite numbers",
+      );
+    emitCanonical(hash, sink, JSON.stringify(Object.is(value, -0) ? 0 : value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    emitCanonical(hash, sink, "[");
+    if (value.length > 1_000) {
+      value.forEach((item, index) => {
+        if (index) emitCanonical(hash, sink, ",");
+        emitCanonical(hash, sink, canonicalJson(item));
+      });
+      emitCanonical(hash, sink, "]");
+      return;
+    }
+    value.forEach((item, index) => {
+      if (index) emitCanonical(hash, sink, ",");
+      writeCanonical(hash, item, sink);
+    });
+    emitCanonical(hash, sink, "]");
+    return;
+  }
+  if (typeof value === "object") {
+    emitCanonical(hash, sink, "{");
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right));
+    entries.forEach(([key, item], index) => {
+      if (index) emitCanonical(hash, sink, ",");
+      emitCanonical(hash, sink, JSON.stringify(key));
+      emitCanonical(hash, sink, ":");
+      writeCanonical(hash, item, sink);
+    });
+    emitCanonical(hash, sink, "}");
+    return;
+  }
+  throw new TypeError(`unsupported canonical artifact value: ${typeof value}`);
+}
+
+function emitCanonical(hash: Hash, sink: { buffer: string }, fragment: string) {
+  sink.buffer += fragment;
+  if (sink.buffer.length >= 1024 * 1024) {
+    hash.update(sink.buffer);
+    sink.buffer = "";
+  }
 }
 
 export function canonicalJson(value: unknown): string {

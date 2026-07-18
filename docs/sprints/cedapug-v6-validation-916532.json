@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-07-18",
+  "source": {
+    "gameId": 916532,
+    "statsExportSha256": "5663c1c7a56c66878c0b72af66e557d4c05b54b8f3822fd01002820352546d83",
+    "demoSha256": {
+      "c8m1_apartment": "29a01c50379ab0b631861bcdbd7e91f86cd0374f9d917e00dcbaab347c41cf2c",
+      "c8m2_subway": "f0631582fec956a27e67c2bf6758db5a519b4863ecda25e4e18dc73082de7b20",
+      "c8m3_sewers": "2d1b6e6039ab9e7477c745e665ea788cbeaccada65408b8f9e97134a350d0947"
+    },
+    "derivationV6EvidenceBundleSha256": {
+      "c8m1_apartment": "0e2a3655a471fb3d909cd61948cf606cfef52e4677f4095b451f014adff17e24",
+      "c8m2_subway": "c687e2a5418d01caf1668f91e4f8de34cdd8025def9681b77dd4d32d424cd191",
+      "c8m3_sewers": "407a273c7d309d77d77d46e25c5192db0e79de3cd07755518bccd4e65f7baa48"
+    }
+  },
+  "engine": {
+    "competitiveDerivationVersion": 6,
+    "maps": [
+      {
+        "map": "c8m1_apartment",
+        "competitiveEpochs": 8,
+        "uniqueCompetitiveHumans": 8,
+        "anonymousCompetitiveHumans": 0,
+        "hitClusters": 21,
+        "overlappingHitWindows": 0,
+        "maximumObservedTeamHealthDrawdown": 56
+      },
+      {
+        "map": "c8m2_subway",
+        "competitiveEpochs": 8,
+        "uniqueCompetitiveHumans": 8,
+        "anonymousCompetitiveHumans": 0,
+        "hitClusters": 15,
+        "overlappingHitWindows": 0,
+        "maximumObservedTeamHealthDrawdown": 127
+      },
+      {
+        "map": "c8m3_sewers",
+        "competitiveEpochs": 9,
+        "uniqueCompetitiveHumans": 8,
+        "anonymousCompetitiveHumans": 0,
+        "hitClusters": 25,
+        "overlappingHitWindows": 0,
+        "maximumObservedTeamHealthDrawdown": 151,
+        "epochNote": "One Steam identity reconnects into a second entity epoch. Game aggregation merges both epochs into one competitive participant."
+      }
+    ]
+  },
+  "assertions": {
+    "canonicalChapterOrder": ["c8m1_apartment", "c8m2_subway", "c8m3_sewers"],
+    "allHitWindowsNonOverlapping": true,
+    "allHealthDrawdownsWithinFourSurvivorBound": true,
+    "allCompetitiveIdentitiesResolved": true,
+    "gameUniqueCompetitiveHumans": 8,
+    "checkpointTotalInfectedKillsExcludedFromRating": true
+  },
+  "browserBoundary": {
+    "path": "upload -> API -> worker -> production parser boundary -> SQLite -> shareable analysis",
+    "mapsUploaded": 3,
+    "desktopViewport": "1440x1000",
+    "mobileViewport": "390x844",
+    "mobileTabsAudited": [
+      "overview",
+      "players",
+      "combat",
+      "timeline",
+      "signals",
+      "data coverage"
+    ],
+    "documentOverflow": 0,
+    "visibleTextBelow11Px": 0,
+    "reconnectCollapsedToUniquePlayers": true,
+    "healthDrawdownsAtOrBelow400": true,
+    "elapsedMinutes": 3.8,
+    "result": "pass"
+  },
+  "limitations": [
+    "Sampled health drawdown is not attributable to the clustered Special Infected.",
+    "The CEDAPug export does not provide a player-state oracle for entity-by-entity comparison.",
+    "A licensed matching L4D2 installation was not available for playback-state validation."
+  ]
+}

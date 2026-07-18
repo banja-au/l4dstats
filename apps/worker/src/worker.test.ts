@@ -1,6 +1,8 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -121,18 +123,115 @@ function associationResult(
 }
 
 describe("LocalWorker", () => {
+  it("does not overlap parser jobs when timer ticks re-enter runOnce", async () => {
+    const repo = new WorkbenchRepository();
+    const first = repo.enqueue(
+      {
+        kind: "local",
+        path: "/tmp/first.dem",
+        sha256: "a".repeat(64),
+        bytes: 1,
+      },
+      "first",
+    );
+    const second = repo.enqueue(
+      {
+        kind: "local",
+        path: "/tmp/second.dem",
+        sha256: "b".repeat(64),
+        bytes: 1,
+      },
+      "second",
+    );
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered!: (jobId: string) => void;
+    const handlerEntered = new Promise<string>((resolve) => {
+      entered = resolve;
+    });
+    const worker = new LocalWorker(repo, async (job) => {
+      entered(job.id);
+      await blocked;
+    });
+    const active = worker.runOnce();
+    const activeJobId = await handlerEntered;
+    const queuedJobId = activeJobId === first.id ? second.id : first.id;
+    expect(await worker.runOnce()).toBe(false);
+    expect(repo.getJob(activeJobId)?.state).toBe("running");
+    expect(repo.getJob(queuedJobId)?.state).toBe("queued");
+    release();
+    expect(await active).toBe(true);
+    expect(repo.getJob(activeJobId)?.state).toBe("succeeded");
+    await worker.runOnce();
+    expect(repo.getJob(queuedJobId)?.state).toBe("succeeded");
+    repo.close();
+  });
+
   it("constructs a shell-free CLI invocation", () => {
-    expect(engineCommand("/data/inbox/a.dem")).toEqual({
-      command: "pnpm",
+    expect(engineCommand("/data/inbox/a.dem", false)).toEqual({
+      command: process.execPath,
       args: [
-        "--filter",
-        "@witchwatch/cli",
-        "dev",
+        "--max-old-space-size=4096",
+        "--import",
+        createRequire(import.meta.url).resolve("tsx"),
+        "apps/cli/src/main.ts",
         "evidence-bundle",
         "/data/inbox/a.dem",
       ],
     });
+    expect(engineCommand("/data/inbox/a.dem", true).args).toEqual([
+      `--as=${5 * 1024 * 1024 * 1024}`,
+      "--cpu=300",
+      "--nofile=64:64",
+      "--core=0:0",
+      "--",
+      "/workspace/apps/worker/dist/parser-no-network",
+      process.execPath,
+      "--max-old-space-size=4096",
+      "--permission",
+      "--allow-fs-read=/workspace",
+      "--allow-fs-read=/data/inbox/a.dem",
+      "apps/cli/dist/main.js",
+      "evidence-bundle",
+      "/data/inbox/a.dem",
+    ]);
   });
+
+  it.runIf(process.platform === "linux")(
+    "denies parser network and filesystem writes",
+    () => {
+      const sandbox = resolve("dist/parser-no-network");
+      expect(existsSync(sandbox)).toBe(true);
+      const network = spawnSync(
+        sandbox,
+        [
+          process.execPath,
+          "--input-type=module",
+          "-e",
+          "try{await fetch('https://example.com');process.exit(2)}catch{process.stdout.write('blocked')}",
+        ],
+        { cwd: resolve("apps/worker"), encoding: "utf8" },
+      );
+      expect(network.status).toBe(0);
+      expect(network.stdout).toBe("blocked");
+      const filesystem = spawnSync(
+        sandbox,
+        [
+          process.execPath,
+          "--permission",
+          "--input-type=module",
+          "-e",
+          "try{(await import('node:fs')).writeFileSync('/tmp/parser-escape','x');process.exit(2)}catch(e){process.stdout.write(e.code)}",
+        ],
+        { cwd: resolve("apps/worker"), encoding: "utf8" },
+      );
+      expect(filesystem.status).toBe(0);
+      expect(filesystem.stdout).toBe("ERR_ACCESS_DENIED");
+      expect(existsSync("/tmp/parser-escape")).toBe(false);
+    },
+  );
 
   it("persists a controlled production-shaped analysis with complete lineage", async () => {
     const root = await mkdtemp(join(tmpdir(), "witchwatch-worker-"));
@@ -798,6 +897,135 @@ describe("LocalWorker", () => {
     expect(repo.getJob(job.id)?.state).toBe("cancelled");
     repo.close();
   });
+
+  it("force-kills an engine that ignores the time-limit termination signal", async () => {
+    const root = await mkdtemp(join(tmpdir(), "witchwatch-timeout-worker-"));
+    cleanup.push(root);
+    const sourcePath = join(root, "timeout.dem"),
+      pidPath = join(root, "engine.pid"),
+      bytes = Buffer.from("HL2DEMO-controlled-timeout-fixture");
+    await writeFile(sourcePath, bytes);
+    const repo = new WorkbenchRepository();
+    const job = repo.enqueue(
+      {
+        kind: "local",
+        path: sourcePath,
+        sha256: sha256(bytes),
+        bytes: bytes.byteLength,
+      },
+      "controlled-timeout",
+    );
+    const handler = createEngineJobHandler(repo, {
+      artifactRoot: root,
+      allowedHosts: ["cedapug.com"],
+      commandForDemo: () => ({
+        command: process.execPath,
+        args: [
+          "-e",
+          `require("node:fs").writeFileSync(${JSON.stringify(pidPath)},String(process.pid));process.on("SIGTERM",()=>{});setInterval(()=>{},1000)`,
+        ],
+      }),
+      processLimits: { timeoutMs: 100, terminationGraceMs: 50 },
+    });
+    await new LocalWorker(repo, handler).runOnce();
+    expect(repo.getJob(job.id)).toMatchObject({
+      state: "failed",
+      message: "Engine exceeded the local job time limit",
+    });
+    const pid = Number(await readFile(pidPath, "utf8"));
+    expect(() => process.kill(pid, 0)).toThrow();
+    repo.close();
+  });
+
+  it("kills an engine before an output flood can be retained", async () => {
+    const root = await mkdtemp(join(tmpdir(), "witchwatch-output-worker-"));
+    cleanup.push(root);
+    const sourcePath = join(root, "output.dem"),
+      bytes = Buffer.from("HL2DEMO-controlled-output-fixture");
+    await writeFile(sourcePath, bytes);
+    const repo = new WorkbenchRepository();
+    const job = repo.enqueue(
+      {
+        kind: "local",
+        path: sourcePath,
+        sha256: sha256(bytes),
+        bytes: bytes.byteLength,
+      },
+      "controlled-output-flood",
+    );
+    const handler = createEngineJobHandler(repo, {
+      artifactRoot: root,
+      allowedHosts: ["cedapug.com"],
+      commandForDemo: () => ({
+        command: process.execPath,
+        args: [
+          "-e",
+          `process.stdout.write("x".repeat(8192));setInterval(()=>{},1000)`,
+        ],
+      }),
+      processLimits: { maxOutputBytes: 1_024, terminationGraceMs: 50 },
+    });
+    await new LocalWorker(repo, handler).runOnce();
+    expect(repo.getJob(job.id)).toMatchObject({
+      state: "failed",
+      message: "Engine output exceeded the configured limit",
+    });
+    repo.close();
+  });
+
+  it("does not expose service credentials to the parser process", async () => {
+    const root = await mkdtemp(join(tmpdir(), "witchwatch-env-worker-"));
+    cleanup.push(root);
+    const sourcePath = join(root, "environment.dem"),
+      bytes = Buffer.from("HL2DEMO-controlled-environment-fixture"),
+      demoSha256 = sha256(bytes);
+    await writeFile(sourcePath, bytes);
+    const repo = new WorkbenchRepository();
+    const job = repo.enqueue(
+      {
+        kind: "local",
+        path: sourcePath,
+        sha256: demoSha256,
+        bytes: bytes.byteLength,
+      },
+      "controlled-environment",
+    );
+    const result: EngineAnalysisResult = {
+      schemaVersion: 1,
+      demo: {
+        sha256: demoSha256,
+        mapName: "controlled_environment",
+        bytes: bytes.byteLength,
+      },
+      cases: [],
+    };
+    const priorToken = process.env.WITCHWATCH_API_TOKEN;
+    const priorPassword = process.env.WITCHWATCH_WEB_PASSWORD;
+    process.env.WITCHWATCH_API_TOKEN = "must-not-reach-parser";
+    process.env.WITCHWATCH_WEB_PASSWORD = "must-not-reach-parser";
+    try {
+      const handler = createEngineJobHandler(repo, {
+        artifactRoot: root,
+        allowedHosts: ["cedapug.com"],
+        commandForDemo: () => ({
+          command: process.execPath,
+          args: [
+            "-e",
+            `if(process.env.WITCHWATCH_API_TOKEN||process.env.WITCHWATCH_WEB_PASSWORD)process.exit(42);process.stdout.write(${JSON.stringify(JSON.stringify(result))})`,
+          ],
+        }),
+      });
+      await new LocalWorker(repo, handler).runOnce();
+      expect(repo.getJob(job.id)?.state).toBe("succeeded");
+    } finally {
+      if (priorToken === undefined) delete process.env.WITCHWATCH_API_TOKEN;
+      else process.env.WITCHWATCH_API_TOKEN = priorToken;
+      if (priorPassword === undefined)
+        delete process.env.WITCHWATCH_WEB_PASSWORD;
+      else process.env.WITCHWATCH_WEB_PASSWORD = priorPassword;
+      repo.close();
+    }
+  });
 });
 
 const corroboratingCorpusDemos = [
@@ -831,6 +1059,11 @@ describe.runIf(corroboratingCorpusDemos.every((path) => existsSync(path)))(
           ),
         );
         await new LocalWorker(repo, handler).runOnce();
+        const completed = repo.getJob(jobs.at(-1)!.id);
+        expect(
+          completed?.state,
+          completed?.message ?? "job has no message",
+        ).toBe("succeeded");
       }
       const results = jobs.map(
         (job) =>

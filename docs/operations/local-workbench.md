@@ -1,5 +1,8 @@
 # Local workbench operations
 
+For production health thresholds, incident triage and recovery verification,
+see [the production response runbook](production-response.md).
+
 ## Start and stop
 
 Docker Desktop is the only host requirement:
@@ -15,6 +18,13 @@ and `/health` are proxied to the API container. SQLite lives in the named
 `workbench-data` volume. Removing containers preserves it; `docker compose down -v`
 also removes that local database and is intentionally not part of the normal stop
 command.
+
+For a private production-shaped deployment, set the web credentials and API
+token documented below, then run `pnpm prod:docker`. The production overlay
+builds the API, worker and web application, runs their compiled output, and
+serves the SPA through the bounded Node static/proxy server instead of Vite
+development middleware. The server applies CSP, frame, MIME-sniffing, referrer
+and permissions headers and refuses to start when authentication is incomplete.
 
 ## Ingest
 
@@ -50,9 +60,54 @@ Runtime configuration:
 - `WITCHWATCH_LOCAL_ROOTS` is a comma-separated local ingest allowlist.
 - `WITCHWATCH_ALLOWED_HOSTS` is a comma-separated remote HTTPS allowlist.
 - `WITCHWATCH_PSEUDONYM_KEY` keys the HMAC used to associate the same stable
-  identity across independently ingested demos without retaining the raw identity.
+  identity across independently ingested demos without using a mutable player
+  name as a join key. Local analysis artifacts also retain the demo's display
+  name and SteamID64 so the statistics UI can identify players and link profiles.
 - `WITCHWATCH_STALE_JOB_MS` and `WITCHWATCH_MAX_JOB_ATTEMPTS` control abandoned
   lease recovery.
+- `WITCHWATCH_MUTATION_RATE_LIMIT` and
+  `WITCHWATCH_MUTATION_RATE_WINDOW_MS` bound non-read API requests per direct
+  client address, or per verified web identity when the authenticated proxy
+  supplies one. The local default is 120 mutations per minute. Identity headers
+  are ignored for quota selection unless the request also carries the valid
+  internal bearer token.
+- `WITCHWATCH_API_TOKEN` enables bearer authentication for every `/api` route.
+  It must contain at least 32 bytes. The Vite proxy injects it server-side, so
+  normal browser requests do not expose it in shipped JavaScript or browser
+  storage. `/health` stays unauthenticated for container health checks. The
+  Compose default is development-only; set a random secret before sharing the
+  service. This protects the API boundary but does not authenticate a browser
+  user because the trusted web proxy injects the bearer token.
+- `WITCHWATCH_AUTH_FAILURE_LIMIT` and
+  `WITCHWATCH_AUTH_FAILURE_WINDOW_MS` bound invalid bearer attempts per direct
+  client address. Successful authentication clears that client's failure
+  bucket. The default is 20 failures per five minutes.
+- Parser subprocesses use a direct shell-free Node invocation with bounded
+  memory, CPU, file descriptors, output, elapsed time and TERM-to-KILL cleanup.
+  Production analysis uses compiled CLI output and fails closed on Linux if its
+  seccomp launcher is absent. The launcher denies network-related syscalls and
+  ptrace/BPF/io_uring; Node permissions allow reads only from application code
+  and the single demo while denying writes, subprocesses, workers and addons.
+  API and web credentials are removed from the child environment. Run
+  `pnpm test:sandbox` to process a real demo through the compiled boundary.
+- `WITCHWATCH_WEB_USERNAME` and `WITCHWATCH_WEB_PASSWORD` enable a single-user
+  HTTP Basic gate in front of the complete web surface. They must be set
+  together and the password must contain at least 16 bytes. Use this only over
+  a trusted encrypted tunnel or TLS because Basic credentials are not encrypted
+  by HTTP itself. It is suitable for a private local/Twingate workbench, not a
+  substitute for multi-user identities, RBAC or an external identity proxy.
+  Both development and production web gates bound failures to 20 attempts per
+  client address over five minutes; a valid login clears the bucket.
+- `WITCHWATCH_WEB_USERS_JSON` replaces the two single-user variables for a
+  small team deployment. It is a JSON array of unique objects with `username`,
+  a password of at least 16 bytes, and role `viewer`, `reviewer`, or `admin`.
+  Viewers can open reports and use read-only API routes but cannot submit API
+  mutations. Reviewers and admins can mutate the current workbench API. The web
+  proxy strips caller-supplied identity and role headers, injects the verified
+  values beside its private bearer token, and the API gives each identity an
+  independent mutation quota. Keep the JSON in a secret manager or protected
+  environment file, never in Compose source or shell history. For internet
+  exposure, terminate TLS and prefer a mature external identity provider.
 
 The bundled pseudonym key is development-only. Set a long random
 `WITCHWATCH_PSEUDONYM_KEY` before reviewing non-fixture demos, keep it out of Git,
@@ -60,14 +115,79 @@ and retain it securely for the lifetime of the database. Rotating or losing the 
 intentionally prevents new demos from joining older cases. Tokens produced with
 different keys, and demo-local epochs where stable identity was unavailable, never
 corroborate one another. Case reports preserve each contributing demo/result hash,
-version/config/map lineage, and the privacy-token association explanation; they do
-not contain the raw platform identity.
+version/config/map lineage, and the privacy-token association explanation. Case
+reports do not contain the raw platform identity; access to local analysis
+artifacts must be treated as access to player identity.
 
 If a worker stops, queued/running metadata remains in SQLite. On API restart, a
 running lease older than five minutes is requeued; after three expired attempts it
 is failed instead of looping forever. Failed or cancelled work can be retried from
 the ingest dialog. Reports are canonical JSON; the UI recomputes SHA-256 before
 download and includes the digest in the filename.
+
+### Backup and restore
+
+Backups include the SQLite database, uploads, content-addressed analysis
+artifacts and extracted geometry in the `workbench-data` volume. The script
+briefly stops the API and worker for a consistent offline snapshot, preserves
+their prior running state, and writes a SHA-256 sidecar:
+
+```bash
+pnpm backup:docker
+# or choose an ignored destination
+pnpm backup:docker -- /path/to/backups
+```
+
+Restore is intentionally explicit and requires the matching checksum file. It
+verifies the checksum and archive member paths before replacing the volume. If
+extraction fails, the in-container pre-restore snapshot is put back before the
+services restart:
+
+```bash
+pnpm restore:docker -- backups/l4dstats-workbench-YYYYMMDDTHHMMSSZ.tar.gz --confirm-restore
+```
+
+Run a restore drill before relying on a backup: record a known game URL, create
+a backup, ingest or remove disposable state, restore, then confirm the URL and
+analysis hashes are unchanged. Copy backups away from the Docker host and apply
+the same access controls as the live volume because analysis artifacts contain
+player identities.
+
+The automated recovery gate exercises the same database-plus-artifact recovery
+boundary without requiring a Docker daemon. It creates a migrated SQLite
+workbench and content artifact, archives them, verifies the archive checksum and
+member safety, restores into a clean root, compares both hashes, reopens the
+database through the production storage package, and proves a corrupted archive
+is rejected:
+
+```bash
+pnpm test:recovery
+```
+
+### Retention and deletion
+
+Preview terminal jobs older than a chosen age without changing state:
+
+```bash
+pnpm retention:docker -- 30
+```
+
+Purge requires an explicit confirmation. The wrapper stops the API and worker,
+preserves their prior running state, stages eligible files by atomic rename,
+deletes metadata transactionally, then removes the staged files. A failure
+before the database commit restores staged files. Active jobs, shared demo
+objects, shared upload paths and cases backed by a retained copy survive.
+Audit tombstones record counts and the cutoff without retaining deleted player
+identities.
+
+```bash
+pnpm retention:docker -- 30 --confirm-purge
+```
+
+Only uploaded files beneath `WITCHWATCH_UPLOAD_ROOT` are eligible for source
+deletion. Files from the read-only inbox are never removed. Unreferenced
+content-addressed demo and result objects are deleted from
+`WITCHWATCH_ARTIFACT_ROOT`. Take and verify a backup before the first purge.
 
 ## Browser verification
 
@@ -84,10 +204,12 @@ under `apps/web/test-results` and `apps/web/playwright-report`.
 Every production web build runs `apps/web/scripts/check-asset-budget.mjs` and fails
 if the emitted first-load files exceed any raw-byte ceiling:
 
-- complete production output: 520 KiB;
-- JavaScript: 250 KiB;
-- CSS: 45 KiB;
+- complete production output: 740 KiB;
+- JavaScript: 314 KiB;
+- CSS: 76 KiB;
 - original hero illustration: 230 KiB;
+- background illustration: 150 KiB;
+- brand images: 75 KiB;
 - HTML: 8 KiB.
 
 Run the check again against an existing build with `pnpm --filter

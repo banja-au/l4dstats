@@ -5,3 +5,7 @@ packages:
 allowBuilds:
   "@tailwindcss/oxide": true
   esbuild: true
+
+overrides:
+  "esbuild@>=0.27.3 <0.28.1": 0.28.1
+  "vite@>=5.0.0 <8.0.0": 7.3.5

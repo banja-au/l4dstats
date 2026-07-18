@@ -10,8 +10,11 @@ playwright-report/
 !.env.example
 data/
 artifacts/
+tmp/
+*.tsbuildinfo
 *.dem
 *.zip
 *.db
 *.db-*
 .DS_Store
+backups/

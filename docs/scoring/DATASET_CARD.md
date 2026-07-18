@@ -113,7 +113,7 @@ separation is not evidence that natural gameplay generalizes similarly.
 
 ## Coverage and distribution-shift reporting
 
-Each release reports counts, missingness, and results—or `not evaluated`—for:
+Each release reports counts, missingness, and results - or `not evaluated` - for:
 
 - skill proxy;
 - latency/ping;

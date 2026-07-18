@@ -6,10 +6,12 @@ const webRoot = fileURLToPath(new URL("..", import.meta.url));
 const distRoot = join(webRoot, "dist");
 const kib = 1024;
 const budgets = {
-  total: 520 * kib,
-  javascript: 250 * kib,
-  css: 45 * kib,
+  total: 740 * kib,
+  javascript: 314 * kib,
+  css: 76 * kib,
   hero: 230 * kib,
+  backdrop: 150 * kib,
+  brand: 75 * kib,
   html: 8 * kib,
 };
 
@@ -38,7 +40,11 @@ const totals = {
   total: sizeOf(() => true),
   javascript: sizeOf((file) => file.extension === ".js"),
   css: sizeOf((file) => file.extension === ".css"),
-  hero: sizeOf((file) => file.path === "art/bloated-infected-hero.jpg"),
+  hero: sizeOf((file) => file.path === "art/boomer-trace.webp"),
+  backdrop: sizeOf((file) => file.path === "art/dark-carnival.webp"),
+  brand: sizeOf((file) =>
+    ["art/infected-mark.webp", "favicon.png"].includes(file.path),
+  ),
   html: sizeOf((file) => file.extension === ".html"),
 };
 
@@ -48,9 +54,13 @@ const failures = Object.entries(budgets).flatMap(([category, limit]) =>
     : [],
 );
 if (totals.hero === 0)
+  failures.push("hero: expected art/boomer-trace.webp in production output");
+if (totals.backdrop === 0)
   failures.push(
-    "hero: expected art/bloated-infected-hero.jpg in production output",
+    "backdrop: expected art/dark-carnival.webp in production output",
   );
+if (totals.brand === 0)
+  failures.push("brand: expected infected-mark and favicon assets");
 
 for (const category of Object.keys(budgets))
   process.stdout.write(

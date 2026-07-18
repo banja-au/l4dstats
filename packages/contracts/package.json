@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "production": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
@@ -12,6 +15,6 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   }
 }

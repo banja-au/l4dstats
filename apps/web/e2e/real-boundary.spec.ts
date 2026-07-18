@@ -1,143 +1,263 @@
-import { expect, test, type Page } from "@playwright/test";
-import { createHash } from "node:crypto";
+import { expect, test } from "@playwright/test";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 
-const demos = [
+const fallbackDemos = [
   "/workspace/data/sprint-4-e2e-corpus/915419_c2m3_coaster/915419_c2m3_coaster.dem",
   "/workspace/data/sprint-4-e2e-corpus/915419_c2m4_barns/915419_c2m4_barns.dem",
-] as const;
+];
+const freshDemos = [
+  "/workspace/tmp/fresh-counter-audit/916532_c8m1_apartment.dem",
+  "/workspace/tmp/fresh-counter-audit/916532_c8m2_subway.dem",
+  "/workspace/tmp/fresh-counter-audit/916532_c8m3_sewers.dem",
+];
+const hasFresh = freshDemos.every(existsSync);
+const hardRainDemos = [
+  "/workspace/tmp/demos/915679_c4m1_milltown_a.dem",
+  "/workspace/tmp/demos/915679_c4m2_sugarmill_a.dem",
+  "/workspace/tmp/demos/915679_c4m3_sugarmill_b.dem",
+  "/workspace/tmp/demos/915679_c4m4_milltown_b.dem",
+];
+const hasHardRain = hardRainDemos.every(existsSync);
+const geometryRoot = [
+  process.env.WITCHWATCH_GEOMETRY_ROOT,
+  "/tmp/l4d2-geometry-all",
+  "/tmp/l4d2-geometry",
+].find((candidate) => candidate && existsSync(`${candidate}/catalog.json`));
+const hardRainGeometry = hardRainDemos.map(
+  (demo) =>
+    `${geometryRoot}/${demo.match(/(c\d+m\d+_[a-z0-9_]+)\.dem$/i)?.[1]}.json`,
+);
+const hasHardRainGeometry =
+  geometryRoot !== undefined && hardRainGeometry.every(existsSync);
+const demos = hasFresh
+  ? freshDemos
+  : hasHardRain
+    ? hardRainDemos
+    : fallbackDemos;
 
-async function ingest(page: Page, path: string) {
-  await page.getByRole("button", { name: "Ingest demo" }).click();
-  await page.getByLabel("Container path").fill(path);
-  await page.getByRole("button", { name: /validate & queue/i }).click();
-  await expect(page.getByRole("status")).toContainText("succeeded", {
-    timeout: 8 * 60_000,
-  });
-  await page
-    .getByRole("button", { name: "Close ingest dialog" })
-    .last()
-    .click();
-}
-
-test("reviews a real corpus case through the API, worker, and storage boundary", async ({
+test("uploads and analyzes real demos through the browser, API, worker, and storage", async ({
   page,
-  request,
 }) => {
-  test.skip(
-    !demos.every(existsSync),
-    "ignored real same-player corpus is unavailable",
-  );
+  test.skip(!demos.every(existsSync), "ignored real corpus is unavailable");
+  test.setTimeout(12 * 60_000);
   await page.goto("/");
-  await ingest(page, demos[0]);
-  await ingest(page, demos[1]);
-
-  const summaries = (await (
-    await request.get("/api/cases?limit=100&offset=0")
-  ).json()) as {
-    items: Array<{ id: string }>;
-  };
-  const details = await Promise.all(
-    summaries.items.map(
-      async ({ id }) =>
-        (await (
-          await request.get(`/api/cases/${encodeURIComponent(id)}`)
-        ).json()) as {
-          id: string;
-          presentation: {
-            demos: Array<{ id: string; sha256: string }>;
-            evidence: Array<{
-              id: string;
-              title: string;
-              demoSha256: string;
-              tick: number;
-            }>;
-            association: { corroboratingDemoCount: number };
-          };
-        },
-    ),
-  );
-  const production = details.find(
-    (detail) =>
-      detail.presentation.demos.length === 2 &&
-      detail.presentation.association.corroboratingDemoCount === 1 &&
-      detail.presentation.evidence.length > 0,
-  );
-  expect(
-    production,
-    "real same-player corpus pair must produce a merged evidence case",
-  ).toBeTruthy();
-
-  await page.goto(`/?real-case=1#case/${production!.id}`);
-  await expect(page.getByLabel("Cross-demo evidence comparison")).toBeVisible();
-  for (const associatedDemo of production!.presentation.demos)
+  await page.locator('input[type="file"]').setInputFiles(demos);
+  await expect(page.getByRole("button", { name: "players" })).toBeVisible({
+    timeout: 10 * 60_000,
+  });
+  if (hasFresh) {
     await expect(
-      page.getByText(associatedDemo.sha256, { exact: true }).first(),
+      page.getByRole("heading", { level: 1, name: "No Mercy" }),
     ).toBeVisible();
-  const sourceDemo = production!.presentation.demos.find((candidate) =>
-    production!.presentation.evidence.some(
-      (event) => event.demoSha256 === candidate.sha256,
-    ),
-  )!;
-  const sourceEvidence = production!.presentation.evidence.find(
-    (event) => event.demoSha256 === sourceDemo.sha256,
-  );
-  if (sourceEvidence) {
-    await page
-      .getByRole("button", { name: new RegExp(sourceEvidence.title, "i") })
-      .click();
-    await page.getByRole("button", { name: /inspect .* context/i }).click();
-    await expect(page).toHaveURL(
-      new RegExp(
-        `#demo/${sourceDemo.id}\\?tick=${sourceEvidence.tick}&case=${production!.id}$`,
-      ),
-    );
-    await expect(page.getByRole("status")).toContainText(
-      `demo ${sourceDemo.sha256}`,
-    );
+    for (const map of ["c8m1_apartment", "c8m2_subway", "c8m3_sewers"])
+      await expect(
+        page.getByRole("link", { name: `Open analysis for ${map}` }),
+      ).toBeVisible();
+  } else if (hasHardRain) {
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Hard Rain" }),
+    ).toBeVisible();
+    await expect(page.getByText("525 : 122", { exact: true })).toBeVisible();
+    await expect(page.getByText("1,237 : 461", { exact: true })).toBeVisible();
+    await expect(page.getByText("1,485 : 698", { exact: true })).toBeVisible();
   } else {
-    const comparison = page.getByLabel("Cross-demo evidence comparison");
-    await expect(comparison).toContainText("no bounded windows");
+    await expect(page.getByText("c2m3_coaster", { exact: true })).toBeVisible();
+    await expect(page.getByText("c2m4_barns", { exact: true })).toBeVisible();
   }
-  const noEvidenceDemo = production!.presentation.demos.find(
-    (candidate) =>
-      !production!.presentation.evidence.some(
-        (event) => event.demoSha256 === candidate.sha256,
+  await page.getByRole("button", { name: "players" }).click();
+  await expect(
+    page.locator(".consolidated-player-table tbody tr").first(),
+  ).toBeVisible();
+  if (hasFresh) {
+    await expect(
+      page.locator(".consolidated-player-table tbody tr"),
+    ).toHaveCount(8);
+    await expect(
+      page.locator(
+        '.consolidated-player-table a[href^="https://steamcommunity.com/profiles/"]',
       ),
-  );
-  expect(
-    noEvidenceDemo,
-    "corroborating demo must preserve explicit no-evidence context",
-  ).toBeTruthy();
-  await page.goto(`/?real-case-return=1#case/${production!.id}`);
-  await expect(page.getByLabel("Cross-demo evidence comparison")).toContainText(
-    "no bounded windows",
-  );
+    ).toHaveCount(8);
+    await expect(page.getByText(/^Player [A-F0-9]{6}$/)).toHaveCount(0);
+    await page.getByRole("button", { name: "combat" }).click();
+    await expect(page.getByText("reanalyze for HP")).toHaveCount(0);
+    const healthDrawdowns = await page
+      .locator(".hp-loss-pill")
+      .allTextContents();
+    expect(healthDrawdowns.length).toBeGreaterThan(0);
+    expect(
+      healthDrawdowns.every((label) => {
+        const value = Number(label.replace(/[^0-9]/g, ""));
+        return Number.isFinite(value) && value <= 400;
+      }),
+    ).toBe(true);
+  } else if (hasHardRain) {
+    await expect(
+      page.locator(".consolidated-player-table tbody tr"),
+    ).toHaveCount(8);
+    await expect(
+      page.locator(
+        '.consolidated-player-table a[href^="https://steamcommunity.com/profiles/"]',
+      ),
+    ).toHaveCount(8);
+    for (const player of [
+      "BINGO #HDP",
+      "demigod",
+      "Yurasos",
+      "KICK/RIKACHUI",
+      "399",
+      "unbeatable",
+      "Путь к 15 000 MMR",
+      "Ｒｙｏ",
+    ])
+      await expect(
+        page.locator(".consolidated-player-table").getByText(player, {
+          exact: true,
+        }),
+      ).toBeVisible();
+    await expect(page.getByText(/^Player [A-F0-9]{6}$/)).toHaveCount(0);
 
-  await page.goto(`/?real-review=1#case/${production!.id}`);
-  await page.getByLabel("Review status").selectOption("needs-context");
-  const note =
-    "Real-boundary review: second demo has no bounded evidence window.";
-  await page.getByLabel("Add review note").fill(note);
-  await page.getByRole("button", { name: "Add note" }).click();
-  await expect(page.getByText(note)).toBeVisible();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: /export manifest/i }).click();
-  const artifact = await download;
-  expect(artifact.suggestedFilename()).toMatch(
-    new RegExp(`^${production!.id}-[a-f0-9]{64}\\.report\\.json$`),
-  );
-  const artifactPath = await artifact.path();
-  expect(artifactPath).not.toBeNull();
-  const reportText = await readFile(artifactPath!, "utf8");
-  const reportSha256 = createHash("sha256").update(reportText).digest("hex");
-  expect(artifact.suggestedFilename()).toContain(reportSha256);
-  expect(reportText).not.toMatch(/STEAM_|\[U:|7656119/);
-  const report = JSON.parse(reportText) as {
-    presentation: { demos: Array<{ sha256: string }> };
-    lineage: { sources: unknown[] };
-  };
-  expect(report.presentation.demos).toHaveLength(2);
-  expect(report.lineage.sources).toHaveLength(2);
+    await page.getByRole("button", { name: "combat" }).click();
+    if (hasHardRainGeometry) {
+      const geometryMaps = page.locator(".geometry-map");
+      const spatialWorkspace = page.locator(".spatial-workspace");
+      await expect(geometryMaps).toHaveCount(1);
+      await expect(
+        geometryMaps.getByText(/Spatial combat · actual BSP geometry/),
+      ).toHaveCount(1);
+      await expect(geometryMaps.locator("canvas")).toHaveCount(1);
+
+      const pixelProof: Array<{
+        map: string;
+        width: number;
+        height: number;
+        changedPixels: number;
+        markerPixels: number;
+      }> = [];
+      for (const map of [
+        "c4m1_milltown_a",
+        "c4m2_sugarmill_a",
+        "c4m3_sugarmill_b",
+        "c4m4_milltown_b",
+      ]) {
+        await page
+          .getByRole("button", { name: `Show spatial combat for ${map}` })
+          .click();
+        await expect(geometryMaps).toHaveCount(1);
+        await expect(geometryMaps.locator("h3")).toContainText(map);
+        await expect(
+          geometryMaps.getByText(/world-brush triangles · BSP/),
+        ).toHaveCount(1);
+        const canvas = await geometryMaps.locator("canvas").evaluate((node) => {
+          const element = node as HTMLCanvasElement;
+          const context = element.getContext("2d");
+          if (!context)
+            return {
+              width: 0,
+              height: 0,
+              changedPixels: 0,
+              markerPixels: 0,
+            };
+          const { data } = context.getImageData(
+            0,
+            0,
+            element.width,
+            element.height,
+          );
+          let changedPixels = 0;
+          let markerPixels = 0;
+          const markerPalette = [
+            [167, 255, 56],
+            [74, 199, 255],
+            [213, 140, 255],
+            [255, 193, 92],
+            [255, 102, 91],
+          ];
+          for (let offset = 0; offset < data.length; offset += 4) {
+            if (
+              data[offset] !== 8 ||
+              data[offset + 1] !== 13 ||
+              data[offset + 2] !== 10
+            )
+              changedPixels += 1;
+            if (
+              markerPalette.some(
+                ([red, green, blue]) =>
+                  Math.abs((data[offset] ?? 0) - red!) <= 2 &&
+                  Math.abs((data[offset + 1] ?? 0) - green!) <= 2 &&
+                  Math.abs((data[offset + 2] ?? 0) - blue!) <= 2,
+              )
+            )
+              markerPixels += 1;
+          }
+          return {
+            width: element.width,
+            height: element.height,
+            changedPixels,
+            markerPixels,
+          };
+        });
+        expect(canvas.width).toBeGreaterThan(0);
+        expect(canvas.height).toBeGreaterThan(0);
+        expect(canvas.changedPixels).toBeGreaterThan(1_000);
+        expect(canvas.markerPixels).toBeGreaterThan(20);
+        pixelProof.push({ map, ...canvas });
+        await test.info().attach(`${map}-canvas-pixel-proof`, {
+          body: Buffer.from(JSON.stringify({ map, ...canvas }, null, 2)),
+          contentType: "application/json",
+        });
+      }
+      test.info().annotations.push({
+        type: "geometry-pixel-proof",
+        description: JSON.stringify(pixelProof),
+      });
+      await test.info().attach("hard-rain-spatial-combat", {
+        body: await spatialWorkspace.screenshot(),
+        contentType: "image/png",
+      });
+    }
+  }
+  await page.getByRole("button", { name: "data coverage" }).click();
+  await expect(page.getByText("Reproducible inputs")).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const tab of [
+    "overview",
+    "players",
+    "combat",
+    "timeline",
+    "signals",
+    "data coverage",
+  ]) {
+    await page.getByRole("button", { name: tab, exact: true }).click();
+    const documentWidth = await page.evaluate(
+      () => document.documentElement.scrollWidth,
+    );
+    expect(documentWidth, `${tab} document width at 390px`).toBeLessThanOrEqual(
+      391,
+    );
+  }
+  const undersizedText = await page
+    .locator(".results-screen *")
+    .evaluateAll((elements) =>
+      elements
+        .filter(
+          (element) =>
+            (element as HTMLElement).offsetParent !== null &&
+            [...element.childNodes].some(
+              (node) =>
+                node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+            ) &&
+            Number.parseFloat(getComputedStyle(element).fontSize) < 11,
+        )
+        .map((element) => ({
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 60),
+          size: getComputedStyle(element).fontSize,
+        })),
+    );
+  expect(undersizedText).toEqual([]);
+  await test.info().attach("fresh-analysis-mobile", {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
 });

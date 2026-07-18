@@ -1,4 +1,4 @@
-import { BinaryReader, BinaryReadError } from "./reader";
+import { BinaryReader, BinaryReadError } from "./reader.js";
 import {
   DEMO_HEADER_BYTES,
   DEMO_STAMP,
@@ -10,7 +10,7 @@ import {
   type DemoDecodeResult,
   type DemoHeader,
   type Vector3,
-} from "./types";
+} from "./types.js";
 
 const DEFAULT_MAX_INPUT_BYTES = 512 * 1024 * 1024;
 const DEFAULT_MAX_COMMANDS = 10_000_000;

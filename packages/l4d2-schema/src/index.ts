@@ -8,15 +8,25 @@ export {
   type PlayerProjectionResult,
   type ProjectableUserInfo,
   type ProjectedPlayerObservation,
+  type L4d2PlayerState,
+  type L4d2PlayerLoadout,
+  type L4d2ActiveWeaponAmmo,
+  type L4d2WeaponIdentity,
+  l4d2WeaponIdentity,
+  type L4d2WitchObservation,
+  type L4d2MatchState,
+  l4d2CounterNames,
+  type L4d2CounterName,
   type ProjectionFieldProvenance,
-} from "./entity-projection";
+} from "./entity-projection.js";
 export {
   projectUserInfoIdentities,
   collectL4d2UserInfoTimeline,
   reconcileUserInfoTimeline,
   type UserInfoPrivacyOptions,
   type UserInfoProjectionResult,
-} from "./userinfo-identity";
+  type DisplayUserInfoIdentity,
+} from "./userinfo-identity.js";
 export {
   L4d2GameEventProjector,
   projectL4d2GameEvents,
@@ -25,7 +35,7 @@ export {
   type GameEventProjectionOptions,
   type GameEventProjectionResult,
   type ProjectedGameEventObservation,
-} from "./game-event-projection";
+} from "./game-event-projection.js";
 
 export interface PlayerConnection {
   readonly entitySlot: number;

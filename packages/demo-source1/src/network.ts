@@ -1,4 +1,4 @@
-import { BitReadError, BitReader } from "./bit-reader";
+import { BitReadError, BitReader } from "./bit-reader.js";
 
 export const SOURCE1_MESSAGE_TYPE_BITS = 6;
 

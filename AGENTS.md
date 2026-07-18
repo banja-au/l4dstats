@@ -4,7 +4,7 @@ Instructions apply to the entire repository.
 
 ## Mission
 
-Build a reproducible L4D2 demo review aid. Optimize for evidence quality, simple code, and reviewer comprehension—not impressive-looking certainty.
+Build a reproducible L4D2 demo review aid. Optimize for evidence quality, simple code, and reviewer comprehension, not impressive-looking certainty.
 
 ## Non-negotiables
 
@@ -18,7 +18,7 @@ Build a reproducible L4D2 demo review aid. Optimize for evidence quality, simple
 
 ## Working method
 
-- Read `README.md`, `PLAN.md`, `docs/ARCHITECTURE.md`, and the relevant ADR before changing architecture.
+- Read `README.md`, `L4D2.md`, `DEMO-DATA.md`, `docs/L4DSTATS-RATING.md`, `PLAN.md`, `docs/ARCHITECTURE.md`, and the relevant ADR before changing architecture. Treat `L4D2.md` as the shared Versus/domain model. Treat `DEMO-DATA.md` as the source of truth for extracted, derived, and unavailable demo data; update it with every parsing/statistics change and never render unavailable data as zero. Keep the rating methodology, `packages/l4d2-rating`, and its adapters synchronized whenever rating inputs, formulas, weights, eligibility, confidence, MVP selection, or scientific claims change.
 - Work one sprint outcome or smaller vertical slice at a time. Do not create speculative packages.
 - Prefer pure functions and narrow interfaces. Detector logic must not know about HTTP, storage, or React.
 - Keep the canonical observation and evidence contracts versioned and append-compatible.

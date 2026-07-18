@@ -1,23 +1,23 @@
-import { decodeDemo } from "./decode";
+import { decodeDemo } from "./decode.js";
 import {
   decodeL4d2DataTables,
   flattenServerClasses,
   type FlattenedServerClass,
-} from "./data-tables";
+} from "./data-tables.js";
 import {
   decodeInstanceBaselines,
   decodePacketEntityData,
   EntityReconstructor,
   type EntityFrame,
-} from "./entities";
-import { extractNetworkBits, inspectNetworkPayload } from "./network";
-import { decodeStringTableSnapshot } from "./string-tables";
+} from "./entities.js";
+import { extractNetworkBits, inspectNetworkPayload } from "./network.js";
+import { decodeStringTableSnapshot } from "./string-tables.js";
 import {
   L4d2GameEventDecoder,
   projectRequiredGameEvent,
   type DecodedGameEvent,
   type RequiredGameEventProjection,
-} from "./game-events";
+} from "./game-events.js";
 
 export interface EntityFrameVisit {
   readonly demoTick: number;

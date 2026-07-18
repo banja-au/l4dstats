@@ -8,11 +8,23 @@ export type JobHandler = (
   },
 ) => Promise<void>;
 export class LocalWorker {
+  #running = false;
+
   public constructor(
     private readonly repo: WorkbenchRepository,
     private readonly handler: JobHandler,
   ) {}
   public async runOnce(): Promise<boolean> {
+    if (this.#running) return false;
+    this.#running = true;
+    try {
+      return await this.#runClaimedJob();
+    } finally {
+      this.#running = false;
+    }
+  }
+
+  async #runClaimedJob(): Promise<boolean> {
     const job = this.repo.claimNext();
     if (!job) return false;
     const context = {

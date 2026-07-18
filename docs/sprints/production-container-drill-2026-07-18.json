@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-07-18",
+  "environment": {
+    "architecture": "arm64",
+    "dockerVersion": "29.1.3",
+    "composeVersion": "1.29.2",
+    "storageDriver": "vfs",
+    "isolatedSocket": "/tmp/l4dstats-docker.sock",
+    "networking": "disabled",
+    "iptables": false
+  },
+  "results": {
+    "daemonInitialized": true,
+    "composeRendered": true,
+    "composeSecurityInvariantsPassed": true,
+    "productionImageBuilt": false,
+    "productionStackStarted": false,
+    "liveRestoreRun": false
+  },
+  "blocker": {
+    "stage": "Docker build container creation",
+    "error": "unshare: operation not permitted",
+    "kernelCause": "The sandbox capability bounding set excludes CAP_SYS_ADMIN, so nested build namespaces cannot be created.",
+    "applicationFailure": false,
+    "requiredEnvironment": "A Docker or compatible OCI host permitted to create containers"
+  },
+  "cleanup": {
+    "daemonTerminatedGracefully": true,
+    "productionContainersCreated": 0
+  }
+}

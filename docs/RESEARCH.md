@@ -40,4 +40,4 @@ Start local-first with SQLite plus content-addressed files and a persistent in-p
 
 ## Product and ethics
 
-The strongest conclusion is a constraint: behavior can prioritize review but cannot establish software use by itself. The UI must separate suspicion from data quality, expose counterevidence, preserve exact source ticks and versions, require human review, support correction/appeal, and avoid public naming or automatic punishment. Ground truth comes from consented clean sessions, controlled known configurations and blinded expert review—not reports or high skill.
+The strongest conclusion is a constraint: behavior can prioritize review but cannot establish software use by itself. The UI must separate suspicion from data quality, expose counterevidence, preserve exact source ticks and versions, require human review, support correction/appeal, and avoid public naming or automatic punishment. Ground truth comes from consented clean sessions, controlled known configurations and blinded expert review - not reports or high skill.

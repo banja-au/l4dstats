@@ -29,6 +29,23 @@ export interface PlayerProjectionOptions {
   readonly userInfo: readonly ProjectableUserInfo[];
   /** Streaming sink. Observations are not retained by the projector. */
   readonly onObservation?: (observation: ProjectedPlayerObservation) => void;
+  /** Streaming sink for bounded Witch entity state. */
+  readonly onWitchObservation?: (observation: L4d2WitchObservation) => void;
+}
+
+export interface L4d2WitchObservation {
+  readonly entityIndex: number;
+  readonly lifetime: number;
+  readonly tick: number;
+  readonly timeSeconds?: number | undefined;
+  /**
+   * Cell-relative origin from DT_Witch. This is not a world coordinate and
+   * must never be overlaid on BSP geometry without validated cell state.
+   */
+  readonly cellRelativeOrigin?: Vector3 | undefined;
+  readonly rage?: number | undefined;
+  readonly wanderRage?: number | undefined;
+  readonly burning?: boolean | undefined;
 }
 
 export interface ProjectionFieldProvenance {
@@ -43,6 +60,8 @@ export interface ProjectionFieldProvenance {
 
 export interface ProjectedPlayerObservation {
   readonly observation: PlayerObservation;
+  /** L4D2-specific network state retained for match-stat derivation. */
+  readonly l4d2: L4d2PlayerState;
   readonly provenance: Readonly<
     Record<
       | "demoTimeSeconds"
@@ -56,6 +75,104 @@ export interface ProjectedPlayerObservation {
     >
   >;
 }
+
+export interface L4d2PlayerState {
+  readonly entityIndex: number;
+  readonly health?: number | undefined;
+  readonly maxHealth?: number | undefined;
+  readonly healthBuffer?: number | undefined;
+  readonly lifeState?: number | undefined;
+  readonly incapacitated?: boolean | undefined;
+  readonly ghost?: boolean | undefined;
+  readonly versusTeam?: number | undefined;
+  readonly checkpointZombieKills?: readonly number[] | undefined;
+  readonly checkpointRevives?: number | undefined;
+  readonly checkpointIncaps?: number | undefined;
+  readonly checkpointSpecialIncaps?: number | undefined;
+  readonly checkpointPounces?: number | undefined;
+  readonly highestPounceDamage?: number | undefined;
+  readonly longestJockeyRide?: number | undefined;
+  readonly frustration?: number | undefined;
+  readonly tongueVictim?: number | undefined;
+  readonly pounceVictim?: number | undefined;
+  readonly jockeyVictim?: number | undefined;
+  readonly carryVictim?: number | undefined;
+  readonly pummelVictim?: number | undefined;
+  readonly loadout?: L4d2PlayerLoadout | undefined;
+  readonly activeWeaponAmmo?: L4d2ActiveWeaponAmmo | undefined;
+  readonly counters?:
+    | Readonly<Partial<Record<L4d2CounterName, number>>>
+    | undefined;
+}
+
+export interface L4d2ActiveWeaponAmmo {
+  readonly weaponClass?: string | undefined;
+  readonly primaryAmmoType?: number | undefined;
+  readonly clip?: number | undefined;
+  readonly reserve?: number | undefined;
+  readonly reloading?: boolean | undefined;
+  readonly extraPrimaryAmmo?: number | undefined;
+  readonly upgradedAmmoLoaded?: number | undefined;
+}
+
+export interface L4d2PlayerLoadout {
+  /** Observed CTerrorPlayerResource weapon ID. Zero means the slot is empty. */
+  readonly primaryWeaponId?: number | undefined;
+  readonly firstAidSlotId?: number | undefined;
+  readonly pillsSlotId?: number | undefined;
+}
+
+export interface L4d2WeaponIdentity {
+  readonly id: number;
+  readonly name: string;
+  readonly category:
+    | "primary"
+    | "secondary"
+    | "medical"
+    | "temporary-health"
+    | "utility"
+    | "infected"
+    | "world"
+    | "unknown";
+}
+
+export const l4d2CounterNames = [
+  "m_checkpointSurvivorDamage",
+  "m_checkpointMedkitsUsed",
+  "m_checkpointPillsUsed",
+  "m_checkpointMolotovsUsed",
+  "m_checkpointPipebombsUsed",
+  "m_checkpointBoomerBilesUsed",
+  "m_checkpointAdrenalinesUsed",
+  "m_checkpointDefibrillatorsUsed",
+  "m_checkpointDamageTaken",
+  "m_checkpointFirstAidShared",
+  "m_checkpointDamageToTank",
+  "m_checkpointDamageToWitch",
+  "m_missionAccuracy",
+  "m_checkpointHeadshots",
+  "m_checkpointHeadshotAccuracy",
+  "m_checkpointDeaths",
+  "m_checkpointMeleeKills",
+  "m_checkpointPZTankDamage",
+  "m_checkpointPZHunterDamage",
+  "m_checkpointPZSmokerDamage",
+  "m_checkpointPZBoomerDamage",
+  "m_checkpointPZJockeyDamage",
+  "m_checkpointPZSpitterDamage",
+  "m_checkpointPZChargerDamage",
+  "m_checkpointPZKills",
+  "m_checkpointPZPushes",
+  "m_checkpointPZTankPunches",
+  "m_checkpointPZTankThrows",
+  "m_checkpointPZHung",
+  "m_checkpointPZPulled",
+  "m_checkpointPZBombed",
+  "m_checkpointPZVomited",
+  "m_checkpointPZLongestSmokerGrab",
+  "m_checkpointPZNumChargeVictims",
+] as const;
+export type L4d2CounterName = (typeof l4d2CounterNames)[number];
 
 export interface PlayerProjectionCoverage {
   readonly framesVisited: number;
@@ -81,6 +198,22 @@ export interface PlayerProjectionCoverage {
 export interface PlayerProjectionResult {
   readonly playerEpochs: readonly PlayerEpoch[];
   readonly coverage: PlayerProjectionCoverage;
+  readonly matchStates: readonly L4d2MatchState[];
+}
+
+export interface L4d2MatchState {
+  readonly tick: number;
+  readonly campaignScores: readonly number[];
+  readonly chapterScores: readonly number[];
+  readonly survivorScores: readonly number[];
+  readonly survivorDistances: readonly number[];
+  readonly survivorDeathDistances: readonly number[];
+  readonly roundDurations: readonly number[];
+  readonly roundNumber?: number | undefined;
+  readonly teamsFlipped?: boolean | undefined;
+  readonly secondHalf?: boolean | undefined;
+  readonly voteRestarting?: boolean | undefined;
+  readonly roundSetupTimeRemaining?: number | undefined;
 }
 
 interface ActiveEpoch {
@@ -134,6 +267,8 @@ export class L4d2PlayerProjector {
   >;
   #framesVisited = 0;
   #observationsEmitted = 0;
+  #matchStates: L4d2MatchState[] = [];
+  #matchStateSignature = "";
 
   constructor(options: PlayerProjectionOptions) {
     if (!/^[a-f\d]{64}$/i.test(options.demoSha256))
@@ -173,13 +308,25 @@ export class L4d2PlayerProjector {
 
   visit(value: EntityFrameVisit): void {
     this.#framesVisited += 1;
+    this.#recordMatchState(value);
     const activePlayers = new Set<number>();
+    const playerResource = [...value.frame.entities.values()].find(
+      (entity) =>
+        entity.active &&
+        value.classes[entity.classId]?.className === "CTerrorPlayerResource",
+    );
     for (const entity of value.frame.entities.values()) {
-      if (
-        !entity.active ||
-        value.classes[entity.classId]?.className !== "CTerrorPlayer"
-      )
-        continue;
+      if (!entity.active) continue;
+      const className = value.classes[entity.classId]?.className;
+      if (className === "Witch")
+        this.#options.onWitchObservation?.(
+          projectWitchObservation(
+            value,
+            entity,
+            this.#options.tickIntervalSeconds,
+          ),
+        );
+      if (className !== "CTerrorPlayer") continue;
       activePlayers.add(entity.entityIndex);
       const epoch = this.#epochFor(entity, value.demoTick);
       const projected = projectObservation(
@@ -187,6 +334,7 @@ export class L4d2PlayerProjector {
         epoch.epoch.id,
         value,
         entity,
+        playerResource,
         this.#options.tickIntervalSeconds,
       );
       this.#record(projected);
@@ -211,7 +359,70 @@ export class L4d2PlayerProjector {
         observationsEmitted: this.#observationsEmitted,
         fieldAvailability: this.#counts,
       },
+      matchStates: this.#matchStates,
     };
+  }
+
+  #recordMatchState(value: EntityFrameVisit): void {
+    const rules = [...value.frame.entities.values()].find(
+      (entity) =>
+        entity.active &&
+        value.classes[entity.classId]?.className === "CTerrorGameRulesProxy",
+    );
+    if (!rules) return;
+    const playerResource = [...value.frame.entities.values()].find(
+      (entity) =>
+        entity.active &&
+        value.classes[entity.classId]?.className === "CTerrorPlayerResource",
+    );
+    const teamsFlipped = readScalar(rules.properties, [
+      "m_bAreTeamsFlipped",
+    ]).value;
+    const secondHalf = readScalar(rules.properties, [
+      "m_bInSecondHalfOfRound",
+    ]).value;
+    const voteRestarting = readScalar(rules.properties, [
+      "m_bIsVersusVoteRestarting",
+    ]).value;
+    const state: L4d2MatchState = {
+      tick: value.demoTick,
+      campaignScores: readIndexed(rules.properties, "m_iCampaignScore", 2),
+      chapterScores: readIndexed(rules.properties, "m_iChapterScore", 2),
+      survivorScores: readIndexed(rules.properties, "m_iSurvivorScore", 2),
+      survivorDistances: readIndexed(
+        rules.properties,
+        "m_iVersusDistancePerSurvivor",
+        8,
+      ),
+      survivorDeathDistances: readIndexed(
+        rules.properties,
+        "m_iVersusSurvivorDeathDistance",
+        8,
+      ),
+      roundDurations: readIndexed(rules.properties, "m_flRoundDuration", 2),
+      roundNumber: readScalar(rules.properties, ["m_nRoundNumber"]).value,
+      ...(teamsFlipped === undefined
+        ? {}
+        : { teamsFlipped: teamsFlipped === 1 }),
+      ...(secondHalf === undefined ? {} : { secondHalf: secondHalf === 1 }),
+      ...(voteRestarting === undefined
+        ? {}
+        : { voteRestarting: voteRestarting === 1 }),
+      ...(playerResource === undefined
+        ? {}
+        : (() => {
+            const value = readScalar(playerResource.properties, [
+              "m_nRoundSetupTimeRemaining",
+            ]).value;
+            return value === undefined
+              ? {}
+              : { roundSetupTimeRemaining: value };
+          })()),
+    };
+    const signature = JSON.stringify({ ...state, tick: 0 });
+    if (signature === this.#matchStateSignature) return;
+    this.#matchStateSignature = signature;
+    this.#matchStates.push(state);
   }
 
   #epochFor(entity: EntitySnapshot, tick: number): ActiveEpoch {
@@ -265,6 +476,29 @@ export class L4d2PlayerProjector {
   }
 }
 
+function projectWitchObservation(
+  value: EntityFrameVisit,
+  entity: EntitySnapshot,
+  tickIntervalSeconds: number | undefined,
+): L4d2WitchObservation {
+  const cellRelativeOrigin = readPosition(entity.properties).available.value;
+  const rage = readScalar(entity.properties, ["m_rage"]).value;
+  const wanderRage = readScalar(entity.properties, ["m_wanderrage"]).value;
+  const burning = readScalar(entity.properties, ["m_bIsBurning"]).value;
+  return {
+    entityIndex: entity.entityIndex,
+    lifetime: entity.lifetime,
+    tick: value.demoTick,
+    ...(tickIntervalSeconds === undefined
+      ? {}
+      : { timeSeconds: value.engineTick * tickIntervalSeconds }),
+    ...(cellRelativeOrigin === undefined ? {} : { cellRelativeOrigin }),
+    ...(rage === undefined ? {} : { rage }),
+    ...(wanderRage === undefined ? {} : { wanderRage }),
+    ...(burning === undefined ? {} : { burning: burning !== 0 }),
+  };
+}
+
 /** Convenience streaming entry point over the protocol-2100 entity visitor. */
 export function projectL4d2PlayerObservations(
   bytes: Uint8Array,
@@ -280,6 +514,7 @@ function projectObservation(
   playerEpochId: string,
   value: EntityFrameVisit,
   player: EntitySnapshot,
+  playerResource: EntitySnapshot | undefined,
   tickIntervalSeconds: number | undefined,
 ): ProjectedPlayerObservation {
   const position = readPosition(player.properties);
@@ -299,7 +534,7 @@ function projectObservation(
   const playerClass =
     zombieClass.value === undefined
       ? absent<string>("networked zombie class was unavailable")
-      : present(`zombie-class:${zombieClass.value}`, zombieClass.paths);
+      : present(l4d2ClassName(zombieClass.value), zombieClass.paths);
   const buttons = absent<number>(
     "SourceTV does not contain per-player user-command buttons",
   );
@@ -321,6 +556,7 @@ function projectObservation(
       weapon: weapon.available,
       buttons: buttons.available,
     },
+    l4d2: projectL4d2State(player, playerResource, value),
     provenance: {
       demoTimeSeconds: demoTime.provenance,
       position: position.provenance,
@@ -333,6 +569,201 @@ function projectObservation(
       weapon: weapon.provenance,
       buttons: buttons.provenance,
     },
+  };
+}
+
+function l4d2ClassName(value: number): string {
+  return (
+    {
+      1: "Smoker",
+      2: "Boomer",
+      3: "Hunter",
+      4: "Spitter",
+      5: "Jockey",
+      6: "Charger",
+      7: "Witch",
+      8: "Tank",
+      9: "Survivor",
+    }[value] ?? `zombie-class:${value}`
+  );
+}
+
+function projectL4d2State(
+  player: EntitySnapshot,
+  playerResource: EntitySnapshot | undefined,
+  value: EntityFrameVisit,
+): L4d2PlayerState {
+  const scalar = (name: string) => readScalar(player.properties, [name]).value;
+  const flag = (name: string) => {
+    const value = scalar(name);
+    return value === undefined ? undefined : value !== 0;
+  };
+  const handle = (name: string) => {
+    const value = scalar(name);
+    if (value === undefined || value === 0x1fffff) return undefined;
+    return value & 0x7ff;
+  };
+  const zombieKills = readNumberArray(
+    player.properties,
+    ["m_checkpointZombieKills"],
+    1,
+  )?.value;
+  const activeWeaponHandle = handle("m_hActiveWeapon");
+  const activeWeapon =
+    activeWeaponHandle === undefined
+      ? undefined
+      : value.frame.entities.get(activeWeaponHandle);
+  const weaponScalar = (name: string) =>
+    activeWeapon === undefined
+      ? undefined
+      : readScalar(activeWeapon.properties, [name]).value;
+  const primaryAmmoType = weaponScalar("m_iPrimaryAmmoType");
+  const reserve =
+    primaryAmmoType === undefined || primaryAmmoType < 0
+      ? undefined
+      : scalar(`m_iAmmo.${String(primaryAmmoType).padStart(3, "0")}`);
+  const reload = weaponScalar("m_bInReload");
+  return {
+    entityIndex: player.entityIndex,
+    health: scalar("m_iHealth"),
+    maxHealth: scalar("m_iMaxHealth"),
+    healthBuffer: scalar("m_healthBuffer"),
+    lifeState: scalar("m_lifeState"),
+    incapacitated: flag("m_isIncapacitated"),
+    ghost: flag("m_isGhost"),
+    versusTeam: scalar("m_iVersusTeam"),
+    checkpointZombieKills: zombieKills,
+    checkpointRevives: scalar("m_checkpointReviveOtherCount"),
+    checkpointIncaps: scalar("m_checkpointIncaps"),
+    checkpointSpecialIncaps: scalar("m_checkpointPZIncaps"),
+    checkpointPounces: scalar("m_checkpointPZPounces"),
+    highestPounceDamage: scalar("m_checkpointPZHighestDmgPounce"),
+    longestJockeyRide: scalar("m_checkpointPZLongestJockeyRide"),
+    frustration: scalar("m_frustration"),
+    tongueVictim: handle("m_tongueVictim"),
+    pounceVictim: handle("m_pounceVictim"),
+    jockeyVictim: handle("m_jockeyVictim"),
+    carryVictim: handle("m_carryVictim"),
+    pummelVictim: handle("m_pummelVictim"),
+    ...(playerResource === undefined
+      ? {}
+      : {
+          loadout: {
+            primaryWeaponId: readScalar(playerResource.properties, [
+              `m_primaryWeapon.${String(player.entityIndex).padStart(3, "0")}`,
+            ]).value,
+            firstAidSlotId: readScalar(playerResource.properties, [
+              `m_firstAidSlot.${String(player.entityIndex).padStart(3, "0")}`,
+            ]).value,
+            pillsSlotId: readScalar(playerResource.properties, [
+              `m_pillsSlot.${String(player.entityIndex).padStart(3, "0")}`,
+            ]).value,
+          },
+        }),
+    ...(activeWeapon === undefined
+      ? {}
+      : {
+          activeWeaponAmmo: {
+            weaponClass: value.classes[activeWeapon.classId]?.className,
+            primaryAmmoType,
+            clip: weaponScalar("m_iClip1"),
+            reserve,
+            ...(reload === undefined ? {} : { reloading: reload !== 0 }),
+            extraPrimaryAmmo: weaponScalar("m_iExtraPrimaryAmmo"),
+            upgradedAmmoLoaded: weaponScalar("m_nUpgradedPrimaryAmmoLoaded"),
+          },
+        }),
+    counters: Object.fromEntries(
+      l4d2CounterNames.flatMap((name) => {
+        const value = scalar(name);
+        return value === undefined ? [] : [[name, value]];
+      }),
+    ),
+  };
+}
+
+const weaponNames = [
+  "Empty",
+  "Pistol",
+  "SMG",
+  "Pump Shotgun",
+  "Auto Shotgun",
+  "Assault Rifle",
+  "Hunting Rifle",
+  "Silenced SMG",
+  "Chrome Shotgun",
+  "Desert Rifle",
+  "Military Sniper",
+  "SPAS Shotgun",
+  "First Aid Kit",
+  "Molotov",
+  "Pipe Bomb",
+  "Pain Pills",
+  "Gas Can",
+  "Propane Tank",
+  "Oxygen Tank",
+  "Melee Weapon",
+  "Chainsaw",
+  "Grenade Launcher",
+  "Ammo Pack",
+  "Adrenaline",
+  "Defibrillator",
+  "Boomer Bile",
+  "AK-47",
+  "Gnome Chompski",
+  "Cola Bottles",
+  "Fireworks Box",
+  "Incendiary Ammo",
+  "Explosive Ammo",
+  "Magnum",
+  "MP5",
+  "SG 552",
+  "AWP",
+  "Scout",
+  "M60",
+  "Tank Claw",
+  "Hunter Claw",
+  "Charger Claw",
+  "Boomer Claw",
+  "Smoker Claw",
+  "Spitter Claw",
+  "Jockey Claw",
+  "Mounted Machine Gun",
+  "Fatal Vomit",
+  "Exploding Splat",
+  "Lunge Pounce",
+  "Lounge",
+  "Full Pull",
+  "Choke",
+  "Tank Rock",
+  "Hittable Physics",
+  "Ammo",
+  "Upgrade Item",
+] as const;
+
+export function l4d2WeaponIdentity(id: number): L4d2WeaponIdentity {
+  const category: L4d2WeaponIdentity["category"] =
+    id === 0
+      ? "unknown"
+      : id >= 38 && id <= 52
+        ? "infected"
+        : [1, 19, 20, 32].includes(id)
+          ? "secondary"
+          : [
+                2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 21, 26, 33, 34, 35, 36, 37,
+              ].includes(id)
+            ? "primary"
+            : [12, 24].includes(id)
+              ? "medical"
+              : [15, 23].includes(id)
+                ? "temporary-health"
+                : [13, 14, 22, 25, 30, 31, 55].includes(id)
+                  ? "utility"
+                  : "world";
+  return {
+    id,
+    name: weaponNames[id] ?? `Unknown weapon ID ${id}`,
+    category,
   };
 }
 
@@ -460,6 +891,19 @@ function readNumberArray(
       };
   }
   return undefined;
+}
+
+function readIndexed(
+  properties: ReadonlyMap<string, SendPropValue>,
+  prefix: string,
+  count: number,
+): readonly number[] {
+  return Array.from(
+    { length: count },
+    (_, index) =>
+      readScalar(properties, [`${prefix}.${String(index).padStart(3, "0")}`])
+        .value ?? 0,
+  );
 }
 
 function present<T>(

@@ -1,6 +1,6 @@
-export { decodeDemo } from "./decode";
-export { BinaryReader, BinaryReadError } from "./reader";
-export { BitReader, BitReadError } from "./bit-reader";
+export { decodeDemo } from "./decode.js";
+export { BinaryReader, BinaryReadError } from "./reader.js";
+export { BitReader, BitReadError } from "./bit-reader.js";
 export {
   decodeClassBaseline,
   decodeInstanceBaselines,
@@ -19,7 +19,7 @@ export {
   type PacketEntityUpdate,
   type PacketEntitiesEnvelope,
   type SendPropValue,
-} from "./entities";
+} from "./entities.js";
 export {
   extractNetworkBits,
   inspectNetworkPayload,
@@ -34,7 +34,7 @@ export {
   type NetworkMessageEnvelope,
   type GameEventDataEnvelope,
   type GameEventListEnvelope,
-} from "./network";
+} from "./network.js";
 export {
   decodeL4d2UserInfo,
   decodeStringTableSnapshot,
@@ -50,7 +50,7 @@ export {
   type UserInfoIdentity,
   type NetworkStringTableChange,
   type NetworkStringTableSchema,
-} from "./string-tables";
+} from "./string-tables.js";
 export {
   decodeL4d2DataTables,
   flattenServerClasses,
@@ -61,7 +61,7 @@ export {
   type SendPropSchema,
   type SendTableSchema,
   type ServerClassSchema,
-} from "./data-tables";
+} from "./data-tables.js";
 export {
   visitL4d2EntityFrames,
   visitL4d2GameEvents,
@@ -69,7 +69,7 @@ export {
   type EntityTelemetrySummary,
   type GameEventVisit,
   type GameEventTelemetrySummary,
-} from "./telemetry";
+} from "./telemetry.js";
 export {
   decodeL4d2GameEvent,
   decodeL4d2GameEventList,
@@ -85,7 +85,7 @@ export {
   type GameEventValue,
   type RequiredGameEventName,
   type RequiredGameEventProjection,
-} from "./game-events";
+} from "./game-events.js";
 export {
   DEMO_HEADER_BYTES,
   DEMO_STAMP,
@@ -99,4 +99,4 @@ export {
   type DemoHeader,
   type DemoParseErrorCode,
   type Vector3,
-} from "./types";
+} from "./types.js";

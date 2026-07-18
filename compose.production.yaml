@@ -1,0 +1,98 @@
+x-app: &app
+  image: l4dstats:local
+  build:
+    context: .
+    dockerfile: Dockerfile.production
+  init: true
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  stop_grace_period: 10s
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+
+x-environment: &environment
+  NODE_ENV: production
+  NODE_OPTIONS: --conditions=production
+  WITCHWATCH_DB: /var/lib/witchwatch/workbench.sqlite
+  WITCHWATCH_UPLOAD_ROOT: /var/lib/witchwatch/uploads
+  WITCHWATCH_ARTIFACT_ROOT: /var/lib/witchwatch
+  WITCHWATCH_GEOMETRY_ROOT: /var/lib/witchwatch/geometry
+  WITCHWATCH_WORKER_HEARTBEAT: /var/lib/witchwatch/worker-heartbeat.json
+  WITCHWATCH_LOCAL_ROOTS: /data/inbox
+  WITCHWATCH_ALLOWED_HOSTS: cedapug.com
+  WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:?set WITCHWATCH_API_TOKEN}
+  WITCHWATCH_MUTATION_RATE_LIMIT: "120"
+  WITCHWATCH_MUTATION_RATE_WINDOW_MS: "60000"
+  WITCHWATCH_AUTH_FAILURE_LIMIT: "20"
+  WITCHWATCH_AUTH_FAILURE_WINDOW_MS: "300000"
+  WITCHWATCH_SEED_EXAMPLE: "false"
+
+services:
+  api:
+    <<: *app
+    command: ["node", "apps/api/dist/main.js"]
+    environment: *environment
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8787/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+    cpus: 1
+    mem_limit: 1g
+    pids_limit: 128
+    volumes:
+      - workbench-data:/var/lib/witchwatch
+      - ./data/sprint-1-corpus/extracted:/data/inbox:ro
+
+  worker:
+    <<: *app
+    command: ["node", "apps/worker/dist/main.js"]
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      <<: *environment
+      WITCHWATCH_PSEUDONYM_KEY: ${WITCHWATCH_PSEUDONYM_KEY:?set WITCHWATCH_PSEUDONYM_KEY}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const s=require('node:fs').statSync(process.env.WITCHWATCH_WORKER_HEARTBEAT);if(Date.now()-s.mtimeMs>15000)process.exit(1)"
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
+    cpus: 2
+    mem_limit: 6g
+    pids_limit: 256
+    volumes:
+      - workbench-data:/var/lib/witchwatch
+      - ./data/sprint-1-corpus/extracted:/data/inbox:ro
+
+  web:
+    <<: *app
+    command: ["node", "apps/web/server.mjs"]
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      WITCHWATCH_API_URL: http://api:8787
+      WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:?set WITCHWATCH_API_TOKEN}
+      WITCHWATCH_WEB_USERNAME: ${WITCHWATCH_WEB_USERNAME:-}
+      WITCHWATCH_WEB_PASSWORD: ${WITCHWATCH_WEB_PASSWORD:-}
+      WITCHWATCH_WEB_USERS_JSON: ${WITCHWATCH_WEB_USERS_JSON:-}
+      WITCHWATCH_REQUIRE_AUTH: "true"
+    ports:
+      - "0.0.0.0:5173:5173"
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 128
+
+volumes:
+  workbench-data:

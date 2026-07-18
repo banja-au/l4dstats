@@ -76,7 +76,7 @@ calibration gates passed.
 
 This near-perfect result is expected from a deliberately separable synthetic
 engineering fixture. It proves determinism, split isolation, metrics, artifact
-binding, and policy behavior—not difficulty representative of natural gameplay.
+binding, and policy behavior - not difficulty representative of natural gameplay.
 The generated report is authoritative for complete reliability bins, bootstrap
 intervals, PR points, assumed-prevalence sensitivity, and explicitly unevaluated
 slices.

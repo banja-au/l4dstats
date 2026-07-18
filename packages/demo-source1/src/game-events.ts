@@ -1,4 +1,4 @@
-import { BitReader } from "./bit-reader";
+import { BitReader } from "./bit-reader.js";
 
 export const gameEventFieldTypes = {
   string: 1,

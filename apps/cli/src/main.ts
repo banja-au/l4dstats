@@ -4,17 +4,24 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { decodeDemo, DemoParseError } from "@witchwatch/demo-source1";
-import { detectorCards, exploreFeatures, parseFeatureRequest } from "./explore";
+import {
+  detectorCards,
+  exploreFeatures,
+  parseFeatureRequest,
+} from "./explore.js";
 import {
   comparePlaybackCheckpoints,
   exportPlaybackCheckpoints,
   parsePlaybackExportRequest,
   type PlaybackCheckpointExport,
   type PlaybackReference,
-} from "./playback-validation";
-import { stableJson, summarizeDemo, type DemoInspection } from "./report";
-import { buildEvidenceBundle } from "./evidence-bundle";
-import { parseControlledDataset, writeCalibrationArtifacts } from "./scoring";
+} from "./playback-validation.js";
+import { stableJson, summarizeDemo, type DemoInspection } from "./report.js";
+import { buildEvidenceBundle } from "./evidence-bundle.js";
+import {
+  parseControlledDataset,
+  writeCalibrationArtifacts,
+} from "./scoring.js";
 
 const inspect = async (path: string): Promise<DemoInspection> => {
   const bytes = await readFile(path);
@@ -116,7 +123,13 @@ const main = async (): Promise<void> => {
       );
     process.stdout.write(
       stableJson(
-        buildEvidenceBundle(await readFile(resolve(target)), { pseudonymKey }),
+        buildEvidenceBundle(await readFile(resolve(target)), {
+          pseudonymKey,
+          onProgress: (progress, message) =>
+            process.stderr.write(
+              `WITCHWATCH_PROGRESS ${JSON.stringify({ progress, message })}\n`,
+            ),
+        }),
       ),
     );
     return;
