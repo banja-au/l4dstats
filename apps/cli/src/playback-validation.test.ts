@@ -1,11 +1,19 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   comparePlaybackCheckpoints,
+  exportPlaybackCheckpoints,
   parsePlaybackExportRequest,
   type PlaybackCheckpointExport,
   type PlaybackReference,
 } from "./playback-validation";
+import { prepareNativeDemoProjection } from "./native-demo-provider";
+
+const corpusDemo = resolve(
+  "../../data/sprint-1-corpus/extracted/901780_c2m1_highway/901780_c2m1_highway.dem",
+);
 
 const bytes = (value: unknown) => Buffer.from(`${JSON.stringify(value)}\n`);
 const hash = (value: Uint8Array) =>
@@ -67,6 +75,33 @@ const reference = (position = 10.02): PlaybackReference => ({
 });
 
 describe("playback validation", () => {
+  it.runIf(existsSync(corpusDemo))(
+    "exports selected checkpoints from the native prepared projection",
+    async () => {
+      const prepared = await prepareNativeDemoProjection(
+        readFileSync(corpusDemo),
+        { pseudonymKey: "witchwatch-playback-validation-v1" },
+      );
+      const tick = prepared.observations[0]!.observation.tick;
+      const exported = exportPlaybackCheckpoints(prepared, {
+        schemaVersion: 1,
+        ticks: [tick],
+        witchwatchRevision: "native-test",
+      });
+      expect(exported.demoSha256).toBe(prepared.demoSha256);
+      expect(exported.mapName).toBe(prepared.header.mapName);
+      expect(exported.checkpoints[0]?.players.length).toBeGreaterThan(0);
+      expect(
+        exportPlaybackCheckpoints(prepared, {
+          schemaVersion: 1,
+          ticks: [tick],
+          witchwatchRevision: "native-test",
+          tickIntervalSeconds: 0.01,
+        }),
+      ).toEqual(exported);
+    },
+    120_000,
+  );
   it("normalizes and validates export requests", () => {
     expect(
       parsePlaybackExportRequest({

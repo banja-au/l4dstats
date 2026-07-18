@@ -168,22 +168,22 @@ export interface DemoStats {
     witchDeaths: number;
     specialKillsByClass: Record<string, number>;
     killsByWeapon: Record<string, number>;
-    campaignScores?: number[];
-    chapterScores?: number[];
-    survivorScores?: number[];
-    survivorDistances?: number[];
-    survivorDeathDistances?: number[];
-    roundDurations?: number[];
+    campaignScores?: Array<number | null>;
+    chapterScores?: Array<number | null>;
+    survivorScores?: Array<number | null>;
+    survivorDistances?: Array<number | null>;
+    survivorDeathDistances?: Array<number | null>;
+    roundDurations?: Array<number | null>;
     roundNumber?: number | null;
     teamsFlipped?: boolean | null;
     secondHalf?: boolean | null;
     scoreTimeline?: Array<{
       tick: number;
       timeSeconds: number;
-      campaignScores: number[];
-      chapterScores: number[];
-      survivorScores: number[];
-      survivorDistances: number[];
+      campaignScores: Array<number | null>;
+      chapterScores: Array<number | null>;
+      survivorScores: Array<number | null>;
+      survivorDistances: Array<number | null>;
       teamsFlipped: boolean | null;
       secondHalf: boolean | null;
       voteRestarting?: boolean | null;
@@ -406,6 +406,16 @@ export interface JobAnalysis {
   engineResult: {
     schemaVersion: 1;
     demo: {
+      parser?: {
+        engine: "rust-native";
+        coreVersion: string;
+        bindingVersion: string | null;
+        bindingApiVersion: number | null;
+        configVersion: number;
+        wireVersion: number;
+        parserConfigId: string;
+        buildSha256: string | null;
+      };
       sha256: string;
       mapName: string;
       bytes: number;

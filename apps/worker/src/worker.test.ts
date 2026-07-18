@@ -15,6 +15,7 @@ import { createApi } from "@witchwatch/api";
 import {
   createEngineJobHandler,
   engineCommand,
+  validateNativeParserAttestation,
   type EngineAnalysisResult,
 } from "./engine.js";
 import { LocalWorker } from "./worker.js";
@@ -24,6 +25,97 @@ afterEach(async () => {
   await Promise.all(
     cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true })),
   );
+});
+
+describe("native parser analysis attestation", () => {
+  const build = "a".repeat(64);
+  const result = (cases: EngineAnalysisResult["cases"] = []) =>
+    ({
+      schemaVersion: 1,
+      demo: {
+        sha256: "b".repeat(64),
+        mapName: "controlled_grid",
+        bytes: 1,
+        parser: {
+          engine: "rust-native",
+          coreVersion: "0.1.0",
+          bindingVersion: "0.1.0",
+          bindingApiVersion: 2,
+          configVersion: 1,
+          wireVersion: 1,
+          parserConfigId: "source1-l4d2-2100-v1",
+          buildSha256: build,
+        },
+      },
+      cases,
+    }) satisfies EngineAnalysisResult;
+
+  it("accepts a valid zero-case native analysis", () => {
+    expect(() => validateNativeParserAttestation(result())).not.toThrow();
+  });
+
+  it("rejects missing and legacy TypeScript parser attestations", () => {
+    const missing = result();
+    delete (missing.demo as EngineAnalysisResult["demo"]).parser;
+    expect(() => validateNativeParserAttestation(missing)).toThrow(
+      "invalid native parser attestation",
+    );
+    const oracle = result() as unknown as {
+      demo: { parser: { engine: string } };
+    };
+    oracle.demo.parser.engine = "typescript-oracle";
+    expect(() =>
+      validateNativeParserAttestation(
+        oracle as unknown as EngineAnalysisResult,
+      ),
+    ).toThrow("invalid native parser attestation");
+  });
+
+  it("rejects an unstamped build and mismatched case lineage", () => {
+    const unstamped = result();
+    unstamped.demo.parser!.buildSha256 = "0".repeat(64);
+    expect(() => validateNativeParserAttestation(unstamped)).toThrow(
+      "invalid native parser attestation",
+    );
+    const mismatch = result([
+      {
+        id: "case",
+        playerKey: "player",
+        status: "unreviewed",
+        score: {},
+        evidence: [],
+        windows: [],
+        versions: {
+          parser: "wrong",
+          schema: "v1",
+          detectors: [],
+          model: "none",
+        },
+        config: {},
+        map: { name: "controlled_grid", assetVersion: "unavailable" },
+        derivation: [],
+        limitations: [],
+        presentation: {
+          schemaVersion: 1,
+          id: "case",
+          alias: "Player",
+          identityLabel: "controlled",
+          provenance: { controlledFixture: false, label: "controlled" },
+          demos: [],
+          evidence: [],
+          association: {
+            kind: "demo-local-epoch",
+            corroboratingDemoCount: 0,
+            explanation: "controlled",
+          },
+          summary: { encounterCount: 0, independentSignalFamilies: [] },
+        },
+      },
+    ]);
+    expect(() => validateNativeParserAttestation(mismatch)).toThrow(
+      "does not match",
+    );
+  });
 });
 
 function associationResult(
@@ -191,6 +283,7 @@ describe("LocalWorker", () => {
       process.execPath,
       "--max-old-space-size=4096",
       "--permission",
+      "--allow-addons",
       "--allow-fs-read=/workspace",
       "--allow-fs-read=/data/inbox/a.dem",
       "apps/cli/dist/main.js",
@@ -996,6 +1089,16 @@ describe("LocalWorker", () => {
         sha256: demoSha256,
         mapName: "controlled_environment",
         bytes: bytes.byteLength,
+        parser: {
+          engine: "rust-native",
+          coreVersion: "0.1.0",
+          bindingVersion: "0.1.0",
+          bindingApiVersion: 2,
+          configVersion: 1,
+          wireVersion: 1,
+          parserConfigId: "source1-l4d2-2100-v1",
+          buildSha256: "a".repeat(64),
+        },
       },
       cases: [],
     };
@@ -1036,104 +1139,108 @@ const corroboratingCorpusDemos = [
     "../../data/sprint-4-e2e-corpus/915419_c2m4_barns/915419_c2m4_barns.dem",
   ),
 ] as const;
+const nativeParserIsStamped = (() => {
+  try {
+    const binding = createRequire(import.meta.url)(
+      resolve("../../crates/demo-source1-node/dist/demo-source1-node.node"),
+    ) as { bindingMetadata(): { buildSha256?: unknown } };
+    const build = binding.bindingMetadata().buildSha256;
+    return typeof build === "string" && !/^0{64}$/.test(build);
+  } catch {
+    return false;
+  }
+})();
 
-describe.runIf(corroboratingCorpusDemos.every((path) => existsSync(path)))(
-  "real-corpus worker integration",
-  () => {
-    it("merges a real positive default bundle with a same-player zero-evidence demo", async () => {
-      const root = await mkdtemp(join(tmpdir(), "witchwatch-real-worker-"));
-      cleanup.push(root);
-      const repo = new WorkbenchRepository();
-      const handler = createEngineJobHandler(repo, {
-        artifactRoot: root,
-        allowedHosts: ["cedapug.com"],
-        pseudonymKey: "witchwatch-dev-only-local-key-v1",
-      });
-      const jobs = [];
-      for (const [index, path] of corroboratingCorpusDemos.entries()) {
-        const bytes = await readFile(path);
-        jobs.push(
-          repo.enqueue(
-            { kind: "local", path, sha256: sha256(bytes), bytes: bytes.length },
-            `real-correlated-${index}`,
-          ),
-        );
-        await new LocalWorker(repo, handler).runOnce();
-        const completed = repo.getJob(jobs.at(-1)!.id);
-        expect(
-          completed?.state,
-          completed?.message ?? "job has no message",
-        ).toBe("succeeded");
-      }
-      const results = jobs.map(
-        (job) =>
-          repo.getJobAnalysis(job.id) as { engineResult: EngineAnalysisResult },
+describe.runIf(
+  nativeParserIsStamped &&
+    corroboratingCorpusDemos.every((path) => existsSync(path)),
+)("real-corpus worker integration", () => {
+  it("merges a real positive default bundle with a same-player zero-evidence demo", async () => {
+    const root = await mkdtemp(join(tmpdir(), "witchwatch-real-worker-"));
+    cleanup.push(root);
+    const repo = new WorkbenchRepository();
+    const handler = createEngineJobHandler(repo, {
+      artifactRoot: root,
+      allowedHosts: ["cedapug.com"],
+      pseudonymKey: "witchwatch-dev-only-local-key-v1",
+    });
+    const jobs = [];
+    for (const [index, path] of corroboratingCorpusDemos.entries()) {
+      const bytes = await readFile(path);
+      jobs.push(
+        repo.enqueue(
+          { kind: "local", path, sha256: sha256(bytes), bytes: bytes.length },
+          `real-correlated-${index}`,
+        ),
       );
-      const positive = results[0]!.engineResult.cases.find(
-        (item) => item.evidence.length > 0,
+      await new LocalWorker(repo, handler).runOnce();
+      const completed = repo.getJob(jobs.at(-1)!.id);
+      expect(completed?.state, completed?.message ?? "job has no message").toBe(
+        "succeeded",
       );
-      expect(positive).toBeDefined();
-      const corroborating = results[1]!.engineResult.cases.find(
-        (item) => item.id === positive!.id,
+    }
+    const results = jobs.map(
+      (job) =>
+        repo.getJobAnalysis(job.id) as { engineResult: EngineAnalysisResult },
+    );
+    const positive = results[0]!.engineResult.cases.find(
+      (item) => item.evidence.length > 0,
+    );
+    expect(positive).toBeDefined();
+    const corroborating = results[1]!.engineResult.cases.find(
+      (item) => item.id === positive!.id,
+    );
+    expect(corroborating).toBeDefined();
+    expect(corroborating!.evidence).toHaveLength(0);
+    expect(corroborating!.windows).toHaveLength(0);
+    expect(corroborating!.score).toMatchObject({
+      status: "insufficient-data",
+    });
+    const merged = repo.getCasePresentation(positive!.id);
+    expect(merged).toMatchObject({
+      association: {
+        kind: "stable-privacy-token",
+        corroboratingDemoCount: 1,
+      },
+    });
+    expect(merged.demos).toHaveLength(2);
+    expect(merged.evidence).toHaveLength(positive!.evidence.length);
+    expect(JSON.parse(repo.getCase(positive!.id)!.scoreJson)).toMatchObject({
+      status: "ranked-evidence",
+    });
+    expect(
+      (repo.getCaseLineage(positive!.id) as { sources: unknown[] }).sources,
+    ).toHaveLength(2);
+    const serializedLineage = JSON.stringify(repo.getCaseLineage(positive!.id));
+    expect(serializedLineage).not.toContain("/workspace/");
+    expect(serializedLineage).not.toContain("witchwatch-dev-only-local-key-v1");
+    for (const job of jobs)
+      expect(serializedLineage).toContain(
+        (repo.getJobAnalysis(job.id) as { demoSha256: string }).demoSha256,
       );
-      expect(corroborating).toBeDefined();
-      expect(corroborating!.evidence).toHaveLength(0);
-      expect(corroborating!.windows).toHaveLength(0);
-      expect(corroborating!.score).toMatchObject({
-        status: "insufficient-data",
-      });
-      const merged = repo.getCasePresentation(positive!.id);
-      expect(merged).toMatchObject({
-        association: {
-          kind: "stable-privacy-token",
-          corroboratingDemoCount: 1,
-        },
-      });
-      expect(merged.demos).toHaveLength(2);
-      expect(merged.evidence).toHaveLength(positive!.evidence.length);
-      expect(JSON.parse(repo.getCase(positive!.id)!.scoreJson)).toMatchObject({
-        status: "ranked-evidence",
-      });
-      expect(
-        (repo.getCaseLineage(positive!.id) as { sources: unknown[] }).sources,
-      ).toHaveLength(2);
-      const serializedLineage = JSON.stringify(
-        repo.getCaseLineage(positive!.id),
-      );
-      expect(serializedLineage).not.toContain("/workspace/");
-      expect(serializedLineage).not.toContain(
-        "witchwatch-dev-only-local-key-v1",
-      );
-      for (const job of jobs)
-        expect(serializedLineage).toContain(
-          (repo.getJobAnalysis(job.id) as { demoSha256: string }).demoSha256,
-        );
-      const api = createApi(repo, {
-        allowedHosts: ["cedapug.com"],
-        allowedLocalRoots: [resolve("../../data/sprint-4-e2e-corpus")],
-        maxLocalBytes: 2 ** 31,
-      });
-      await new Promise<void>((resolveListen) =>
-        api.listen(0, "127.0.0.1", resolveListen),
-      );
-      const address = api.address();
-      if (!address || typeof address === "string")
-        throw new Error("real API did not bind");
-      const detail = (await fetch(
-        `http://127.0.0.1:${address.port}/api/cases/${positive!.id}`,
-      ).then((value) => value.json())) as { presentation: unknown };
-      expect(detail.presentation).toEqual(merged);
-      const report = (await fetch(
-        `http://127.0.0.1:${address.port}/api/cases/${positive!.id}/report`,
-      ).then((value) => value.json())) as { canonicalJson: string };
-      expect(
-        (JSON.parse(report.canonicalJson) as { presentation: unknown })
-          .presentation,
-      ).toEqual(merged);
-      await new Promise<void>((resolveClose) =>
-        api.close(() => resolveClose()),
-      );
-      repo.close();
-    }, 180_000);
-  },
-);
+    const api = createApi(repo, {
+      allowedHosts: ["cedapug.com"],
+      allowedLocalRoots: [resolve("../../data/sprint-4-e2e-corpus")],
+      maxLocalBytes: 2 ** 31,
+    });
+    await new Promise<void>((resolveListen) =>
+      api.listen(0, "127.0.0.1", resolveListen),
+    );
+    const address = api.address();
+    if (!address || typeof address === "string")
+      throw new Error("real API did not bind");
+    const detail = (await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${positive!.id}`,
+    ).then((value) => value.json())) as { presentation: unknown };
+    expect(detail.presentation).toEqual(merged);
+    const report = (await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${positive!.id}/report`,
+    ).then((value) => value.json())) as { canonicalJson: string };
+    expect(
+      (JSON.parse(report.canonicalJson) as { presentation: unknown })
+        .presentation,
+    ).toEqual(merged);
+    await new Promise<void>((resolveClose) => api.close(() => resolveClose()));
+    repo.close();
+  }, 180_000);
+});

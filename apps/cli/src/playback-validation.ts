@@ -1,14 +1,11 @@
 import { createHash } from "node:crypto";
 import type {
   AvailableValue,
+  ProjectedPlayerObservation,
   Vector3,
   ViewAngles,
 } from "@witchwatch/contracts";
-import { decodeDemo } from "@witchwatch/demo-source1";
-import {
-  projectL4d2PlayerObservations,
-  type ProjectedPlayerObservation,
-} from "@witchwatch/l4d2-schema";
+import type { PreparedDemoProjection } from "./evidence-bundle.js";
 
 export interface PlaybackExportRequest {
   readonly schemaVersion: 1;
@@ -118,32 +115,25 @@ export function parsePlaybackExportRequest(
 }
 
 export function exportPlaybackCheckpoints(
-  bytes: Uint8Array,
+  prepared: PreparedDemoProjection,
   request: PlaybackExportRequest,
 ): PlaybackCheckpointExport {
-  const demoSha256 = sha256(bytes);
   const selected = new Set(request.ticks);
   const byTick = new Map<number, ProjectedPlayerObservation[]>();
-  const result = projectL4d2PlayerObservations(bytes, {
-    demoSha256,
-    userInfo: [],
-    ...(request.tickIntervalSeconds === undefined
-      ? {}
-      : { tickIntervalSeconds: request.tickIntervalSeconds }),
-    onObservation: (observation) => {
-      if (!selected.has(observation.observation.tick)) return;
-      const values = byTick.get(observation.observation.tick) ?? [];
-      values.push(observation);
-      byTick.set(observation.observation.tick, values);
-    },
-  });
-  const epochs = new Map(result.playerEpochs.map((epoch) => [epoch.id, epoch]));
-  const decoded = decodeDemo(bytes);
+  for (const observation of prepared.observations) {
+    if (!selected.has(observation.observation.tick)) continue;
+    const values = byTick.get(observation.observation.tick) ?? [];
+    values.push(observation);
+    byTick.set(observation.observation.tick, values);
+  }
+  const epochs = new Map(
+    prepared.playerEpochs.map((epoch) => [epoch.id, epoch]),
+  );
   return {
     schemaVersion: 1,
     producer: "witchwatch",
-    demoSha256,
-    mapName: decoded.header.mapName,
+    demoSha256: prepared.demoSha256,
+    mapName: prepared.header.mapName,
     witchwatchRevision: request.witchwatchRevision,
     selectedTicks: request.ticks,
     checkpoints: request.ticks.map((tick) => ({

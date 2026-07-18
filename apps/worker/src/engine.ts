@@ -50,6 +50,7 @@ export interface EngineCaseResult {
 export interface EngineAnalysisResult {
   schemaVersion: 1;
   demo: {
+    parser?: ParserAttestation;
     sha256: string;
     mapName: string;
     bytes: number;
@@ -64,6 +65,41 @@ export interface EngineAnalysisResult {
     stats?: unknown;
   };
   cases: EngineCaseResult[];
+}
+
+interface ParserAttestation {
+  engine: "rust-native";
+  coreVersion: string;
+  bindingVersion: string | null;
+  bindingApiVersion: number | null;
+  configVersion: number;
+  wireVersion: number;
+  parserConfigId: string;
+  buildSha256: string | null;
+}
+
+export function validateNativeParserAttestation(
+  result: EngineAnalysisResult,
+): void {
+  const parser = result.demo.parser;
+  if (
+    !parser ||
+    parser.engine !== "rust-native" ||
+    !/^\d+\.\d+\.\d+/.test(parser.coreVersion) ||
+    typeof parser.bindingVersion !== "string" ||
+    !/^\d+\.\d+\.\d+/.test(parser.bindingVersion) ||
+    parser.bindingApiVersion !== 2 ||
+    parser.configVersion !== 1 ||
+    parser.wireVersion !== 1 ||
+    parser.parserConfigId !== "source1-l4d2-2100-v1" ||
+    typeof parser.buildSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(parser.buildSha256) ||
+    /^0{64}$/.test(parser.buildSha256)
+  )
+    throw new Error("Engine returned invalid native parser attestation");
+  const expected = `demo-source1-native@${parser.coreVersion}+node-${parser.bindingVersion}/config-${parser.configVersion}/build-${parser.buildSha256}`;
+  if (result.cases.some((item) => item.versions.parser !== expected))
+    throw new Error("Case parser lineage does not match demo attestation");
 }
 
 interface PreparedDemo {
@@ -111,6 +147,7 @@ export function engineCommand(
     ...(production && process.platform === "linux"
       ? [
           "--permission",
+          "--allow-addons",
           "--allow-fs-read=/workspace",
           `--allow-fs-read=${resolve(path)}`,
         ]
@@ -119,9 +156,9 @@ export function engineCommand(
     "evidence-bundle",
     path,
   ];
-  // The tsx development loader initializes a WebAssembly parser whose virtual
-  // reservation is incompatible with a useful RLIMIT_AS. Production executes
-  // compiled JavaScript and keeps the stricter OS limits below.
+  // Development's tsx loader and source graph reserve enough virtual address
+  // space to make RLIMIT_AS unreliable. Production executes compiled JavaScript
+  // with the native addon inside the stricter OS limits below.
   if (production && process.platform === "linux") {
     const sandbox =
       process.env.WITCHWATCH_PARSER_SANDBOX ??
@@ -389,6 +426,7 @@ async function analyzeWithCli(
   const result = inspection as unknown as EngineAnalysisResult;
   if (result.schemaVersion !== 1 || !Array.isArray(result.cases))
     throw new Error("Engine returned an invalid evidence bundle");
+  validateNativeParserAttestation(result);
   return result;
 }
 

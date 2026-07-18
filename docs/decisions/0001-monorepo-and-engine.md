@@ -3,6 +3,10 @@
 - Status: accepted for feasibility phase
 - Date: 2026-07-17
 
+The initial TypeScript parser choice recorded here is superseded by
+[ADR 0009](0009-native-rust-demo-pipeline.md). The stable CLI/engine boundary
+remains in force.
+
 ## Decision
 
 Use pnpm and Turborepo. Begin the Source 1 feasibility spike in TypeScript behind a versioned CLI/NDJSON boundary, adapting only the required low-level pieces of a pinned MIT-licensed `demofile` fork if validation permits.

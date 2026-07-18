@@ -14,9 +14,7 @@
   },
   "dependencies": {
     "@witchwatch/contracts": "workspace:*",
-    "@witchwatch/demo-source1": "workspace:*",
     "@witchwatch/detectors": "workspace:*",
-    "@witchwatch/l4d2-schema": "workspace:*",
     "@witchwatch/scoring": "workspace:*"
   },
   "devDependencies": {

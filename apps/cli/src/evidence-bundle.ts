@@ -1,27 +1,24 @@
 import { createHash, createHmac } from "node:crypto";
-import {
-  decodeL4d2ServerInfo,
-  decodeDemo,
-  extractNetworkBits,
-  inspectNetworkPayload,
-  visitL4d2GameEvents,
-  type GameEventVisit,
-} from "@witchwatch/demo-source1";
+import type {
+  DecodeIssue,
+  DemoHeader,
+  DisplayUserInfoIdentity,
+  GameEventTelemetrySummary,
+  GameEventVisit,
+  L4d2MatchState,
+  L4d2ServerInfo,
+  L4d2WitchObservation,
+  PlayerEpoch,
+  PlayerProjectionCoverage,
+  ProjectableUserInfo,
+  ProjectedPlayerObservation,
+} from "@witchwatch/contracts";
 import {
   buildRealAimEvidence,
   defaultAimConfig,
   type PlayerRealEvidence,
 } from "@witchwatch/detectors";
-import {
-  collectL4d2UserInfoTimeline,
-  l4d2CounterNames,
-  l4d2WeaponIdentity,
-  projectL4d2PlayerObservations,
-  type L4d2MatchState,
-  type L4d2WitchObservation,
-  type DisplayUserInfoIdentity,
-  type ProjectedPlayerObservation,
-} from "@witchwatch/l4d2-schema";
+import { l4d2CounterNames, l4d2WeaponIdentity } from "./l4d2-domain.js";
 
 const CONTEXT_SECONDS = 8;
 const MAX_WINDOW_TICKS = 600;
@@ -102,6 +99,7 @@ export interface DemoSessionEvidence {
 export interface EvidenceBundle {
   schemaVersion: 1;
   demo: {
+    parser: ParserLineage;
     sha256: string;
     mapName: string;
     bytes: number;
@@ -109,6 +107,17 @@ export interface EvidenceBundle {
     stats: DemoStats;
   };
   cases: BundleCase[];
+}
+
+export interface ParserLineage {
+  engine: "rust-native";
+  coreVersion: string;
+  bindingVersion: string | null;
+  bindingApiVersion: number | null;
+  configVersion: number;
+  wireVersion: number;
+  parserConfigId: string;
+  buildSha256: string | null;
 }
 
 export interface DemoStats {
@@ -136,22 +145,22 @@ export interface DemoStats {
     witchDeaths: number;
     specialKillsByClass: Record<string, number>;
     killsByWeapon: Record<string, number>;
-    campaignScores: number[];
-    chapterScores: number[];
-    survivorScores: number[];
-    survivorDistances: number[];
-    survivorDeathDistances: number[];
-    roundDurations: number[];
+    campaignScores: Array<number | null>;
+    chapterScores: Array<number | null>;
+    survivorScores: Array<number | null>;
+    survivorDistances: Array<number | null>;
+    survivorDeathDistances: Array<number | null>;
+    roundDurations: Array<number | null>;
     roundNumber: number | null;
     teamsFlipped: boolean | null;
     secondHalf: boolean | null;
     scoreTimeline: Array<{
       tick: number;
       timeSeconds: number;
-      campaignScores: number[];
-      chapterScores: number[];
-      survivorScores: number[];
-      survivorDistances: number[];
+      campaignScores: Array<number | null>;
+      chapterScores: Array<number | null>;
+      survivorScores: Array<number | null>;
+      survivorDistances: Array<number | null>;
       teamsFlipped: boolean | null;
       secondHalf: boolean | null;
       voteRestarting: boolean | null;
@@ -421,30 +430,15 @@ export interface CompetitiveHalfPlayerSummary {
 }
 
 function buildSessionEvidence(
-  decoded: ReturnType<typeof decodeDemo>,
+  header: DemoHeader,
+  serverInfo: L4d2ServerInfo | null,
   stableTokens: readonly string[],
   pseudonymKey: string | Uint8Array,
 ): DemoSessionEvidence {
-  const serverInfo = (() => {
-    for (const frame of decoded.frames) {
-      if (!frame.payload) continue;
-      const message = inspectNetworkPayload(frame.payload).messages.find(
-        (candidate) => candidate.id === 8 && candidate.endBit !== null,
-      );
-      if (message?.endBit === null || message?.endBit === undefined) continue;
-      const payload = extractNetworkBits(
-        frame.payload,
-        message.startBit,
-        message.endBit - message.startBit,
-      );
-      return decodeL4d2ServerInfo(payload);
-    }
-    return undefined;
-  })();
-  const mapSequence = /^((?:c|m)[0-9]+)m([0-9]+)/i.exec(decoded.header.mapName);
-  const serverToken = decoded.header.serverName
+  const mapSequence = /^((?:c|m)[0-9]+)m([0-9]+)/i.exec(header.mapName);
+  const serverToken = header.serverName
     ? createHmac("sha256", pseudonymKey)
-        .update(`server:${decoded.header.serverName}`)
+        .update(`server:${header.serverName}`)
         .digest("hex")
     : null;
   const roster = [...new Set(stableTokens)].sort();
@@ -466,22 +460,65 @@ function buildSessionEvidence(
   };
 }
 
-export function extractDemoSessionEvidence(
+export interface PreparedDemoProjection {
+  readonly parserVersion: string;
+  readonly parser: ParserLineage;
+  readonly demoSha256: string;
+  readonly bytes: number;
+  readonly header: DemoHeader;
+  readonly decodeIssues: readonly DecodeIssue[];
+  /** Null explicitly means the demo header cannot establish demo time. */
+  readonly tickIntervalSeconds: number | null;
+  readonly identity: {
+    readonly mappings: readonly ProjectableUserInfo[];
+    readonly displayIdentities: readonly DisplayUserInfoIdentity[];
+    readonly rejectedEntries: number;
+  };
+  readonly observations: readonly ProjectedPlayerObservation[];
+  readonly witchObservations: readonly L4d2WitchObservation[];
+  readonly playerEpochs: readonly PlayerEpoch[];
+  readonly projectionCoverage: PlayerProjectionCoverage;
+  readonly matchStates: readonly L4d2MatchState[];
+  /** Null explicitly means svc_ServerInfo was not observed. */
+  readonly serverInfo: L4d2ServerInfo | null;
+  readonly eventSummary: GameEventTelemetrySummary;
+  readonly eventVisits: readonly GameEventVisit[];
+}
+
+export type DemoProjectionProvider = (
   bytes: Uint8Array,
-  options: { pseudonymKey: string | Uint8Array },
-): DemoSessionEvidence {
-  const identities = collectL4d2UserInfoTimeline(bytes, options);
-  return buildSessionEvidence(
-    decodeDemo(bytes),
-    identities.mappings.flatMap((identity) =>
-      identity.stableIdentityToken ? [identity.stableIdentityToken] : [],
-    ),
-    options.pseudonymKey,
+  options: {
+    pseudonymKey: string | Uint8Array;
+    onProgress?: (value: number, message: string) => void;
+  },
+) => PreparedDemoProjection | Promise<PreparedDemoProjection>;
+
+export async function buildEvidenceBundle(
+  bytes: Uint8Array,
+  options: {
+    pseudonymKey: string | Uint8Array;
+    onProgress?: (value: number, message: string) => void;
+    /** Internal replacement seam; omitted by normal synchronous callers. */
+    projectionProvider?: DemoProjectionProvider;
+  },
+): Promise<EvidenceBundle> {
+  const provider =
+    options.projectionProvider ?? (await defaultProjectionProvider());
+  return buildEvidenceBundleFromPrepared(
+    await provider(bytes, options),
+    options,
   );
 }
 
-export function buildEvidenceBundle(
-  bytes: Uint8Array,
+async function defaultProjectionProvider(): Promise<DemoProjectionProvider> {
+  const { prepareNativeDemoProjection } = await import(
+    "./native-demo-provider.js"
+  );
+  return prepareNativeDemoProjection;
+}
+
+export function buildEvidenceBundleFromPrepared(
+  prepared: PreparedDemoProjection,
   options: {
     pseudonymKey: string | Uint8Array;
     onProgress?: (value: number, message: string) => void;
@@ -489,37 +526,26 @@ export function buildEvidenceBundle(
 ): EvidenceBundle {
   const progress = (value: number, message: string) =>
     options.onProgress?.(value, message);
-  progress(0.04, "Reading demo header and network frames");
-  const demoSha256 = createHash("sha256").update(bytes).digest("hex");
-  const decoded = decodeDemo(bytes);
-  const tickIntervalSeconds =
-    decoded.header.playbackTicks > 0 && decoded.header.playbackTimeSeconds > 0
-      ? decoded.header.playbackTimeSeconds / decoded.header.playbackTicks
-      : undefined;
-  const observations: ProjectedPlayerObservation[] = [];
-  const witchObservations: L4d2WitchObservation[] = [];
-  progress(0.14, "Resolving players and SourceTV identities");
-  const identityTimeline = collectL4d2UserInfoTimeline(bytes, {
-    pseudonymKey: options.pseudonymKey,
-  });
-  progress(0.25, "Reconstructing player and infected state");
-  const projection = projectL4d2PlayerObservations(bytes, {
+  const {
     demoSha256,
-    ...(tickIntervalSeconds === undefined ? {} : { tickIntervalSeconds }),
-    userInfo: identityTimeline.mappings,
-    onObservation: (observation) => {
-      observations.push(observation);
-    },
-    onWitchObservation: (observation) => {
-      witchObservations.push(observation);
-    },
-  });
+    header,
+    decodeIssues,
+    identity: identityTimeline,
+    observations,
+    witchObservations,
+    playerEpochs: extractedPlayerEpochs,
+    matchStates,
+    serverInfo,
+    eventSummary,
+    eventVisits,
+    parserVersion,
+  } = prepared;
+  const tickIntervalSeconds = prepared.tickIntervalSeconds ?? undefined;
   progress(0.62, "Correlating player epochs and side swaps");
   const inferredIdentityEpochIds = new Set<string>();
-  const playerEpochs = projection.playerEpochs.map((epoch) => {
+  const playerEpochs = extractedPlayerEpochs.map((epoch) => {
     if (epoch.userId.value !== undefined) return epoch;
-    const endTick =
-      epoch.disconnectedAtTick.value ?? decoded.header.playbackTicks;
+    const endTick = epoch.disconnectedAtTick.value ?? header.playbackTicks;
     const timedCandidates = identityTimeline.mappings.filter(
       (identity) =>
         identity.entityIndex === epoch.entitySlot &&
@@ -555,11 +581,7 @@ export function buildEvidenceBundle(
   });
   progress(0.7, "Running evidence detectors");
   const detected = buildRealAimEvidence({ demoSha256, observations });
-  const eventVisits: GameEventVisit[] = [];
   progress(0.78, "Decoding combat and round events");
-  const eventSummary = visitL4d2GameEvents(bytes, (event) =>
-    eventVisits.push(event),
-  );
   const stableTokens = new Map(
     playerEpochs.flatMap((epoch) =>
       epoch.steamId.value === undefined
@@ -568,15 +590,16 @@ export function buildEvidenceBundle(
     ),
   );
   const session = buildSessionEvidence(
-    decoded,
+    header,
+    serverInfo,
     [...stableTokens.values()],
     options.pseudonymKey,
   );
   progress(0.86, "Deriving scores, timelines, and competitive stats");
   const stats = buildDemoStats(
-    decoded.header.playbackTimeSeconds,
-    decoded.header.playbackTicks,
-    decoded.issues.length,
+    header.playbackTimeSeconds,
+    header.playbackTicks,
+    decodeIssues.length,
     observations,
     detected.artifact.players,
     stableTokens,
@@ -584,7 +607,7 @@ export function buildEvidenceBundle(
     eventVisits,
     playerEpochs,
     identityTimeline.displayIdentities,
-    projection.matchStates,
+    matchStates,
     tickIntervalSeconds,
     witchObservations,
     inferredIdentityEpochIds,
@@ -593,9 +616,10 @@ export function buildEvidenceBundle(
   return {
     schemaVersion: 1,
     demo: {
+      parser: prepared.parser,
       sha256: demoSha256,
-      mapName: decoded.header.mapName,
-      bytes: bytes.byteLength,
+      mapName: header.mapName,
+      bytes: prepared.bytes,
       session,
       stats,
     },
@@ -609,7 +633,7 @@ export function buildEvidenceBundle(
         toCase(
           player,
           observations,
-          decoded.header.mapName,
+          header.mapName,
           demoSha256,
           stableTokens.get(player.playerEpochId),
           identityTimeline.rejectedEntries,
@@ -617,6 +641,7 @@ export function buildEvidenceBundle(
           detected.artifact.observationArtifactSha256,
           detected.evidenceArtifactSha256,
           detected.artifact.configSha256,
+          parserVersion,
         ),
       ),
   };
@@ -2478,6 +2503,7 @@ function toCase(
   observationArtifactSha256: string,
   evidenceArtifactSha256: string,
   configSha256: string,
+  parserVersion: string,
 ): BundleCase {
   const evidence = player.result.evidence;
   const counterevidence = unique(
@@ -2541,7 +2567,7 @@ function toCase(
     evidence,
     windows,
     versions: {
-      parser: "demo-source1@0.0.0",
+      parser: parserVersion,
       schema: "observations/v1",
       detectors: ["aim-dynamics@1.0.0", "real-evidence@1.0.0"],
       model: "none-ranked-evidence",

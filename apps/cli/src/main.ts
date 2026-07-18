@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
-import { decodeDemo, DemoParseError } from "@witchwatch/demo-source1";
 import {
   detectorCards,
   exploreFeatures,
@@ -16,8 +14,16 @@ import {
   type PlaybackCheckpointExport,
   type PlaybackReference,
 } from "./playback-validation.js";
-import { stableJson, summarizeDemo, type DemoInspection } from "./report.js";
+import {
+  stableJson,
+  summarizeNativeDemo,
+  type DemoInspection,
+} from "./report.js";
 import { buildEvidenceBundle } from "./evidence-bundle.js";
+import {
+  inspectNativeDemo,
+  prepareNativeDemoProjection,
+} from "./native-demo-provider.js";
 import {
   parseControlledDataset,
   writeCalibrationArtifacts,
@@ -25,12 +31,8 @@ import {
 
 const inspect = async (path: string): Promise<DemoInspection> => {
   const bytes = await readFile(path);
-  const decoded = decodeDemo(bytes);
-  return summarizeDemo(
-    decoded,
-    createHash("sha256").update(bytes).digest("hex"),
-    bytes.byteLength,
-  );
+  const inspected = await inspectNativeDemo(bytes);
+  return summarizeNativeDemo(inspected, inspected.framing);
 };
 
 const findDemos = async (root: string): Promise<string[]> => {
@@ -84,7 +86,12 @@ const main = async (): Promise<void> => {
     );
     process.stdout.write(
       stableJson(
-        exportPlaybackCheckpoints(await readFile(resolve(target)), request),
+        exportPlaybackCheckpoints(
+          await prepareNativeDemoProjection(await readFile(resolve(target)), {
+            pseudonymKey: "witchwatch-playback-validation-v1",
+          }),
+          request,
+        ),
       ),
     );
     return;
@@ -123,7 +130,7 @@ const main = async (): Promise<void> => {
       );
     process.stdout.write(
       stableJson(
-        buildEvidenceBundle(await readFile(resolve(target)), {
+        await buildEvidenceBundle(await readFile(resolve(target)), {
           pseudonymKey,
           onProgress: (progress, message) =>
             process.stderr.write(
@@ -154,7 +161,7 @@ const main = async (): Promise<void> => {
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  const code = error instanceof DemoParseError ? error.code : "CLI_ERROR";
+  const code = "CLI_ERROR";
   process.stderr.write(stableJson({ error: { code, message } }));
   process.exitCode = 1;
 });

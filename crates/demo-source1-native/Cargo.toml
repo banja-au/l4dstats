@@ -1,0 +1,24 @@
+[package]
+name = "demo-source1-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "demo_source1_native"
+
+[[bin]]
+name = "demo-source1-stage"
+path = "src/bin/stage.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+hex = "=0.4.3"
+hmac = "=0.13.0"
+sha2 = "=0.11.0"
+snap = "=1.1.2"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"

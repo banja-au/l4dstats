@@ -1,10 +1,15 @@
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type {
   L4d2MatchState,
   ProjectedPlayerObservation,
-} from "@witchwatch/l4d2-schema";
+} from "@witchwatch/contracts";
 import {
   buildBoundedContextWindow,
+  buildEvidenceBundle,
+  buildEvidenceBundleFromPrepared,
   clusterSpawnWindows,
   deriveCompetitiveStats,
   deriveSurvivorHealthTraces,
@@ -12,6 +17,54 @@ import {
   sumPositiveCounterDeltas,
   type DemoStats,
 } from "./evidence-bundle";
+import { stableJson } from "./report";
+import { prepareNativeDemoProjection } from "./native-demo-provider";
+
+const seamCorpusDemo = resolve(
+  "../../data/sprint-1-corpus/extracted/901780_c2m1_highway/901780_c2m1_highway.dem",
+);
+describe.runIf(existsSync(seamCorpusDemo))(
+  "prepared demo projection seam",
+  () => {
+    it("preserves the canonical bundle through direct and prepared paths", async () => {
+      const bytes = readFileSync(seamCorpusDemo);
+      const options = { pseudonymKey: "controlled-prepared-seam-key" };
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(
+        "299019bf3e956176034230b3ad28b634016ec8fe0334ca6c6b95cc0597ac483d",
+      );
+      const prepared = await prepareNativeDemoProjection(bytes, options);
+      const direct = await buildEvidenceBundle(bytes, options);
+      const injected = buildEvidenceBundleFromPrepared(prepared, options);
+
+      expect(injected).toEqual(direct);
+      expect(stableJson(injected)).toBe(stableJson(direct));
+      expect(direct).toMatchObject({
+        schemaVersion: 1,
+        demo: {
+          sha256: prepared.demoSha256,
+          mapName: "c2m1_highway",
+          bytes: bytes.byteLength,
+          session: { campaign: "c2", chapter: 1 },
+        },
+      });
+      expect(prepared.identity.displayIdentities.length).toBeGreaterThan(0);
+      expect(prepared.serverInfo).not.toBeNull();
+      const unavailable = {
+        ...prepared,
+        tickIntervalSeconds: null,
+        matchStates: [],
+        serverInfo: null,
+      } as const;
+      const bundle = buildEvidenceBundleFromPrepared(unavailable, {
+        pseudonymKey: "controlled-prepared-seam-key",
+      });
+      expect(unavailable.tickIntervalSeconds).toBeNull();
+      expect(unavailable.matchStates).toEqual([]);
+      expect(bundle.demo.session.serverCount).toBeNull();
+      expect(bundle.demo.stats.match.roundNumber).toBeNull();
+    }, 120_000);
+  },
+);
 
 describe("evidence bundle windows", () => {
   it("counts maximum contiguous health drawdown without double-counting healing", () => {

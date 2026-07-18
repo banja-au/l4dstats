@@ -44,7 +44,7 @@ export function seedControlledWorkbench(repo: WorkbenchRepository): void {
     source: { demoSha256: "0".repeat(64), origin: "controlled-fixture" },
     artifacts: { engineResultSha256: "1".repeat(64) },
     versions: {
-      parser: "demo-source1@0.1.0",
+      parser: "demo-source1-native@controlled-fixture",
       schema: "observations/v1",
       detectors: ["controlled-ui-fixture@1"],
       model: "none-controlled-fixture",

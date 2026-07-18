@@ -45,6 +45,44 @@ test("uploads and analyzes real demos through the browser, API, worker, and stor
   await expect(page.getByRole("button", { name: "players" })).toBeVisible({
     timeout: 10 * 60_000,
   });
+  await expect(page.getByLabel("Parser provenance")).toContainText(
+    /Rust native \d+\.\d+\.\d+ · build [a-f0-9]{8}/,
+  );
+  const parserAttestations = await page.evaluate(async () => {
+    const match = window.location.pathname.match(/^\/game\/([^/]+)/);
+    if (!match) throw new Error("real boundary did not resolve to a game URL");
+    const response = await fetch(
+      `/api/games/${encodeURIComponent(decodeURIComponent(match[1]!))}`,
+    );
+    if (!response.ok)
+      throw new Error(`game lineage request failed: ${response.status}`);
+    const game = (await response.json()) as {
+      analyses: Array<{
+        engineResult: {
+          demo: { parser?: Record<string, unknown> };
+          cases: Array<{ versions?: { parser?: string } }>;
+        };
+      }>;
+    };
+    return game.analyses.map(({ engineResult }) => ({
+      parser: engineResult.demo.parser,
+      caseParsers: engineResult.cases.map((item) => item.versions?.parser),
+    }));
+  });
+  expect(parserAttestations).toHaveLength(demos.length);
+  for (const { parser, caseParsers } of parserAttestations) {
+    expect(parser).toMatchObject({
+      engine: "rust-native",
+      bindingApiVersion: 2,
+      configVersion: 1,
+      wireVersion: 1,
+      parserConfigId: "source1-l4d2-2100-v1",
+    });
+    expect(parser?.buildSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(parser?.buildSha256).not.toMatch(/^0{64}$/);
+    const prefix = `demo-source1-native@${String(parser?.coreVersion)}+node-${String(parser?.bindingVersion)}/config-1/build-${String(parser?.buildSha256)}`;
+    expect(caseParsers.every((value) => value === prefix)).toBe(true);
+  }
   if (hasFresh) {
     await expect(
       page.getByRole("heading", { level: 1, name: "No Mercy" }),

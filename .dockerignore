@@ -14,6 +14,8 @@ node_modules
 **/playwright-report
 apps/api/data
 tmp
+target
+**/target
 *.db
 *.db-*
 *.dem

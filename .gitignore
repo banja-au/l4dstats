@@ -3,6 +3,7 @@ node_modules/
 .turbo/
 dist/
 coverage/
+target/
 test-results/
 playwright-report/
 .env
@@ -18,3 +19,5 @@ tmp/
 *.db-*
 .DS_Store
 backups/
+*.cpuprofile
+*.profraw

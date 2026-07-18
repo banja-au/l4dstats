@@ -43,15 +43,9 @@ importers:
       '@witchwatch/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@witchwatch/demo-source1':
-        specifier: workspace:*
-        version: link:../../packages/demo-source1
       '@witchwatch/detectors':
         specifier: workspace:*
         version: link:../../packages/detectors
-      '@witchwatch/l4d2-schema':
-        specifier: workspace:*
-        version: link:../../packages/l4d2-schema
       '@witchwatch/scoring':
         specifier: workspace:*
         version: link:../../packages/scoring
@@ -146,31 +140,12 @@ importers:
         specifier: 3.2.6
         version: 3.2.6(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.21.0)
 
-  packages/demo-source1:
-    dependencies:
-      snappyjs:
-        specifier: 0.7.0
-        version: 0.7.0
-    devDependencies:
-      '@types/snappyjs':
-        specifier: 0.7.1
-        version: 0.7.1
-      vitest:
-        specifier: 3.2.6
-        version: 3.2.6(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.21.0)
-
   packages/detectors:
     dependencies:
       '@witchwatch/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@witchwatch/l4d2-schema':
-        specifier: workspace:*
-        version: link:../l4d2-schema
     devDependencies:
-      '@witchwatch/demo-source1':
-        specifier: workspace:*
-        version: link:../demo-source1
       vitest:
         specifier: 3.2.6
         version: 3.2.6(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.21.0)
@@ -187,33 +162,11 @@ importers:
         specifier: 3.2.6
         version: 3.2.6(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.21.0)
 
-  packages/l4d2-schema:
-    dependencies:
-      '@witchwatch/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@witchwatch/demo-source1':
-        specifier: workspace:*
-        version: link:../demo-source1
-    devDependencies:
-      tsx:
-        specifier: 4.20.6
-        version: 4.20.6
-      vitest:
-        specifier: 3.2.6
-        version: 3.2.6(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.20.6)
-
   packages/map-source1:
     dependencies:
       '@napi-rs/lzma':
         specifier: 1.5.1
         version: 1.5.1
-      '@witchwatch/demo-source1':
-        specifier: workspace:*
-        version: link:../demo-source1
-      '@witchwatch/l4d2-schema':
-        specifier: workspace:*
-        version: link:../l4d2-schema
     devDependencies:
       '@types/node':
         specifier: 24.10.1
@@ -1099,9 +1052,6 @@ packages:
   '@types/react@19.2.2':
     resolution: {integrity: sha512-6mDvHUFSjyT2B2yeNx2nUgMxh9LtOWvkhIU3uePn2I2oyNymUAX1NIsdgviM4CH+JSrp2D2hsMvJOkxY+0wNRA==}
 
-  '@types/snappyjs@0.7.1':
-    resolution: {integrity: sha512-OxjzJ6cQZstysMh6PEwZWmK9qlKZyezHJKOkcUkZDooSFuog2votUEKkxMaTq51UQF3cJkXKQ+XGlj4FSl8JQQ==}
-
   '@vitejs/plugin-react@5.0.4':
     resolution: {integrity: sha512-La0KD0vGkVkSk6K+piWDKRUyg8Rl5iAIKRMH0vMJI0Eg47bq1eOxmoObAaQG37WMW9MSyk7Cs8EIWwJC1PtzKA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1441,9 +1391,6 @@ packages:
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
-
-  snappyjs@0.7.0:
-    resolution: {integrity: sha512-u5iEEXkMe2EInQio6Wv9LWHOQYRDbD2O9hzS27GpT/lwfIQhTCnHCTqedqHIHe9ZcvQo+9au6vngQayipz1NYw==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -2217,8 +2164,6 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
-  '@types/snappyjs@0.7.1': {}
-
   '@vitejs/plugin-react@5.0.4(vite@7.3.5(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.30.1)(tsx@4.21.0))':
     dependencies:
       '@babel/core': 7.29.7
@@ -2570,8 +2515,6 @@ snapshots:
   semver@6.3.1: {}
 
   siginfo@2.0.0: {}
-
-  snappyjs@0.7.0: {}
 
   source-map-js@1.2.1: {}
 

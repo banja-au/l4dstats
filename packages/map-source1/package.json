@@ -25,8 +25,6 @@
     "vitest": "3.2.6"
   },
   "dependencies": {
-    "@napi-rs/lzma": "1.5.1",
-    "@witchwatch/demo-source1": "workspace:*",
-    "@witchwatch/l4d2-schema": "workspace:*"
+    "@napi-rs/lzma": "1.5.1"
   }
 }

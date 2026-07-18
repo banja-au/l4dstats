@@ -36,11 +36,9 @@ services:
       - worker-node-modules:/workspace/apps/worker/node_modules
       - acquisition-node-modules:/workspace/packages/acquisition/node_modules
       - contracts-node-modules:/workspace/packages/contracts/node_modules
-      - demo-source1-node-modules:/workspace/packages/demo-source1/node_modules
       - detectors-node-modules:/workspace/packages/detectors/node_modules
       - geometry-node-modules:/workspace/packages/geometry/node_modules
       - map-source1-node-modules:/workspace/packages/map-source1/node_modules
-      - l4d2-schema-node-modules:/workspace/packages/l4d2-schema/node_modules
       - scoring-node-modules:/workspace/packages/scoring/node_modules
       - storage-node-modules:/workspace/packages/storage/node_modules
       - workbench-data:/var/lib/witchwatch
@@ -51,7 +49,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: bash -lc "pnpm --filter @witchwatch/worker dev"
+    command: bash -lc "pnpm native:prepare && pnpm --filter @witchwatch/worker dev"
     depends_on:
       api:
         condition: service_healthy
@@ -136,11 +134,9 @@ volumes:
   cli-node-modules:
   acquisition-node-modules:
   contracts-node-modules:
-  demo-source1-node-modules:
   detectors-node-modules:
   geometry-node-modules:
   map-source1-node-modules:
-  l4d2-schema-node-modules:
   scoring-node-modules:
   api-node-modules:
   worker-node-modules:

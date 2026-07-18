@@ -28,6 +28,7 @@ import {
   type MatchTimelineEvent,
   type PlayerStats,
 } from "./api";
+import { parserProvenanceLabel } from "./parser-provenance";
 import { aggregateGamePlayers } from "./game-aggregation";
 import { halfScopeKey, scopeDemoStats } from "./demo-scope";
 import { rateGamePlayers } from "./player-rating";
@@ -563,6 +564,7 @@ function App() {
       (analysis.engineResult.demo.stats?.competitive?.derivationVersion ?? 0) <
       6,
   );
+  const parserProvenance = parserProvenanceLabel(analyses);
   const phase =
     items.length === 0
       ? "landing"
@@ -729,6 +731,12 @@ function App() {
             </button>
           </div>
           <section className="results">
+            <aside className="legacy-analysis" aria-label="Parser provenance">
+              <div>
+                <strong>Parser provenance</strong>
+                <span>{parserProvenance}</span>
+              </div>
+            </aside>
             {(hasLegacyAnalysis || hasOutdatedCompetitive) && (
               <aside className="legacy-analysis" role="status">
                 <div>
@@ -1408,7 +1416,9 @@ function Overview({
           )}
           {stats.map((value, index) =>
             value.match?.scoreTimeline?.some((point) =>
-              point.survivorDistances.some((distance) => distance > 0),
+              point.survivorDistances.some(
+                (distance) => distance !== null && distance > 0,
+              ),
             ) ? (
               <DistanceProgression
                 key={`distance-${index}`}
@@ -1676,7 +1686,12 @@ function DistanceProgression({
   const height = 150;
   const maxTime = Math.max(1, ...points.map((point) => point.timeSeconds));
   const distanceAt = (point: (typeof points)[number]) =>
-    Math.max(0, ...point.survivorDistances);
+    Math.max(
+      0,
+      ...point.survivorDistances.filter(
+        (distance): distance is number => distance !== null,
+      ),
+    );
   const maxDistance = Math.max(1, ...points.map(distanceAt));
   const path = points
     .map((point, index) => {

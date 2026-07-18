@@ -82,6 +82,10 @@ signals remain infrastructure responsibilities.
    under the new key.
 4. If a malicious demo or parser crash is suspected, stop the worker first.
    Preserve the demo hash and job ID, but do not redistribute the demo.
+   Capture parser core/binding versions, config and compact-wire versions, and
+   native build SHA from persisted lineage. Distinguish a missing, incompatible
+   or unstamped addon from hostile input. No alternate parser exists; never work
+   around the native validation boundary to resume processing.
 5. If SQLite or artifacts may be damaged, stop API and worker, take a backup,
    verify its checksum, then restore only from a known-good archive using the
    documented restore command.
@@ -98,6 +102,9 @@ After remediation:
    and API port 8787 is not published externally.
 5. Check the most recent backup checksum and schedule a restore drill if the
    incident involved persistence.
+6. After rebuilding or redeploying the provenance-stamped addon, enqueue
+   reanalysis for affected demos. Preserve old job analyses for comparison;
+   never rewrite their parser lineage in place.
 
 ## Communication and closure
 

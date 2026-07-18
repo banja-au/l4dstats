@@ -2,6 +2,11 @@
 
 Research was performed on 2026-07-17. Libraries and hosted behavior must be rechecked before implementation.
 
+> **Status note (2026-07-18):** The parser-selection discussion below records
+> the earlier feasibility state and is superseded for implementation by
+> [ADR 0009](decisions/0009-native-rust-demo-pipeline.md), which adopts the
+> repository-owned clean-room Rust parser as the normal evidence path.
+
 ## Corpus
 
 The provided [CEDAPug demo directory](https://cedapug.com/demos/) is an Apache-style index. A direct inspection found roughly 63,250 ZIP links at research time. Treat that count as volatile. Build pageless streaming discovery and selective fixture acquisition; do not mirror the corpus. CEDAPug describes itself as a competitive L4D2 platform and says cheating decisions currently involve community reports and stats ([site](https://cedapug.com/), [FAQ](https://cedapug.com/faq)). Access and retention still require explicit policy review.
@@ -12,7 +17,7 @@ Source 1 demos contain an `HL2DEMO` header followed by ticked command frames. Pa
 
 The strongest starting point found is [`saul/demofile`](https://github.com/saul/demofile): MIT licensed, Source 1, supports demo commands, network messages, data/string tables, entities and events. Its high-level model is CS:GO-specific and the repository was archived in April 2026, so WitchWatch should pin/fork the minimum decoder, isolate it, and implement L4D2 projections behind adapters. Its [format notes](https://github.com/saul/demofile/wiki/Demo-files) point to Valve's `demoinfogo` as the closest complete reference.
 
-Alternatives do not remove the key risk. [`demoinfocs-golang`](https://github.com/markus-wa/demoinfocs-golang) is mature and fast but CS-focused. [`demoparser2`](https://github.com/LaihoE/demoparser) targets Source 2/CS2. No maintained Rust L4D2 parser was identified. A from-scratch Rust decoder is therefore a fallback after a fixture gate, not the default.
+Alternatives do not remove the key risk. [`demoinfocs-golang`](https://github.com/markus-wa/demoinfocs-golang) is mature and fast but CS-focused. [`demoparser2`](https://github.com/LaihoE/demoparser) targets Source 2/CS2. No maintained Rust L4D2 parser was identified. At that feasibility stage, a from-scratch Rust decoder was therefore considered a fallback after a fixture gate; ADR 0009 records the later clean-room implementation decision.
 
 Unknowns that must be measured include whether archives are POV or SourceTV; which user commands/view angles are present; protocol drift; observer versus player state; slot/user-ID churn; pauses/timescale; cvars/plugins; and custom maps. These directly constrain which detectors are valid.
 

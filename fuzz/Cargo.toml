@@ -1,0 +1,56 @@
+[package]
+name = "demo-source1-native-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+demo-source1-native = { path = "../crates/demo-source1-native" }
+
+[workspace]
+
+[[bin]]
+name = "readers"
+path = "fuzz_targets/readers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "demo_framing"
+path = "fuzz_targets/demo_framing.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "network_tables_compression"
+path = "fuzz_targets/network_tables_compression.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "game_events"
+path = "fuzz_targets/game_events.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "stateful_entities"
+path = "fuzz_targets/stateful_entities.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bounded_projection"
+path = "fuzz_targets/bounded_projection.rs"
+test = false
+doc = false
+bench = false

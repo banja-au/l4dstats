@@ -23,7 +23,13 @@ Every sprint runs unit, contract, integration, corruption/adversarial, and end-t
 
 ### Deliverables
 
-`apps/cli`, `packages/acquisition`, `packages/demo-source1`, `packages/l4d2-schema`, contract v1, golden manifest runner, protocol coverage report, parser benchmark, licensing inventory, and ADR confirming or replacing the decoder.
+Historical Sprint 1 deliverables included `apps/cli`, `packages/acquisition`,
+the TypeScript `packages/demo-source1` and `packages/l4d2-schema` prototypes,
+contract v1, a golden manifest runner, protocol coverage report, parser
+benchmark, licensing inventory, and an ADR confirming or replacing the decoder.
+The prototypes were subsequently replaced and removed; the current parser lives
+in `crates/demo-source1-native`, with parser-neutral DTOs in
+`packages/contracts`.
 
 ### Exit gate
 
@@ -114,7 +120,11 @@ runbook and automated recovery drill are also implemented. The parser now runs
 as a direct compiled process with a minimal environment, output/time limits,
 Linux rlimits, Node permissions, a fail-closed no-network seccomp launcher and
 process-group TERM-to-KILL cleanup; the production container is read-only and
-capability-free. A live Docker restore drill, hosted monitoring integration and
+capability-free. The native Node-API parser is permitted only inside that parser
+child, with a bytes-only surface and stamped build/config/wire lineage; API,
+worker and web processes do not receive addon permission. Parser, config, wire
+or derivation incompatibility requires a new analysis while preserving the
+prior artifact. A live Docker restore drill, hosted monitoring integration and
 prospective shadow validation remain open. Private production operation is
 supported; public hosted readiness remains withheld pending those live drills
 and an external identity/monitoring layer.

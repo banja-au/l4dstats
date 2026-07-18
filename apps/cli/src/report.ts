@@ -1,12 +1,12 @@
-import type { DemoDecodeResult } from "@witchwatch/demo-source1";
 import { createHash } from "node:crypto";
+import type { NativeFramingSummary } from "./native-demo-provider.js";
 
 export interface DemoInspection {
   readonly schemaVersion: 1;
   readonly sha256: string;
   readonly bytes: number;
   readonly header: Pick<
-    DemoDecodeResult["header"],
+    NativeFramingSummary,
     | "stamp"
     | "demoProtocol"
     | "networkProtocol"
@@ -23,7 +23,7 @@ export interface DemoInspection {
   };
   readonly commandCounts: Readonly<Record<string, number>>;
   readonly commandSequenceSha256: string;
-  readonly issues: DemoDecodeResult["issues"];
+  readonly issues: NativeFramingSummary["issues"];
   readonly telemetryAvailability: {
     readonly playerIdentity: "not-evaluated-by-lightweight-inspect";
     readonly gameEvents: "not-evaluated-by-lightweight-inspect";
@@ -35,65 +35,49 @@ export interface DemoInspection {
   readonly limitations: readonly string[];
 }
 
-export const summarizeDemo = (
-  result: DemoDecodeResult,
-  sha256: string,
-  bytes: number,
-): DemoInspection => {
-  const commandCounts: Record<string, number> = {};
-  for (const frame of result.frames)
-    commandCounts[frame.kind] = (commandCounts[frame.kind] ?? 0) + 1;
-  return {
-    schemaVersion: 1,
-    sha256,
-    bytes,
-    header: {
-      stamp: result.header.stamp,
-      demoProtocol: result.header.demoProtocol,
-      networkProtocol: result.header.networkProtocol,
-      mapName: result.header.mapName,
-      gameDirectory: result.header.gameDirectory,
-      playbackTimeSeconds: result.header.playbackTimeSeconds,
-      playbackTicks: result.header.playbackTicks,
-      playbackFrames: result.header.playbackFrames,
-      signonLength: result.header.signonLength,
-    },
-    headerLabelSha256: {
-      serverName: createHash("sha256")
-        .update(result.header.serverName)
-        .digest("hex"),
-      clientName: createHash("sha256")
-        .update(result.header.clientName)
-        .digest("hex"),
-    },
-    commandCounts: Object.fromEntries(
-      Object.entries(commandCounts).sort(([left], [right]) =>
-        left.localeCompare(right),
-      ),
-    ),
-    commandSequenceSha256: createHash("sha256")
-      .update(
-        result.frames
-          .map((frame) => `${frame.tick ?? "null"}\t${frame.kind}\n`)
-          .join(""),
-      )
-      .digest("hex"),
-    issues: result.issues,
-    telemetryAvailability: {
-      playerIdentity: "not-evaluated-by-lightweight-inspect",
-      gameEvents: "not-evaluated-by-lightweight-inspect",
-      playerPositions: "not-evaluated-by-lightweight-inspect",
-      playerEyeAngles: "not-evaluated-by-lightweight-inspect",
-      weaponAndFire: "not-evaluated-by-lightweight-inspect",
-      userCommands: "unavailable-for-sourcetv",
-    },
-    limitations: [
-      "The inspect command validates outer framing only; deep entity, identity, and event projection use dedicated streaming commands and corpus gates.",
-      "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
-      "Unavailable telemetry is never substituted with zero-valued observations.",
-    ],
-  };
-};
+export const summarizeNativeDemo = (
+  input: { demoSha256: string; bytes: number },
+  framing: NativeFramingSummary,
+): DemoInspection => ({
+  schemaVersion: 1,
+  sha256: input.demoSha256,
+  bytes: input.bytes,
+  header: {
+    stamp: framing.stamp,
+    demoProtocol: framing.demoProtocol,
+    networkProtocol: framing.networkProtocol,
+    mapName: framing.mapName,
+    gameDirectory: framing.gameDirectory,
+    playbackTimeSeconds: framing.playbackTimeSeconds,
+    playbackTicks: framing.playbackTicks,
+    playbackFrames: framing.playbackFrames,
+    signonLength: framing.signonLength,
+  },
+  headerLabelSha256: {
+    serverName: createHash("sha256").update(framing.serverName).digest("hex"),
+    clientName: createHash("sha256").update(framing.clientName).digest("hex"),
+  },
+  commandCounts: Object.fromEntries(
+    framing.commandCounts
+      .map(({ kind, count }) => [kind, count] as const)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  ),
+  commandSequenceSha256: framing.commandSequenceSha256,
+  issues: framing.issues,
+  telemetryAvailability: {
+    playerIdentity: "not-evaluated-by-lightweight-inspect",
+    gameEvents: "not-evaluated-by-lightweight-inspect",
+    playerPositions: "not-evaluated-by-lightweight-inspect",
+    playerEyeAngles: "not-evaluated-by-lightweight-inspect",
+    weaponAndFire: "not-evaluated-by-lightweight-inspect",
+    userCommands: "unavailable-for-sourcetv",
+  },
+  limitations: [
+    "The inspect command validates outer framing only; deep entity, identity, and event projection use dedicated streaming commands and corpus gates.",
+    "Packet command-info view angles in SourceTV demos describe the TV recorder, not individual players.",
+    "Unavailable telemetry is never substituted with zero-valued observations.",
+  ],
+});
 
 export const stableJson = (value: unknown): string =>
   `${JSON.stringify(sortValue(value), null, 2)}\n`;

@@ -30,7 +30,13 @@ architecture, sets `no_new_privs`, denies socket creation, socket pairs,
 `io_uring`, BPF and ptrace through seccomp, then executes Node. The stable
 [Node permission model](https://nodejs.org/api/permissions.html) allows reads
 only from application code and the exact content-addressed demo. Filesystem
-writes, child processes, worker threads and native addons remain denied.
+writes, child processes and worker threads remain denied. `--allow-addons` is
+enabled only for this parser child so it can load the exact repository-built
+Node-API module. Node permissions do not sandbox syscalls made by native code;
+the compensating controls are the addon's bytes-only API, strict metadata and
+configuration validation, no-network seccomp, read-only container, rlimits,
+bounded output and whole-process-group termination. Production rejects an
+unstamped all-zero native build SHA-256.
 
 The CLI also has a 4 GiB V8 heap cap. `prlimit` caps address space at 5 GiB, CPU
 at 300 seconds, open files at 64 and core dumps at zero. Standard output plus
@@ -40,3 +46,5 @@ terminates the entire child process group, waits up to one second, then sends
 processes. A real CEDAPug derivation-v6 bundle passes through this exact compiled
 boundary. Public high-risk operation can still add a separate ephemeral parser
 container as another layer against a Node runtime or kernel vulnerability.
+The asynchronous native task is not cooperatively interrupted inside the addon;
+the isolated process-group kill is the cancellation boundary.

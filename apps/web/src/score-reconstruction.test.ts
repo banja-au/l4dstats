@@ -48,6 +48,14 @@ const analysis = (mapName: string): JobAnalysis =>
   ({ engineResult: { demo: { mapName } } }) as unknown as JobAnalysis;
 
 describe("Versus score reconstruction", () => {
+  it("does not turn a missing required team score into zero", () => {
+    const incomplete = demo([525, 0], [0, 0]);
+    incomplete.match!.campaignScores = [525, null];
+    expect(
+      reconstructVersusScores([incomplete], [analysis("c4m1_milltown_a")]),
+    ).toEqual([]);
+  });
+
   it("uses following-map boundaries and leaves the terminal half incomplete", () => {
     const rows = reconstructVersusScores(
       [

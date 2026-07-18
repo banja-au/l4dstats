@@ -1,12 +1,16 @@
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS dotnet
 
+FROM rust:1.97.1-bookworm@sha256:77fac8b98f9f46062bb680b6d25d5bcaabfc400143952ebc572e924bcbedc3fa AS rust
+
 FROM node:24-bookworm-slim
 
 RUN apt-get update \
   && apt-get install --yes --no-install-recommends \
     ca-certificates \
     curl \
+    gcc \
     git \
+    libc6-dev \
     libgcc-s1 \
     libgssapi-krb5-2 \
     libicu72 \
@@ -16,16 +20,23 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=dotnet /usr/share/dotnet /usr/share/dotnet
+COPY --from=rust /usr/local/cargo /usr/local/cargo
+COPY --from=rust /usr/local/rustup /usr/local/rustup
 
 ENV DOTNET_ROOT=/usr/share/dotnet
-ENV PATH="/usr/share/dotnet:${PATH}"
+ENV CARGO_HOME=/usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV PATH="/usr/local/cargo/bin:/usr/share/dotnet:${PATH}"
 ENV PNPM_HOME=/pnpm
 ENV PATH="/pnpm:${PATH}"
 
 RUN corepack enable && corepack prepare pnpm@11.13.1 --activate
 RUN dotnet --info
+RUN rustc --version && cargo --version
 
 WORKDIR /workspace
+
+COPY scripts/prepare-native-parser.sh /usr/local/bin/prepare-native-parser
 
 EXPOSE 5173
 

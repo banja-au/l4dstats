@@ -96,10 +96,19 @@ For native development with Node 24+ and Corepack:
 
 ```bash
 ./init.sh
+pnpm build
 pnpm dev
 ```
 
 Native `pnpm dev` starts the web surface only; use Compose for the complete analysis pipeline.
+The normal evidence path requires the repository-built Rust Node-API addon at
+`crates/demo-source1-node/dist/demo-source1-node.node`. A fresh development
+Compose worker prepares that addon with `pnpm native:prepare`; local CLI and web
+development commands use the same prerequisite. Production images build and
+verify a provenance-stamped addon themselves. The Rust parser is the only demo
+parser implementation; an
+addon load or compatibility failure stops analysis rather than selecting another
+parser.
 
 `pnpm dev:docker` force-recreates the three application containers so the web
 proxy and API cannot retain different authentication environments. Named
@@ -147,7 +156,7 @@ browser .dem files
        ▼
 local API ──► durable SQLite job queue ──► worker
                                               │
-                   Source 1 decode ──► L4D2 observation projection
+                   native Rust decode ──► L4D2 observation projection
                                               │
                    descriptive stats ◄── events + player telemetry
                                               │
@@ -163,8 +172,9 @@ apps/web/             React/Vite upload, progress, and results experience
 apps/api/             streaming uploads, job state, and bounded local API
 apps/worker/          retryable analysis jobs and artifact persistence
 apps/cli/             deterministic demo/corpus inspection
-packages/demo-source1 dependency-free Source 1 framing and decoding
-packages/l4d2-schema/ typed L4D2 observation projection
+packages/contracts/   parser-neutral observation and projection contracts
+crates/demo-source1-native clean-room bounded Rust decoder and projection
+crates/demo-source1-node coarse bytes-only Node-API binding
 packages/detectors/   explainable, prerequisite-gated review signals
 packages/storage/     SQLite jobs and content-addressed artifacts
 ```
@@ -191,6 +201,22 @@ first-load budget. The recovery gate verifies checksum rejection, archive
 safety, SQLite reopening and exact artifact hashes after restoration.
 On Linux, the sandbox gate runs a complete real CEDAPug evidence bundle through
 the production seccomp and Node-permission boundary.
+
+Native performance regressions use `tools/demo-benchmark/benchmark.mjs` with
+explicit ignored demo paths. The harness hashes fixtures instead of retaining
+their contents, enforces release artifacts, runs demos sequentially, performs
+warmups and records repeated wall, CPU, maximum-RSS and throughput
+distributions plus command, artifact, toolchain and host provenance. Optional
+same-host median wall/RSS/throughput thresholds can fail
+a regression run. Stage and end-to-end addon measurements remain separate. The
+historical comparison recorded on the Linux arm64 benchmark host found that the
+five-demo end-to-end median fell from 138.985 seconds for the optimized
+now-removed TypeScript implementation to 53.816 seconds for native Rust
+(2.583x); median peak RSS
+fell from 1,988,496 KiB to 1,290,136 KiB. This is 9.36x faster than the original
+503.57-second baseline. These TypeScript figures are historical migration
+evidence, not a selectable benchmark target. Demos and identity-bearing outputs
+must never be committed.
 
 > [!IMPORTANT]
 > L4DStats output is descriptive. Demo telemetry is incomplete, behavior is contextual, and skilled play can look extraordinary. Signals do not prove player conduct and must not be used for automated enforcement.

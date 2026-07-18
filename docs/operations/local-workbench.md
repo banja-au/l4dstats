@@ -45,6 +45,13 @@ The local worker invokes the versioned CLI without a shell. It caps execution at
 five minutes and combined captured stdout/stderr at 16 MiB. Jobs remain durable and
 may be cancelled or retried.
 
+Evidence analysis requires the Rust addon at
+`crates/demo-source1-node/dist/demo-source1-node.node`. Production builds and
+stamps it automatically. The development Compose worker runs
+`pnpm native:prepare` before it starts; the local CLI and web development scripts
+use the same prerequisite. An addon-load failure stops analysis; no fallback
+parser exists.
+
 ## Runtime data and recovery
 
 - Health: `http://localhost:8787/health`
@@ -87,9 +94,21 @@ Runtime configuration:
   Production analysis uses compiled CLI output and fails closed on Linux if its
   seccomp launcher is absent. The launcher denies network-related syscalls and
   ptrace/BPF/io_uring; Node permissions allow reads only from application code
-  and the single demo while denying writes, subprocesses, workers and addons.
+  and the single demo while denying writes, subprocesses and workers. Native
+  addon permission is enabled only for that parser child. Because Node cannot
+  restrict syscalls made by the addon, its bytes-only API remains behind
+  seccomp, rlimits, the read-only container and process-group cleanup.
   API and web credentials are removed from the child environment. Run
   `pnpm test:sandbox` to process a real demo through the compiled boundary.
+
+The parser configuration caps input at 512 MiB, compact output at 256 MiB,
+observations at 2,000,000, identity mappings at 16,384, match states at 100,000,
+raw events at 2,000,000, required events at 1,000,000 and event kinds at 4,096.
+The pseudonym key must contain 16–64 bytes. The child additionally has a 4 GiB
+V8 heap, 5 GiB address-space, 300-second CPU, 64-file and 16 MiB captured-output
+limits. Cancellation sends TERM to the process group and KILL after one second;
+the native task itself is not cooperatively cancelled.
+
 - `WITCHWATCH_WEB_USERNAME` and `WITCHWATCH_WEB_PASSWORD` enable a single-user
   HTTP Basic gate in front of the complete web surface. They must be set
   together and the password must contain at least 16 bytes. Use this only over

@@ -1,11 +1,5 @@
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { visitL4d2EntityFrames } from "@witchwatch/demo-source1";
-import {
-  L4d2PlayerProjector,
-  type ProjectedPlayerObservation,
-} from "@witchwatch/l4d2-schema";
 import { describe, expect, it } from "vitest";
 import {
   deriveCompetitiveStats,
@@ -13,30 +7,18 @@ import {
   deriveSurvivorHealthTraces,
   deriveSurvivorLoadoutTraces,
 } from "./evidence-bundle";
+import { prepareNativeDemoProjection } from "./native-demo-provider";
 
 const corpusDemo = resolve(
   "../../data/sprint-1-corpus/extracted/901780_c2m1_highway/901780_c2m1_highway.dem",
 );
-const stop = new Error("bounded health sample captured");
-
 describe.runIf(existsSync(corpusDemo))("real Survivor health traces", () => {
-  it("compresses observed health and buffer state without losing damage changes", () => {
+  it("compresses observed health and buffer state without losing damage changes", async () => {
     const bytes = readFileSync(corpusDemo);
-    const projected: ProjectedPlayerObservation[] = [];
-    const projector = new L4d2PlayerProjector({
-      demoSha256: createHash("sha256").update(bytes).digest("hex"),
-      userInfo: [],
-      tickIntervalSeconds: 1 / 30,
-      onObservation: (observation) => {
-        projected.push(observation);
-        if (projected.length === 20_000) throw stop;
-      },
+    const prepared = await prepareNativeDemoProjection(bytes, {
+      pseudonymKey: "health-trace-native-fixture-key",
     });
-    try {
-      visitL4d2EntityFrames(bytes, (frame) => projector.visit(frame));
-    } catch (error) {
-      if (error !== stop) throw error;
-    }
+    const projected = prepared.observations.slice(0, 20_000);
     const participantIds = new Set(
       projected.map((row) => row.observation.playerEpochId),
     );

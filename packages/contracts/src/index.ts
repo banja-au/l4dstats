@@ -247,3 +247,293 @@ export interface CanonicalDemo {
   readonly events: readonly GameEventObservation[];
   readonly coverage: ProtocolCoverage;
 }
+
+/** Parser-neutral Source 1 demo header metadata. */
+export interface DemoHeader {
+  readonly stamp: "HL2DEMO";
+  readonly demoProtocol: number;
+  readonly networkProtocol: number;
+  readonly serverName: string;
+  readonly clientName: string;
+  readonly mapName: string;
+  readonly gameDirectory: string;
+  readonly playbackTimeSeconds: number;
+  readonly playbackTicks: number;
+  readonly playbackFrames: number;
+  readonly signonLength: number;
+}
+
+export interface DecodeIssue {
+  readonly code: "UNKNOWN_DEMO_COMMAND" | "TRAILING_DATA";
+  readonly offset: number;
+  readonly command?: number;
+  readonly message: string;
+}
+
+export interface L4d2ServerInfo {
+  readonly networkProtocol: number;
+  readonly serverCount: number;
+  readonly isSourceTv: boolean;
+  readonly dedicated: boolean;
+  readonly maxServerClasses: number;
+  readonly playerCount: number;
+  readonly maxClients: number;
+  readonly tickIntervalSeconds: number;
+  readonly platformCode: number;
+}
+
+export type GameEventValue = boolean | number | string;
+export type GameEventFieldType =
+  | "string"
+  | "float"
+  | "long"
+  | "short"
+  | "byte"
+  | "boolean"
+  | "uint64";
+
+export interface GameEventFieldSchema {
+  readonly name: string;
+  readonly type: GameEventFieldType;
+}
+
+export interface GameEventSchema {
+  readonly id: number;
+  readonly name: string;
+  readonly fields: readonly GameEventFieldSchema[];
+}
+
+export interface DecodedGameEvent {
+  readonly id: number;
+  readonly name: string;
+  readonly fields: Readonly<Record<string, GameEventValue>>;
+  readonly schema: GameEventSchema;
+}
+
+export interface EventFieldAvailability<T extends GameEventValue> {
+  readonly availability: "observed" | "unavailable";
+  readonly value?: T;
+  readonly provenance?: {
+    readonly message: "svc_GameEvent";
+    readonly eventId: number;
+    readonly field: string;
+  };
+  readonly reason?: string;
+}
+
+export type RequiredGameEventName =
+  | "weapon_fire"
+  | "player_hurt"
+  | "player_death";
+
+export interface RequiredGameEventProjection {
+  readonly name: RequiredGameEventName;
+  readonly eventId: number;
+  readonly tick: number;
+  readonly actorUserId: EventFieldAvailability<number>;
+  readonly victimUserId: EventFieldAvailability<number>;
+  readonly attackerUserId: EventFieldAvailability<number>;
+  readonly weapon: EventFieldAvailability<string>;
+  readonly damage: EventFieldAvailability<number>;
+  readonly health: EventFieldAvailability<number>;
+  readonly decoded: DecodedGameEvent;
+}
+
+export interface GameEventVisit {
+  readonly demoTick: number;
+  readonly engineTick: number | null;
+  readonly event: DecodedGameEvent;
+  readonly required: RequiredGameEventProjection | null;
+}
+
+export interface GameEventTelemetrySummary {
+  readonly schemaLists: number;
+  readonly schemas: number;
+  readonly events: number;
+  readonly requiredEvents: Readonly<Record<string, number>>;
+}
+
+export interface ProjectableUserInfo {
+  readonly entityIndex: number;
+  readonly userInfoSlot: number;
+  readonly userId?: number;
+  readonly stableIdentityToken?: string;
+  readonly effectiveTick?: number;
+}
+
+export interface DisplayUserInfoIdentity {
+  readonly entityIndex: number;
+  readonly userInfoSlot: number;
+  readonly userId: number;
+  readonly effectiveTick?: number;
+  readonly displayName: string;
+  readonly fakePlayer: boolean;
+  readonly steamId64?: string;
+}
+
+export interface L4d2WitchObservation {
+  readonly entityIndex: number;
+  readonly lifetime: number;
+  readonly tick: number;
+  readonly timeSeconds?: number | undefined;
+  readonly cellRelativeOrigin?: Vector3 | undefined;
+  readonly rage?: number | undefined;
+  readonly wanderRage?: number | undefined;
+  readonly burning?: boolean | undefined;
+}
+
+export interface ProjectionFieldProvenance {
+  readonly source:
+    | "network-send-property"
+    | "derived-engine-tick"
+    | "derived-network-normalization"
+    | "unavailable";
+  readonly properties: readonly string[];
+  readonly reason?: string;
+}
+
+export interface ProjectedPlayerObservation {
+  readonly observation: PlayerObservation;
+  readonly l4d2: L4d2PlayerState;
+  readonly provenance: Readonly<
+    Record<
+      | "demoTimeSeconds"
+      | "position"
+      | "eyeAngles"
+      | "team"
+      | "playerClass"
+      | "weapon"
+      | "buttons",
+      ProjectionFieldProvenance
+    >
+  >;
+}
+
+export interface L4d2PlayerState {
+  readonly entityIndex: number;
+  readonly health?: number | undefined;
+  readonly maxHealth?: number | undefined;
+  readonly healthBuffer?: number | undefined;
+  readonly lifeState?: number | undefined;
+  readonly incapacitated?: boolean | undefined;
+  readonly ghost?: boolean | undefined;
+  readonly versusTeam?: number | undefined;
+  readonly checkpointZombieKills?: readonly number[] | undefined;
+  readonly checkpointRevives?: number | undefined;
+  readonly checkpointIncaps?: number | undefined;
+  readonly checkpointSpecialIncaps?: number | undefined;
+  readonly checkpointPounces?: number | undefined;
+  readonly highestPounceDamage?: number | undefined;
+  readonly longestJockeyRide?: number | undefined;
+  readonly frustration?: number | undefined;
+  readonly tongueVictim?: number | undefined;
+  readonly pounceVictim?: number | undefined;
+  readonly jockeyVictim?: number | undefined;
+  readonly carryVictim?: number | undefined;
+  readonly pummelVictim?: number | undefined;
+  readonly loadout?: L4d2PlayerLoadout | undefined;
+  readonly activeWeaponAmmo?: L4d2ActiveWeaponAmmo | undefined;
+  readonly counters?: Readonly<Partial<Record<L4d2CounterName, number>>>;
+}
+
+export interface L4d2ActiveWeaponAmmo {
+  readonly weaponClass?: string | undefined;
+  readonly primaryAmmoType?: number | undefined;
+  readonly clip?: number | undefined;
+  readonly reserve?: number | undefined;
+  readonly reloading?: boolean | undefined;
+  readonly extraPrimaryAmmo?: number | undefined;
+  readonly upgradedAmmoLoaded?: number | undefined;
+}
+
+export interface L4d2PlayerLoadout {
+  readonly primaryWeaponId?: number | undefined;
+  readonly firstAidSlotId?: number | undefined;
+  readonly pillsSlotId?: number | undefined;
+}
+
+export interface L4d2WeaponIdentity {
+  readonly id: number;
+  readonly name: string;
+  readonly category:
+    | "primary"
+    | "secondary"
+    | "medical"
+    | "temporary-health"
+    | "utility"
+    | "infected"
+    | "world"
+    | "unknown";
+}
+
+export type L4d2CounterName =
+  | "m_checkpointSurvivorDamage"
+  | "m_checkpointMedkitsUsed"
+  | "m_checkpointPillsUsed"
+  | "m_checkpointMolotovsUsed"
+  | "m_checkpointPipebombsUsed"
+  | "m_checkpointBoomerBilesUsed"
+  | "m_checkpointAdrenalinesUsed"
+  | "m_checkpointDefibrillatorsUsed"
+  | "m_checkpointDamageTaken"
+  | "m_checkpointFirstAidShared"
+  | "m_checkpointDamageToTank"
+  | "m_checkpointDamageToWitch"
+  | "m_missionAccuracy"
+  | "m_checkpointHeadshots"
+  | "m_checkpointHeadshotAccuracy"
+  | "m_checkpointDeaths"
+  | "m_checkpointMeleeKills"
+  | "m_checkpointPZTankDamage"
+  | "m_checkpointPZHunterDamage"
+  | "m_checkpointPZSmokerDamage"
+  | "m_checkpointPZBoomerDamage"
+  | "m_checkpointPZJockeyDamage"
+  | "m_checkpointPZSpitterDamage"
+  | "m_checkpointPZChargerDamage"
+  | "m_checkpointPZKills"
+  | "m_checkpointPZPushes"
+  | "m_checkpointPZTankPunches"
+  | "m_checkpointPZTankThrows"
+  | "m_checkpointPZHung"
+  | "m_checkpointPZPulled"
+  | "m_checkpointPZBombed"
+  | "m_checkpointPZVomited"
+  | "m_checkpointPZLongestSmokerGrab"
+  | "m_checkpointPZNumChargeVictims";
+
+export interface PlayerProjectionCoverage {
+  readonly framesVisited: number;
+  readonly observationsEmitted: number;
+  readonly fieldAvailability: Readonly<
+    Record<
+      | "demoTimeSeconds"
+      | "position"
+      | "eyeAngles"
+      | "team"
+      | "playerClass"
+      | "weapon"
+      | "buttons",
+      {
+        readonly observed: number;
+        readonly derived: number;
+        readonly unavailable: number;
+      }
+    >
+  >;
+}
+
+export interface L4d2MatchState {
+  readonly tick: number;
+  readonly campaignScores: readonly (number | null)[];
+  readonly chapterScores: readonly (number | null)[];
+  readonly survivorScores: readonly (number | null)[];
+  readonly survivorDistances: readonly (number | null)[];
+  readonly survivorDeathDistances: readonly (number | null)[];
+  readonly roundDurations: readonly (number | null)[];
+  readonly roundNumber?: number | undefined;
+  readonly teamsFlipped?: boolean | undefined;
+  readonly secondHalf?: boolean | undefined;
+  readonly voteRestarting?: boolean | undefined;
+  readonly roundSetupTimeRemaining?: number | undefined;
+}

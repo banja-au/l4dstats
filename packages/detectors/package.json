@@ -17,11 +17,9 @@
     "test:real": "WITCHWATCH_REAL_CORPUS=1 vitest run src/real-evidence.test.ts --pool=forks --maxWorkers=1"
   },
   "dependencies": {
-    "@witchwatch/contracts": "workspace:*",
-    "@witchwatch/l4d2-schema": "workspace:*"
+    "@witchwatch/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@witchwatch/demo-source1": "workspace:*",
     "vitest": "3.2.6"
   }
 }

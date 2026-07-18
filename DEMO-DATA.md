@@ -19,6 +19,31 @@ or statistic change. Never present an unavailable value as zero.
   identity across the entire demo (`unique-slot-v1`). Ambiguous slot reuse stays
   anonymous, and the artifact marks whether identity was observed or inferred.
 
+## Parser artifact and lineage
+
+Normal evidence analysis uses the clean-room Rust parser through one coarse,
+bytes-only Node-API call. It is the repository's only demo parser; failures are
+reported explicitly and never select a fallback implementation. Rust emits
+compact artifact wire version 1, a private
+transport into the shared TypeScript statistics, detector and evidence packaging
+path rather than a second public data contract.
+
+The adapter independently verifies input byte length and demo SHA-256 and
+strictly validates bounded registries, rows, masks, nested events, match state,
+coverage, missingness and provenance before rehydration. Tick remains primary.
+Null, unavailable and unobserved values retain their exact meaning; compact
+encoding must never turn them into zero.
+
+Lineage records native core and binding versions, parser config ID,
+binding/config/wire versions and the 64-hex native build SHA-256. Production
+rejects an unstamped all-zero build hash. Changes to parser semantics, compact
+wire interpretation, parser configuration or downstream derivation require new
+versions and reanalysis of incompatible stored results. Existing results are
+preserved rather than silently reinterpreted. Before the TypeScript parser was
+removed, exact 22-demo semantic parity to its prepared-projection output was
+recorded as migration evidence. That historical comparison does not replace the
+still-open licensed game-playback validation boundary.
+
 ## Directly decoded data
 
 | Source                                   | Retained data                                                                                                                                                                                                                                                  | Limits                                                                                                                                                                                                                                                                          |
@@ -123,6 +148,10 @@ or statistic change. Never present an unavailable value as zero.
   recompute player, combat, timeline and coverage views without relabelling
   whole-demo totals as half totals. A late first observation can still make
   any delta a lower bound.
+- Indexed match-state arrays preserve an absent network send property as
+  `null`; numeric zero is reserved for an observed engine value. Consumers
+  must not reconstruct or chart a score boundary whose required team index is
+  missing.
 - `m_checkpointZombieKills` is a total infected-kill counter, not a Common
   Infected counter. A fresh complete CEDAPug game showed its excess over the
   plugin's `GunStats.all.CommonKill` exactly equalled attributed SI kills for

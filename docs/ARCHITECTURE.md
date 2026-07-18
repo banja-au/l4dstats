@@ -26,7 +26,28 @@ apps/web  ─HTTP/SSE─► apps/api ─job─► engine CLI
 engine CLI = decoder → L4D2 projection → observations → detectors → scoring
 ```
 
-The initial engine may be TypeScript. The boundary is a versioned CLI and NDJSON/JSON schema so a later Rust decoder does not disturb the API or UI.
+The production engine uses a clean-room Rust decoder through one asynchronous,
+coarse Node-API call. The addon accepts demo bytes, a privacy key and canonical
+bounded configuration; it exposes no path or network API. It returns compact
+wire v1, which a strict TypeScript adapter rehydrates before the existing
+statistics, detectors and evidence packaging run. The versioned CLI/JSON
+boundary keeps API, storage and UI contracts independent of parser language.
+The Rust core is the only demo decoder and L4D2 projector. TypeScript retains the
+strict wire adapter and downstream statistics, detector and evidence packaging;
+there is no alternate parser or fallback path.
+
+Artifact production uses one `PreparedDemo`: outer command framing is decoded
+once and packet message boundaries are inspected once, then shared by identity,
+server-info, entity, and event consumers. Public diagnostic helpers may create
+their own prepared view when invoked independently. Native failures cross the
+binding as a stable typed envelope with stage and the best defensible byte
+offset; unavailable offsets remain explicit rather than inferred.
+
+The addon is loaded only inside the parser child. That child has exact
+demo/application read permissions, no-network seccomp, a read-only production
+filesystem, rlimits, bounded output and process-group cancellation. Node's
+permission model does not constrain syscalls made by an addon, so native addon
+permission is not granted to the API, worker or web processes.
 
 ## Canonical concepts
 
