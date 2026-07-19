@@ -120,3 +120,19 @@ jobs:
           printf '%s' "$L4DSTATS_PSEUDONYM_KEY" | pnpm dlx wrangler@4 secret put L4DSTATS_PSEUDONYM_KEY --config deploy/cloudflare/wrangler.production.jsonc
       - name: Deploy Worker, static assets, Queue bindings, and Container
         run: pnpm dlx wrangler@4 deploy --config deploy/cloudflare/wrangler.production.jsonc
+      - name: Attach production hostname
+        run: |
+          response="$(curl --fail-with-body --silent --show-error \
+            --request PUT \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "{\"hostname\":\"$PRODUCTION_HOSTNAME\",\"service\":\"l4dstats-production\",\"zone_name\":\"$PRODUCTION_HOSTNAME\"}" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains")"
+          RESPONSE="$response" node -e '
+            const body = JSON.parse(process.env.RESPONSE);
+            if (!body.success) {
+              console.error(body.errors?.map(({ code, message }) => `${code}: ${message}`).join("\n"));
+              process.exit(1);
+            }
+            console.log(`Attached ${body.result.hostname} to ${body.result.service}`);
+          '
