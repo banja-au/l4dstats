@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ContentAddressedStore,
@@ -21,6 +22,9 @@ import {
 import { LocalWorker } from "./worker.js";
 
 const cleanup: string[] = [];
+const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const workerRoot = resolve(repositoryRoot, "apps/worker");
+const parserSandbox = resolve(workerRoot, "dist/parser-no-network");
 afterEach(async () => {
   await Promise.all(
     cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true })),
@@ -279,12 +283,12 @@ describe("LocalWorker", () => {
       "--nofile=64:64",
       "--core=0:0",
       "--",
-      "/workspace/apps/worker/dist/parser-no-network",
+      parserSandbox,
       process.execPath,
       "--max-old-space-size=4096",
       "--permission",
       "--allow-addons",
-      "--allow-fs-read=/workspace",
+      `--allow-fs-read=${repositoryRoot}`,
       "--allow-fs-read=/data/inbox/a.dem",
       "apps/cli/dist/main.js",
       "evidence-bundle",
@@ -295,7 +299,7 @@ describe("LocalWorker", () => {
   it.runIf(process.platform === "linux")(
     "denies parser network and filesystem writes",
     () => {
-      const sandbox = resolve("dist/parser-no-network");
+      const sandbox = parserSandbox;
       expect(existsSync(sandbox)).toBe(true);
       const network = spawnSync(
         sandbox,
@@ -305,7 +309,7 @@ describe("LocalWorker", () => {
           "-e",
           "try{await fetch('https://example.com');process.exit(2)}catch{process.stdout.write('blocked')}",
         ],
-        { cwd: resolve("apps/worker"), encoding: "utf8" },
+        { cwd: workerRoot, encoding: "utf8" },
       );
       expect(network.status).toBe(0);
       expect(network.stdout).toBe("blocked");
@@ -318,7 +322,7 @@ describe("LocalWorker", () => {
           "-e",
           "try{(await import('node:fs')).writeFileSync('/tmp/parser-escape','x');process.exit(2)}catch(e){process.stdout.write(e.code)}",
         ],
-        { cwd: resolve("apps/worker"), encoding: "utf8" },
+        { cwd: workerRoot, encoding: "utf8" },
       );
       expect(filesystem.status).toBe(0);
       expect(filesystem.stdout).toBe("ERR_ACCESS_DENIED");

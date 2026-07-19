@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { acquire, extractEntry, inspectZip } from "@l4dstats/acquisition";
 import {
   type CasePresentationV1,
@@ -20,6 +21,7 @@ const TERMINATION_GRACE_MS = 1_000;
 const MAX_OLD_SPACE_MIB = 4_096;
 const MAX_ADDRESS_SPACE_BYTES = 5 * 1024 * 1024 * 1024;
 const REMOTE_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const ZIP_LIMITS = {
   maxEntries: 64,
   maxExpandedBytes: 2 * 1024 * 1024 * 1024,
@@ -148,7 +150,7 @@ export function engineCommand(
       ? [
           "--permission",
           "--allow-addons",
-          "--allow-fs-read=/workspace",
+          `--allow-fs-read=${REPOSITORY_ROOT}`,
           `--allow-fs-read=${resolve(path)}`,
         ]
       : []),
@@ -162,7 +164,7 @@ export function engineCommand(
   if (production && process.platform === "linux") {
     const sandbox =
       process.env.L4DSTATS_PARSER_SANDBOX ??
-      "/workspace/apps/worker/dist/parser-no-network";
+      resolve(REPOSITORY_ROOT, "apps/worker/dist/parser-no-network");
     if (!existsSync(sandbox))
       throw new Error(`Production parser sandbox is unavailable: ${sandbox}`);
     const sandboxed = [sandbox, process.execPath, ...nodeArgs];
@@ -293,7 +295,7 @@ async function analyzeWithCli(
           .filter((entry): entry is [string, string] => entry[1] !== undefined),
       );
       const child = spawn(invocation.command, invocation.args, {
-        cwd: "/workspace",
+        cwd: REPOSITORY_ROOT,
         env: {
           ...childEnvironment,
           CI: "true",
