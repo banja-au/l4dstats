@@ -161,4 +161,26 @@ describe("edge dispatcher", () => {
     ]);
     expect(document.security).toEqual([{ bearerAuth: [] }]);
   });
+
+  it("serves the developer directory index without an index redirect loop", async () => {
+    const env = environment();
+    env.ASSETS = {
+      async fetch(request) {
+        expect(new URL(request.url).pathname).toBe("/developers/");
+        return new Response(
+          "<!doctype html><title>L4DStats Developers</title>",
+          {
+            headers: { "content-type": "text/html" },
+          },
+        );
+      },
+    };
+    const response = await fetchHandler(
+      new Request("https://developers.l4dstats.gg/"),
+      env,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    await expect(response.text()).resolves.toContain("L4DStats Developers");
+  });
 });

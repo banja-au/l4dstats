@@ -532,16 +532,14 @@ export async function fetchHandler(
     if (developerHost) {
       const isDeveloperAsset =
         url.pathname.startsWith("/developers/assets/") ||
-        url.pathname === "/developers/index.html";
-      assetUrl.pathname = isDeveloperAsset
-        ? url.pathname
-        : "/developers/index.html";
+        url.pathname === "/developers/";
+      assetUrl.pathname = isDeveloperAsset ? url.pathname : "/developers/";
     }
     let response = await environment.ASSETS.fetch(
       new Request(assetUrl, request),
     );
     if (developerHost && response.status === 404) {
-      assetUrl.pathname = "/developers/index.html";
+      assetUrl.pathname = "/developers/";
       response = await environment.ASSETS.fetch(new Request(assetUrl, request));
     }
     if (response.status !== 404) {
