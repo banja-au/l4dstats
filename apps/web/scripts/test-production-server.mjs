@@ -15,7 +15,18 @@ const viewerAuthorization = `Basic ${Buffer.from(`${viewerUsername}:${viewerPass
 const webRoot = await mkdtemp(join(tmpdir(), "l4dstats-production-web-"));
 await writeFile(
   join(webRoot, "index.html"),
-  "<!doctype html><html><body>L4DStats production test</body></html>",
+  `<!doctype html><html><head>
+  <link rel="canonical" href="https://l4dstats.gg/" />
+  <meta name="description" content="home" />
+  <meta property="og:title" content="home" />
+  <meta property="og:description" content="home" />
+  <meta property="og:url" content="https://l4dstats.gg/" />
+  <meta property="og:image" content="home.webp" />
+  <meta property="og:image:alt" content="home" />
+  <meta name="twitter:title" content="home" />
+  <meta name="twitter:description" content="home" />
+  <meta name="twitter:image" content="home.webp" />
+  <title>Home</title></head><body>L4DStats production test</body></html>`,
   { mode: 0o600 },
 );
 
@@ -36,6 +47,17 @@ const upstream = createServer((request, response) => {
       "content-type": "text/plain; version=0.0.4; charset=utf-8",
     });
     response.end("l4dstats_up 1\n");
+  } else if (request.url === "/api/games/test") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        id: "test",
+        analyses: [
+          { engineResult: { demo: { mapName: "c2m1_highway" } } },
+          { engineResult: { demo: { mapName: "c2m2_fairgrounds" } } },
+        ],
+      }),
+    );
   } else {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true, path: request.url }));
@@ -121,6 +143,19 @@ try {
   });
   if (!page.ok || !page.headers.get("content-security-policy"))
     throw new Error("authenticated SPA route or security headers failed");
+  const gameHtml = await page.text();
+  if (
+    !gameHtml.includes("Dark Carnival · 2 maps · L4DStats") ||
+    !gameHtml.includes(
+      'property="og:url" content="https://l4dstats.gg/game/test/overview"',
+    ) ||
+    !gameHtml.includes(
+      'name="twitter:description" content="2 maps reconstructed as one Dark Carnival game.',
+    )
+  )
+    throw new Error(
+      "game route did not receive campaign-specific social metadata",
+    );
   if (page.headers.get("x-frame-options") !== "DENY")
     throw new Error("frame protection is absent");
   const proxied = await fetch(`${base}/api/test?value=1`, {

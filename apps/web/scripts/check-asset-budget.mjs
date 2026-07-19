@@ -24,6 +24,7 @@ const budgets = {
   backdrop: 150 * kib,
   brand: 75 * kib,
   infected: 480 * kib,
+  social: 260 * kib,
   html: 8 * kib,
 };
 
@@ -50,6 +51,7 @@ const measured = await Promise.all(
 const sizeOf = (predicate) =>
   measured.filter(predicate).reduce((total, file) => total + file.bytes, 0);
 const isMainAsset = (file) =>
+  file.path !== "art/og-home.webp" &&
   !file.path.startsWith("map-geometry/") &&
   !file.path.startsWith("developers/") &&
   // The hidden aggregate dashboard is a route-level lazy chunk and does not
@@ -74,6 +76,7 @@ const totals = {
     ["art/infected-mark.webp", "favicon.png"].includes(file.path),
   ),
   infected: sizeOf((file) => file.path.startsWith("art/si/")),
+  social: sizeOf((file) => file.path === "art/og-home.webp"),
   html: sizeOf((file) => isMainAsset(file) && file.extension === ".html"),
   geometry: sizeOf((file) => file.path.startsWith("map-geometry/")),
   developerTransfer: measured
@@ -94,6 +97,8 @@ if (totals.backdrop === 0)
   );
 if (totals.brand === 0)
   failures.push("brand: expected infected-mark and favicon assets");
+if (totals.social === 0)
+  failures.push("social: expected bespoke art/og-home.webp social card");
 if (measured.filter((file) => file.path.startsWith("art/si/")).length !== 8)
   failures.push("infected: expected all eight realistic infected portraits");
 if (

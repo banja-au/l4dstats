@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createServer, request as proxyRequest } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,8 @@ const expectedUsers = configuredUsers.map((user) => ({
   ),
 }));
 const authFailures = new Map();
+const publicOrigin = "https://l4dstats.gg";
+const homeSocialImage = `${publicOrigin}/art/og-home.webp`;
 
 const mime = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -190,7 +193,122 @@ function proxy(request, response) {
   request.pipe(upstream);
 }
 
-function staticFile(request, response, pathname) {
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function campaignName(mapNames) {
+  const campaigns = {
+    c1: "Dead Center",
+    c2: "Dark Carnival",
+    c3: "Swamp Fever",
+    c4: "Hard Rain",
+    c5: "The Parish",
+    c6: "The Passing",
+    c7: "The Sacrifice",
+    c8: "No Mercy",
+    c9: "Crash Course",
+    c10: "Death Toll",
+    c11: "Dead Air",
+    c12: "Blood Harvest",
+    c13: "Cold Stream",
+    c14: "The Last Stand",
+  };
+  for (const mapName of mapNames) {
+    const match = /^(c\d+)m\d+(?:_|$)/i.exec(mapName);
+    const name = match ? campaigns[match[1].toLowerCase()] : undefined;
+    if (name) return name;
+  }
+  return null;
+}
+
+function replaceMeta(html, selector, value) {
+  const attribute = selector.startsWith("og:") ? "property" : "name";
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `(<meta\\s+${attribute}=["']${escapedSelector}["']\\s+content=["'])[^"']*(["']\\s*\\/?>)`,
+  );
+  return html.replace(pattern, `$1${escapeHtml(value)}$2`);
+}
+
+function renderSocialMetadata(html, metadata) {
+  let rendered = html.replace(
+    /<link rel="canonical" href="[^"]*"\s*\/>/,
+    `<link rel="canonical" href="${escapeHtml(metadata.url)}" />`,
+  );
+  rendered = rendered.replace(
+    /<title>[^<]*<\/title>/,
+    `<title>${escapeHtml(metadata.title)}</title>`,
+  );
+  for (const [selector, key] of [
+    ["description", "description"],
+    ["og:title", "title"],
+    ["og:description", "description"],
+    ["og:url", "url"],
+    ["og:image", "image"],
+    ["og:image:alt", "imageAlt"],
+    ["twitter:title", "title"],
+    ["twitter:description", "description"],
+    ["twitter:image", "image"],
+  ])
+    rendered = replaceMeta(rendered, selector, metadata[key]);
+  return rendered;
+}
+
+async function gameMetadata(request, pathname) {
+  const match = /^\/game\/([^/]+)(?:\/[^/]*)?\/?$/.exec(pathname);
+  if (!match) return null;
+  let gameId;
+  try {
+    gameId = decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+  const url = `${publicOrigin}${pathname}`;
+  const fallback = {
+    title: "L4DStats · Match review",
+    description:
+      "Evidence-first Left 4 Dead 2 match statistics and demo review.",
+    url,
+    image: homeSocialImage,
+    imageAlt: "L4DStats match analysis evidence board",
+  };
+  try {
+    const headers = {
+      "x-l4dstats-user": request.authenticatedIdentity.username,
+      "x-l4dstats-role": request.authenticatedIdentity.role,
+    };
+    if (apiToken) headers.authorization = `Bearer ${apiToken}`;
+    const response = await fetch(
+      new URL(`/api/games/${encodeURIComponent(gameId)}`, api),
+      { headers, signal: AbortSignal.timeout(2_000) },
+    );
+    if (!response.ok) return fallback;
+    const game = await response.json();
+    const maps = Array.isArray(game.analyses)
+      ? game.analyses.flatMap((analysis) => {
+          const mapName = analysis?.engineResult?.demo?.mapName;
+          return typeof mapName === "string" && mapName ? [mapName] : [];
+        })
+      : [];
+    const campaign = campaignName(maps);
+    const subject = campaign ?? maps[0] ?? "L4D2 match";
+    const mapLabel = `${maps.length || "Unknown"} ${maps.length === 1 ? "map" : "maps"}`;
+    return {
+      ...fallback,
+      title: `${subject} · ${mapLabel} · L4DStats`,
+      description: `${mapLabel} reconstructed as one ${subject} game. Review match statistics, timeline, data quality and evidence at exact ticks.`,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function staticFile(request, response, pathname) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     secureHeaders(response);
     response.writeHead(405, { allow: "GET, HEAD" });
@@ -245,7 +363,11 @@ function staticFile(request, response, pathname) {
       : "no-cache",
   });
   if (request.method === "HEAD") response.end();
-  else createReadStream(path).pipe(response);
+  else if (extension === ".html") {
+    const metadata = await gameMetadata(request, pathname);
+    const html = await readFile(path, "utf8");
+    response.end(metadata ? renderSocialMetadata(html, metadata) : html);
+  } else createReadStream(path).pipe(response);
 }
 
 createServer((request, response) => {
@@ -275,7 +397,14 @@ createServer((request, response) => {
     proxy(request, response);
     return;
   }
-  staticFile(request, response, url.pathname);
+  void staticFile(request, response, url.pathname).catch(() => {
+    if (response.headersSent) response.destroy();
+    else {
+      secureHeaders(response);
+      response.writeHead(500, { "cache-control": "no-store" });
+      response.end();
+    }
+  });
 }).listen(port, "0.0.0.0", () =>
   process.stdout.write(`L4DStats web on ${port}\n`),
 );
