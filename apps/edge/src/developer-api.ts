@@ -272,10 +272,19 @@ export async function handleDeveloperConsole(
             now,
           ],
         });
-      } catch {
-        return json(409, {
-          error: "An account with that email already exists",
-        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown";
+        if (/unique|already exists/i.test(message))
+          return json(409, {
+            error: "An account with that email already exists",
+          });
+        console.error(
+          JSON.stringify({
+            event: "developer.account.registration_failed",
+            category: message.slice(0, 160),
+          }),
+        );
+        return json(503, { error: "Account registration is unavailable" });
       }
       return createSession(client, id);
     }

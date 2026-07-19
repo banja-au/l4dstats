@@ -68,6 +68,25 @@ describe("developer account boundary", () => {
     );
     expect(stored.rows[0]?.email).toBe("dev@example.com");
     expect(stored.rows[0]?.password_hash).not.toContain("correct horse");
+    const duplicate = await handleDeveloperConsole(
+      new Request(
+        "https://developers.l4dstats.gg/developer-api/auth/register",
+        {
+          method: "POST",
+          headers: {
+            origin: "https://developers.l4dstats.gg",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            email: "dev@example.com",
+            password: "another correct horse battery staple",
+          }),
+        },
+      ),
+      environment,
+      database,
+    );
+    expect(duplicate?.status).toBe(409);
   });
 
   it("issues a one-time API key and returns account-scoped usage and logs", async () => {
