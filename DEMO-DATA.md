@@ -310,3 +310,21 @@ information when every compared player is zero. Cross-map aggregation is
 strict: if an additive metric is unavailable for any selected map on which the
 player appears, its game total remains unavailable instead of treating that map
 as zero.
+
+## Hosted aggregate materialization
+
+The hosted statistics surface stores a versioned per-demo signal count and,
+for each stable Steam identity observed in that demo, its signal count plus the
+shared rating projection input. These rows are derived indexes of the retained,
+hash-verified result artifact; they do not replace its parser, detector, config,
+map, or source lineage. Historical materialization downloads the retained
+artifact, verifies its recorded byte length and SHA-256, then rebuilds the same
+index idempotently.
+
+Global signal totals and averages are available only when every hosted analysis
+has the current materialization version. Player totals likewise remain missing
+when any linked demo is uncovered. Survivor exposure, infected lives, metric
+observations, and career rating remain missing when rating inputs are absent;
+the hosted UI must not substitute zero. Career ratings are recomputed through
+the canonical rating package only for players with at least 100 distinct games
+and only when the eligible comparison cohort meets the model minimum.

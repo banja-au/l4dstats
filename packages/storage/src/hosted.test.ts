@@ -39,7 +39,7 @@ const source = {
 };
 
 describe("HostedJobRepository", () => {
-  it("reports empty hosted aggregates without manufacturing unavailable signals", async () => {
+  it("reports empty hosted aggregates without manufacturing averages", async () => {
     const { repository: repo, close } = await repository();
     try {
       await expect(
@@ -48,7 +48,7 @@ describe("HostedJobRepository", () => {
         totals: {
           demosProcessed: 0,
           gamesProcessed: 0,
-          signalsIdentified: null,
+          signalsIdentified: 0,
           averageSignalsPerDemo: null,
         },
         players: {
@@ -234,15 +234,18 @@ describe("HostedJobRepository", () => {
           stats: {
             players: [
               {
+                id: "player-1",
                 alias: "Coach",
                 identity: {
                   displayName: "Coach",
                   steamId64: "76561198000000007",
                 },
+                evidenceWindows: 2,
               },
             ],
           },
         },
+        cases: [{ evidence: [{}, {}] }],
       };
       await repo.recordAnalysis({
         jobId: job.id,
@@ -272,12 +275,34 @@ describe("HostedJobRepository", () => {
       ).resolves.toMatchObject({
         steamId64: "76561198000000007",
         displayName: "Coach",
+        stats: {
+          games: 1,
+          demos: 1,
+          signals: 2,
+          materializedDemos: 1,
+          rating: null,
+        },
         games: [
           {
             id: gameId,
             demos: [{ jobId: job.id, mapName: "c5m4_quarter" }],
           },
         ],
+      });
+      await expect(
+        repo.publicStats(new Date("2026-07-20T00:00:00.000Z")),
+      ).resolves.toMatchObject({
+        totals: { signalsIdentified: 2, averageSignalsPerDemo: 2 },
+        players: {
+          bySignals: [
+            {
+              lookup: "76561198000000007",
+              displayName: "Coach",
+              signals: 2,
+            },
+          ],
+        },
+        recentGames: [{ id: gameId, signals: 2 }],
       });
     } finally {
       close();

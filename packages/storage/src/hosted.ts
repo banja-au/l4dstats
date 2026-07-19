@@ -1,4 +1,13 @@
 import { randomUUID } from "node:crypto";
+import {
+  l4dStatsRatingVersion,
+  mergeRatingInputs,
+  projectRatingInputs,
+  rateL4d2Match,
+  ratingMetricDefinitions,
+  type RatingPlayerInput,
+  type RatingProjectionStats,
+} from "@l4dstats/l4d2-rating";
 
 import type {
   JobState,
@@ -39,6 +48,10 @@ export interface HostedAnalysisReference {
   resultSha256: string;
   resultBytes: number;
   createdAt: string;
+}
+
+export interface HostedStatsBackfillReference extends HostedAnalysisReference {
+  materializedStatsVersion: string | null;
 }
 
 export interface HostedGameReference {
@@ -157,7 +170,26 @@ export const hostedMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS hosted_player_demos_player_idx
      ON hosted_player_demos(steam_id64,created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS hosted_demo_stats (
+    job_id TEXT PRIMARY KEY REFERENCES hosted_jobs(id) ON DELETE CASCADE,
+    signal_count INTEGER NOT NULL,
+    stats_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS hosted_player_demo_stats (
+    steam_id64 TEXT NOT NULL REFERENCES hosted_players(steam_id64) ON DELETE CASCADE,
+    job_id TEXT NOT NULL REFERENCES hosted_jobs(id) ON DELETE CASCADE,
+    signal_count INTEGER NOT NULL,
+    rating_input_json TEXT,
+    stats_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(steam_id64,job_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS hosted_player_demo_stats_player_idx
+     ON hosted_player_demo_stats(steam_id64,created_at DESC)`,
 ] as const;
+
+const hostedStatsVersion = `hosted-stats-v2:${l4dStatsRatingVersion}`;
 
 function parseJob(row: Record<string, unknown>): HostedJob {
   return {
@@ -543,13 +575,135 @@ export class HostedJobRepository {
       demoSha256: input.demoSha256,
       resultSha256: input.resultSha256,
     });
-    if (input.engineResult)
+    if (input.engineResult) {
       await this.assignGame({
         jobId: input.jobId,
         demoSha256: input.demoSha256,
         engineResult: input.engineResult,
       });
+      await this.materializeAnalysisStats(input.jobId, input.engineResult, at);
+    }
     return stored;
+  }
+
+  public async listAnalysesNeedingStats(
+    limit = 100,
+  ): Promise<HostedStatsBackfillReference[]> {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1_000)
+      throw new RangeError("stats backfill limit must be between 1 and 1000");
+    const rows = (
+      await this.client.execute(
+        `SELECT a.*,s.stats_version FROM hosted_analyses a
+         LEFT JOIN hosted_demo_stats s ON s.job_id=a.job_id
+         WHERE s.stats_version IS NULL OR s.stats_version<>?
+         ORDER BY a.created_at,a.job_id LIMIT ?`,
+        [hostedStatsVersion, limit],
+      )
+    ).rows;
+    return rows.map((row) => ({
+      jobId: String(row.job_id),
+      demoSha256: String(row.demo_sha256),
+      resultKey: String(row.result_key),
+      resultSha256: String(row.result_sha256),
+      resultBytes: Number(row.result_bytes),
+      createdAt: String(row.created_at),
+      materializedStatsVersion:
+        row.stats_version === null ? null : String(row.stats_version),
+    }));
+  }
+
+  public async materializeAnalysisStats(
+    jobId: string,
+    engineResult: unknown,
+    at = new Date(),
+  ): Promise<void> {
+    const result = engineResult as {
+      demo?: {
+        stats?: RatingProjectionStats & {
+          players: Array<
+            RatingProjectionStats["players"][number] & {
+              evidenceWindows?: unknown;
+              identity?: { steamId64?: unknown } | null;
+            }
+          >;
+        };
+      };
+      cases?: Array<{
+        evidence?: unknown[];
+        presentation?: { evidence?: unknown[] };
+      }>;
+    };
+    const stats = result.demo?.stats;
+    const signalCount = (result.cases ?? []).reduce(
+      (sum, item) =>
+        sum +
+        (item.presentation?.evidence?.length ?? item.evidence?.length ?? 0),
+      0,
+    );
+    const timestamp = iso(at);
+    if (!stats) {
+      await this.client.execute(
+        `INSERT INTO hosted_demo_stats VALUES(?,?,?,?)
+         ON CONFLICT(job_id) DO UPDATE SET
+           signal_count=excluded.signal_count,
+           stats_version=excluded.stats_version,
+           created_at=excluded.created_at`,
+        [jobId, signalCount, hostedStatsVersion, timestamp],
+      );
+      return;
+    }
+    const players = stats.players as Array<
+      RatingProjectionStats["players"][number] & {
+        evidenceWindows?: unknown;
+        identity?: { steamId64?: unknown } | null;
+      }
+    >;
+    const identities = new Map(
+      players.flatMap((player) =>
+        typeof player.identity?.steamId64 === "string" &&
+        /^7656119\d{10}$/.test(player.identity.steamId64)
+          ? [[player.id, player.identity.steamId64] as const]
+          : [],
+      ),
+    );
+    const ratingInputs = new Map(
+      projectRatingInputs([stats], (player) => {
+        const steamId64 = identities.get(player.id);
+        return steamId64 ? { id: steamId64, alias: player.alias } : undefined;
+      }).map((input) => [input.playerId, input]),
+    );
+    for (const player of players) {
+      const steamId64 = identities.get(player.id);
+      if (!steamId64) continue;
+      const playerSignals =
+        typeof player.evidenceWindows === "number" ? player.evidenceWindows : 0;
+      await this.client.execute(
+        `INSERT INTO hosted_player_demo_stats VALUES(?,?,?,?,?,?)
+         ON CONFLICT(steam_id64,job_id) DO UPDATE SET
+           signal_count=excluded.signal_count,
+           rating_input_json=excluded.rating_input_json,
+           stats_version=excluded.stats_version,
+           created_at=excluded.created_at`,
+        [
+          steamId64,
+          jobId,
+          playerSignals,
+          ratingInputs.has(steamId64)
+            ? JSON.stringify(ratingInputs.get(steamId64))
+            : null,
+          hostedStatsVersion,
+          timestamp,
+        ],
+      );
+    }
+    await this.client.execute(
+      `INSERT INTO hosted_demo_stats VALUES(?,?,?,?)
+       ON CONFLICT(job_id) DO UPDATE SET
+         signal_count=excluded.signal_count,
+         stats_version=excluded.stats_version,
+         created_at=excluded.created_at`,
+      [jobId, signalCount, hostedStatsVersion, timestamp],
+    );
   }
 
   private async assignGame(input: {
@@ -767,7 +921,11 @@ export class HostedJobRepository {
     engineResult: unknown;
   }): Promise<string> {
     const existing = await this.getGameIdForJob(input.jobId);
-    if (!existing) return this.assignGame(input);
+    if (!existing) {
+      const gameId = await this.assignGame(input);
+      await this.materializeAnalysisStats(input.jobId, input.engineResult);
+      return gameId;
+    }
     await this.indexPlayers({
       gameId: existing,
       jobId: input.jobId,
@@ -779,6 +937,7 @@ export class HostedJobRepository {
       engineResult: input.engineResult,
       at: iso(),
     });
+    await this.materializeAnalysisStats(input.jobId, input.engineResult);
     return existing;
   }
 
@@ -818,12 +977,107 @@ export class HostedJobRepository {
       });
       games.set(id, game);
     }
+    const materializedRows = (
+      await this.client.execute(
+        `SELECT signal_count,rating_input_json FROM hosted_player_demo_stats
+         WHERE steam_id64=? AND stats_version=? ORDER BY created_at,job_id`,
+        [steamId64, hostedStatsVersion],
+      )
+    ).rows;
+    const ratingInputs = materializedRows.flatMap((row) =>
+      row.rating_input_json === null
+        ? []
+        : [JSON.parse(String(row.rating_input_json)) as RatingPlayerInput],
+    );
+    const merged = ratingInputs.length
+      ? mergeRatingInputs(ratingInputs)
+      : undefined;
+    let careerRating: number | null = null;
+    if (games.size >= 100 && materializedRows.length === rows.length) {
+      const cohortRows = (
+        await this.client.execute(
+          `SELECT p.steam_id64,p.display_name,d.game_id,s.rating_input_json
+           FROM hosted_players p
+           JOIN hosted_player_demos d ON d.steam_id64=p.steam_id64
+           JOIN hosted_player_demo_stats s
+             ON s.steam_id64=d.steam_id64 AND s.job_id=d.job_id
+           WHERE s.stats_version=? AND s.rating_input_json IS NOT NULL
+           ORDER BY p.steam_id64,d.created_at,d.job_id`,
+          [hostedStatsVersion],
+        )
+      ).rows;
+      const cohort = new Map<
+        string,
+        { alias: string; games: Set<string>; inputs: RatingPlayerInput[] }
+      >();
+      for (const row of cohortRows) {
+        const id = String(row.steam_id64);
+        const value = cohort.get(id) ?? {
+          alias:
+            row.display_name === null
+              ? "Unknown player"
+              : String(row.display_name),
+          games: new Set<string>(),
+          inputs: [],
+        };
+        value.games.add(String(row.game_id));
+        value.inputs.push(
+          JSON.parse(String(row.rating_input_json)) as RatingPlayerInput,
+        );
+        cohort.set(id, value);
+      }
+      const eligible = [...cohort.entries()].flatMap(([id, value]) => {
+        if (value.games.size < 100) return [];
+        const input = mergeRatingInputs(value.inputs);
+        input.playerId = id;
+        input.playerAlias = value.alias;
+        input.maps = value.games.size;
+        return [input];
+      });
+      if (eligible.length >= 4)
+        careerRating =
+          rateL4d2Match(eligible).players.find(
+            (value) => value.playerId === steamId64,
+          )?.rating ?? null;
+    }
     return {
       steamId64,
       displayName:
         player.display_name === null ? null : String(player.display_name),
       profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
       updatedAt: String(player.updated_at),
+      stats: {
+        games: games.size,
+        demos: rows.length,
+        signals:
+          materializedRows.length === rows.length
+            ? materializedRows.reduce(
+                (sum, row) => sum + Number(row.signal_count),
+                0,
+              )
+            : null,
+        materializedDemos: materializedRows.length,
+        survivorSeconds: merged?.survivorSeconds ?? null,
+        infectedLives: merged?.infectedLives ?? null,
+        rating: careerRating,
+        ratingMinimumGames: 100,
+        ratingModelVersion: l4dStatsRatingVersion,
+        metrics: merged
+          ? Object.entries(merged.metrics).flatMap(([key, observation]) => {
+              if (!observation) return [];
+              return [
+                {
+                  key,
+                  label:
+                    ratingMetricDefinitions.find((item) => item.key === key)
+                      ?.label ?? key,
+                  value: observation.value,
+                  exposure: observation.exposure,
+                },
+              ];
+            })
+          : [],
+      },
       games: [...games.values()],
     };
   }
@@ -847,6 +1101,15 @@ export class HostedJobRepository {
     const gameTotal = (
       await this.client.execute("SELECT COUNT(*) AS count FROM hosted_games")
     ).rows[0];
+    const materialized = (
+      await this.client.execute(
+        `SELECT COUNT(*) AS count,COALESCE(SUM(signal_count),0) AS signals
+         FROM hosted_demo_stats WHERE stats_version=?`,
+        [hostedStatsVersion],
+      )
+    ).rows[0];
+    const demoCount = Number(totals?.demos_processed ?? 0);
+    const statsComplete = Number(materialized?.count ?? 0) === demoCount;
     const ranked = (
       await this.client.execute(
         `SELECT p.steam_id64,p.display_name,COUNT(DISTINCT d.game_id) AS games,
@@ -862,42 +1125,150 @@ export class HostedJobRepository {
       games: Number(row.games),
       demos: Number(row.demos),
     }));
+    const signalRanked = statsComplete
+      ? (
+          await this.client.execute(
+            `SELECT p.steam_id64,p.display_name,COUNT(DISTINCT d.game_id) AS games,
+                    SUM(s.signal_count) AS signals
+             FROM hosted_players p
+             JOIN hosted_player_demos d ON d.steam_id64=p.steam_id64
+             JOIN hosted_player_demo_stats s
+               ON s.steam_id64=d.steam_id64 AND s.job_id=d.job_id
+             WHERE s.stats_version=?
+             GROUP BY p.steam_id64,p.display_name
+             ORDER BY signals DESC,games DESC,p.display_name ASC LIMIT 10`,
+            [hostedStatsVersion],
+          )
+        ).rows.map((row) => ({
+          displayName:
+            row.display_name === null
+              ? "Unknown player"
+              : String(row.display_name),
+          lookup: String(row.steam_id64),
+          games: Number(row.games),
+          signals: Number(row.signals),
+        }))
+      : [];
+    const careerRows = statsComplete
+      ? (
+          await this.client.execute(
+            `SELECT p.steam_id64,p.display_name,d.game_id,s.rating_input_json
+             FROM hosted_players p
+             JOIN hosted_player_demos d ON d.steam_id64=p.steam_id64
+             JOIN hosted_player_demo_stats s
+               ON s.steam_id64=d.steam_id64 AND s.job_id=d.job_id
+             WHERE s.stats_version=? AND s.rating_input_json IS NOT NULL
+             ORDER BY p.steam_id64,d.created_at,d.job_id`,
+            [hostedStatsVersion],
+          )
+        ).rows
+      : [];
+    const careers = new Map<
+      string,
+      { displayName: string; games: Set<string>; inputs: RatingPlayerInput[] }
+    >();
+    for (const row of careerRows) {
+      const steamId64 = String(row.steam_id64);
+      const career = careers.get(steamId64) ?? {
+        displayName:
+          row.display_name === null
+            ? "Unknown player"
+            : String(row.display_name),
+        games: new Set<string>(),
+        inputs: [],
+      };
+      career.games.add(String(row.game_id));
+      career.inputs.push(
+        JSON.parse(String(row.rating_input_json)) as RatingPlayerInput,
+      );
+      careers.set(steamId64, career);
+    }
+    const eligibleCareerInputs = [...careers.entries()].flatMap(
+      ([steamId64, career]) => {
+        if (career.games.size < 100) return [];
+        const input = mergeRatingInputs(career.inputs);
+        input.playerId = steamId64;
+        input.playerAlias = career.displayName;
+        input.maps = career.games.size;
+        return [input];
+      },
+    );
+    const careerRatings =
+      eligibleCareerInputs.length >= 4
+        ? rateL4d2Match(eligibleCareerInputs).players
+        : [];
+    const byRating = careerRatings
+      .flatMap((rating) => {
+        const career = careers.get(rating.playerId);
+        return rating.rating !== null && career
+          ? [
+              {
+                displayName: career.displayName,
+                lookup: rating.playerId,
+                games: career.games.size,
+                rating: rating.rating,
+              },
+            ]
+          : [];
+      })
+      .sort(
+        (left, right) =>
+          right.rating - left.rating ||
+          right.games - left.games ||
+          left.displayName.localeCompare(right.displayName),
+      )
+      .slice(0, 10);
     const recent = (
       await this.client.execute(
         `SELECT g.id,g.campaign,MAX(a.created_at) AS processed_at,
                 COUNT(DISTINCT d.map_name) AS map_count,
-                COUNT(DISTINCT p.steam_id64) AS player_count
+                COUNT(DISTINCT d.job_id) AS demo_count,
+                (SELECT COUNT(DISTINCT pd.steam_id64)
+                   FROM hosted_player_demos pd WHERE pd.game_id=g.id) AS player_count,
+                COUNT(DISTINCT s.job_id) AS stats_count,
+                COALESCE(SUM(s.signal_count),0) AS signals
          FROM hosted_games g
          JOIN hosted_game_demos d ON d.game_id=g.id
          JOIN hosted_analyses a ON a.job_id=d.job_id
-         LEFT JOIN hosted_player_demos p ON p.game_id=g.id
+         LEFT JOIN hosted_demo_stats s
+           ON s.job_id=d.job_id AND s.stats_version=?
          GROUP BY g.id,g.campaign
          ORDER BY processed_at DESC,g.id LIMIT 20`,
+        [hostedStatsVersion],
       )
     ).rows;
     return {
       generatedAt: at.toISOString(),
       totals: {
-        demosProcessed: Number(totals?.demos_processed ?? 0),
+        demosProcessed: demoCount,
         demosLast24Hours: Number(totals?.demos_last_24_hours ?? 0),
         demosLast30Days: Number(totals?.demos_last_30_days ?? 0),
         gamesProcessed: Number(gameTotal?.count ?? 0),
-        signalsIdentified: null,
-        averageSignalsPerDemo: null,
+        signalsIdentified: statsComplete
+          ? Number(materialized?.signals ?? 0)
+          : null,
+        averageSignalsPerDemo:
+          statsComplete && demoCount
+            ? Number(materialized?.signals ?? 0) / demoCount
+            : null,
       },
       players: {
         byGames: ranked,
-        bySignals: [],
-        byRating: [],
+        bySignals: signalRanked,
+        byRating,
         ratingMinimumGames: 100,
-        ratingAvailability: "unavailable",
+        ratingAvailability:
+          eligibleCareerInputs.length >= 4 ? "available" : "unavailable",
       },
       recentGames: recent.map((row) => ({
         id: String(row.id),
         campaign: row.campaign === null ? null : String(row.campaign),
         mapCount: Number(row.map_count),
         playerCount: Number(row.player_count),
-        signals: null,
+        signals:
+          Number(row.stats_count) === Number(row.demo_count)
+            ? Number(row.signals)
+            : null,
         processedAt: String(row.processed_at),
       })),
     };

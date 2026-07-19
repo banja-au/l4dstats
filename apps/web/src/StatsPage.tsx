@@ -37,7 +37,7 @@ function PlayerRows({
       {rows.map((row, index) => (
         <li key={row.lookup}>
           <span>{String(index + 1).padStart(2, "0")}</span>
-          <a href={`/?player=${encodeURIComponent(row.lookup)}`}>
+          <a href={`/player/${encodeURIComponent(row.lookup)}`}>
             {row.displayName}
           </a>
           <strong>
@@ -114,11 +114,7 @@ function StatsPage() {
           <span className="stats-kicker">
             <i /> {tx("Live archive", "Archivo en vivo")}
           </span>
-          <h1>
-            {tx("THE TAPE", "LA CINTA")}
-            <br />
-            {tx("DOESN’T LIE.", "NO MIENTE.")}
-          </h1>
+          <h1>{tx("STATS", "ESTADÍSTICAS")}</h1>
           <p>
             {tx(
               "Aggregate processing and review workload across retained L4DStats analyses. Signals are reasons to inspect evidence—not verdicts.",
@@ -205,7 +201,7 @@ function StatsPage() {
               {stats.players.byRating.map((row, i) => (
                 <li key={row.lookup}>
                   <span>{String(i + 1).padStart(2, "0")}</span>
-                  <a href={`/?player=${encodeURIComponent(row.lookup)}`}>
+                  <a href={`/player/${encodeURIComponent(row.lookup)}`}>
                     {row.displayName}
                   </a>
                   <strong>{row.rating.toFixed(2)}</strong>

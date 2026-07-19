@@ -19,6 +19,7 @@
     "vitest": "3.2.6"
   },
   "dependencies": {
-    "@libsql/client": "0.17.0"
+    "@libsql/client": "0.17.0",
+    "@l4dstats/l4d2-rating": "workspace:*"
   }
 }

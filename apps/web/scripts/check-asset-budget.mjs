@@ -56,7 +56,8 @@ const isMainAsset = (file) =>
   !file.path.startsWith("developers/") &&
   // The hidden aggregate dashboard is a route-level lazy chunk and does not
   // contribute to the upload/results first load guarded by these budgets.
-  !file.path.startsWith("assets/StatsPage-");
+  !file.path.startsWith("assets/StatsPage-") &&
+  !file.path.startsWith("assets/GlobalPlayerPage-");
 const totals = {
   total: sizeOf(isMainAsset),
   javascript: sizeOf((file) => isMainAsset(file) && file.extension === ".js"),

@@ -37,6 +37,23 @@ export interface ApiPlayerHistory {
   displayName: string | null;
   profileUrl: string;
   updatedAt: string;
+  stats?: {
+    games: number;
+    demos: number;
+    signals: number | null;
+    materializedDemos: number;
+    survivorSeconds: number | null;
+    infectedLives: number | null;
+    rating: number | null;
+    ratingMinimumGames: 100;
+    ratingModelVersion: string;
+    metrics: Array<{
+      key: string;
+      label: string;
+      value: number;
+      exposure: number;
+    }>;
+  };
   games: Array<{
     id: string;
     confidence: "high" | "provisional" | "unassociated";

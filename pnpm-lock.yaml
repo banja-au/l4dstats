@@ -277,6 +277,9 @@ importers:
 
   packages/storage:
     dependencies:
+      '@l4dstats/l4d2-rating':
+        specifier: workspace:*
+        version: link:../l4d2-rating
       '@libsql/client':
         specifier: 0.17.0
         version: 0.17.0

@@ -95,10 +95,15 @@ game/player association logic. Source-provided game IDs and filenames may
 prioritize work but never override canonical session evidence.
 
 The hidden aggregate statistics route reads bounded counts, recent games, and
-player-frequency rankings directly from hosted Turso indexes. Signal totals and
-career ratings remain unavailable on the hosted surface until their inputs are
-materialized with complete historical coverage; missing values are never
-rendered as zero.
+player-frequency rankings directly from hosted Turso indexes. Versioned,
+per-demo materializations retain signal counts and the rating inputs required
+to derive career summaries without repeatedly downloading result artifacts.
+The restartable stats backfill verifies every derived artifact before repairing
+historical player/game indexes and writing those rows. Aggregate signal totals
+are published only when every hosted analysis has the current materialization;
+otherwise they remain explicitly unavailable. Career ratings use the shared
+rating package and remain unavailable until the documented eligibility and
+cohort requirements are met.
 
 ## Visualization ladder
 

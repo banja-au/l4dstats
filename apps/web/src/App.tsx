@@ -63,6 +63,7 @@ import { INFECTED_CLASSES, InfectedIcon } from "./visual";
 import { useI18n } from "./i18n";
 import { captureAnalyticsEvent } from "./analytics";
 const StatsPage = lazy(() => import("./StatsPage"));
+const GlobalPlayerPage = lazy(() => import("./GlobalPlayerPage"));
 
 type UploadItem = {
   key: string;
@@ -392,6 +393,15 @@ function Ring({ value, label }: { value: number; label: string }) {
 }
 
 function App() {
+  const globalPlayer = window.location.pathname.match(
+    /^\/player\/(7656119\d{10})\/?$/,
+  )?.[1];
+  if (globalPlayer)
+    return (
+      <Suspense fallback={null}>
+        <GlobalPlayerPage steamId64={globalPlayer} />
+      </Suspense>
+    );
   if (
     window.location.pathname === "/stats" ||
     window.location.pathname === "/stats/"
