@@ -54,6 +54,31 @@ const funnel = (series) => ({
 
 const insights = [
   {
+    name: "Demos processed — daily",
+    description:
+      "Authoritative count of successfully processed demos per day over 90 days.",
+    query: trend([event("hosted_analysis_succeeded", "Demos processed")], {
+      dateRange: { date_from: "-90d", date_to: null },
+      interval: "day",
+    }),
+  },
+  {
+    name: "Demos processed — monthly",
+    description:
+      "Authoritative count of successfully processed demos per month over 12 months.",
+    query: trend([event("hosted_analysis_succeeded", "Demos processed")], {
+      dateRange: { date_from: "-12m", date_to: null },
+      interval: "month",
+    }),
+  },
+  {
+    name: "Demos processed — last 30 days",
+    description: "Total successfully processed demos in the last 30 days.",
+    query: trend([event("hosted_analysis_succeeded", "Demos processed")], {
+      trendsFilter: { display: "BoldNumber" },
+    }),
+  },
+  {
     name: "Visitors and engaged sessions",
     description: "Anonymous visitors and key homepage activity over 30 days.",
     query: trend([
@@ -143,6 +168,36 @@ const insights = [
     name: "Results section engagement",
     description: "Analysis sections visitors intentionally open.",
     query: breakdown("results_tab_selected", "tab", "Tab opens"),
+  },
+  {
+    name: "Demo result views and interactions",
+    description:
+      "Daily result views and intentional section changes across demo analyses.",
+    query: trend([
+      event("game_viewed", "Saved game views"),
+      event("results_tab_selected", "Section interactions"),
+    ]),
+  },
+  {
+    name: "Result-view engagement funnel",
+    description:
+      "Anonymous visitors who view a saved game and then open another results section.",
+    query: funnel([
+      event("game_viewed", "Saved game viewed"),
+      event("results_tab_selected", "Results section selected"),
+    ]),
+  },
+  {
+    name: "Result views by entry point",
+    description:
+      "How visitors reach demo results: direct route or player-profile discovery.",
+    query: breakdown("game_viewed", "entry", "Saved game views"),
+  },
+  {
+    name: "Result engagement by route type",
+    description:
+      "Section interactions on grouped games versus single analyses.",
+    query: breakdown("results_tab_selected", "route", "Section interactions"),
   },
   {
     name: "Locale mix",
