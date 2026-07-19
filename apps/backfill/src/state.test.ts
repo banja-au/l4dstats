@@ -21,7 +21,10 @@ function demo(game: string, chapter: number, date: string): DiscoveredDemo {
     filename,
     declaredBytes: null,
     gameHint: game,
-    metadata: {},
+    metadata: {
+      mapKey: `c1m${chapter}_map`,
+      chapterHint: chapter,
+    },
   };
 }
 
@@ -52,11 +55,50 @@ describe("BackfillState", () => {
       demo("GAMESETTLED", 2, "2026-07-20T00:01:00.000Z"),
       demo("GAMELIVE", 1, "2026-07-20T00:55:00.000Z"),
     ]);
-    const selected = state.pending(1, 30, new Date("2026-07-20T01:00:00.000Z"));
+    const selected = state.pending(
+      1,
+      30,
+      1,
+      new Date("2026-07-20T01:00:00.000Z"),
+    );
     expect(selected.map((item) => item.gameHint)).toEqual([
       "GAMESETTLED",
       "GAMESETTLED",
     ]);
+    state.close();
+  });
+
+  it("waits until an official campaign has reached the minimum chapter", async () => {
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-backfill-"));
+    roots.push(root);
+    const state = new BackfillState(join(root, "state.sqlite"));
+    state.upsertDiscovered([
+      demo("GAMEEARLY", 1, "2026-01-01T00:00:00.000Z"),
+      demo("GAMEEARLY", 2, "2026-01-01T00:01:00.000Z"),
+    ]);
+    expect(state.pending(20, 0, 3)).toEqual([]);
+    state.upsertDiscovered([demo("GAMEEARLY", 3, "2026-01-01T00:02:00.000Z")]);
+    expect(state.pending(20, 0, 3)).toHaveLength(3);
+    state.close();
+  });
+
+  it("requires three distinct map names for custom campaigns", async () => {
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-backfill-"));
+    roots.push(root);
+    const state = new BackfillState(join(root, "state.sqlite"));
+    const custom = (mapKey: string, suffix: string): DiscoveredDemo => ({
+      ...demo("GAMECUSTOM", 1, `2026-01-01T00:0${suffix}:00.000Z`),
+      sourceItemKey: `GAMECUSTOM_${mapKey}_170000000${suffix}.dem.xz`,
+      filename: `GAMECUSTOM_${mapKey}_170000000${suffix}.dem.xz`,
+      metadata: { mapKey, chapterHint: null },
+    });
+    state.upsertDiscovered([
+      custom("custom_intro", "0"),
+      custom("custom_middle", "1"),
+    ]);
+    expect(state.pending(20, 0, 3)).toEqual([]);
+    state.upsertDiscovered([custom("custom_finale", "2")]);
+    expect(state.pending(20, 0, 3)).toHaveLength(3);
     state.close();
   });
 

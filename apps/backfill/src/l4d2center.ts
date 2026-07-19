@@ -70,6 +70,14 @@ function parseEntry(value: unknown): DiscoveredDemo | undefined {
   const publishedAt = new Date(row.date * 1_000);
   if (!Number.isFinite(publishedAt.getTime())) return undefined;
   const sizeMb = row.size_mb;
+  const gameHint = NAME.exec(row.name)?.[1] ?? null;
+  const withoutContainer = row.name.replace(/\.dem\.xz$/i, "");
+  const withoutTimestamp = withoutContainer.replace(/_\d+$/, "");
+  const mapKey = gameHint
+    ? withoutTimestamp.slice(gameHint.length + 1)
+    : withoutTimestamp;
+  const chapterMatch = mapKey.match(/(?:^|_)c\d+m(\d+)(?:_|$)/i);
+  const chapterHint = chapterMatch?.[1] ? Number(chapterMatch[1]) : null;
   const declaredBytes =
     typeof sizeMb === "number" && Number.isFinite(sizeMb) && sizeMb > 0
       ? Math.round(sizeMb * 1024 * 1024)
@@ -81,8 +89,8 @@ function parseEntry(value: unknown): DiscoveredDemo | undefined {
     downloadUrl: download.href,
     filename: row.name,
     declaredBytes,
-    gameHint: NAME.exec(row.name)?.[1] ?? null,
-    metadata: { date: row.date, sizeMb: sizeMb ?? null },
+    gameHint,
+    metadata: { date: row.date, sizeMb: sizeMb ?? null, mapKey, chapterHint },
   };
 }
 

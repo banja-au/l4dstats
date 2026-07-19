@@ -27,6 +27,10 @@ describe("L4D2CenterSource", () => {
         sourceItemKey: "GAMEABC_c1m1_hotel_1700000000.dem.xz",
         gameHint: "GAMEABC",
         declaredBytes: 8 * 1024 * 1024,
+        metadata: expect.objectContaining({
+          mapKey: "c1m1_hotel",
+          chapterHint: 1,
+        }),
       }),
     ]);
   });

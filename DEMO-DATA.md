@@ -19,7 +19,10 @@ multiple recordings of one chapter only after every currently cataloged member
 has processed and embedded campaign evidence does not conflict. The resulting
 game remains explicit about `external-source-group` evidence; the key is never
 reported as a demo-extracted universal match UUID, and a quiet source window is
-not proof that gameplay reached a planned finale.
+not proof that gameplay reached a planned finale. Selection additionally waits
+for standard filename evidence of map 3, or three distinct map names for a
+custom campaign. This adapter metadata is only an ingestion maturity gate; it
+does not replace demo-extracted chapter evidence or prove earlier maps exist.
 
 This is the source of truth for what L4DStats extracts from L4D2 SourceTV
 `.dem` files. Update it in the same change as any decoder, projection, artifact,

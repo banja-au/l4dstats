@@ -18,7 +18,10 @@ publication time, sanitized URL metadata and an optional provider-issued source
 game key. Source games must remain unchanged for a default 60-minute settlement
 window before selection. `--max-demos` is a target cap and never splits one
 source game. Items are scheduled by newest settled source game first and
-chronologically within a source game.
+chronologically within a source game. By default, an official campaign is not
+eligible until its filename evidence reaches chapter 3. A custom campaign with
+no standard chapter names instead requires three distinct map names. This is a
+maturity gate, not a claim that the catalog is complete.
 
 After every catalog member succeeds, the publisher finalizes the provider group
 as one hosted game. Embedded server, stable-roster, campaign, chapter and
@@ -56,7 +59,10 @@ identity.
 
 Game merges retain aliases from every replaced UUID to the surviving game.
 Previously issued `/game/:id` URLs therefore remain resolvable after later
-chapters or source finalization consolidate provisional games.
+chapters or source finalization consolidate provisional games. When a later
+catalog run discovers another chapter for an already finalized provider group,
+only the new source item is parsed and the stored provider association extends
+the existing canonical game rather than creating an independent match.
 
 ## Consequences
 

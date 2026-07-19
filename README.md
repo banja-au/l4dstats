@@ -152,8 +152,11 @@ therefore produce one game URL.
 By default, source games must be quiet for 60 minutes before processing. The
 `--max-demos` value is a target: the selector may exceed it to keep one source
 game intact, and it never imports only the first half of a currently visible
-group. Override the quiet period with `--settle-minutes` only when the source is
-known to be historical and stable.
+group. Official campaigns must also have reached at least map 3; campaigns
+without standard `cNmN` names require three distinct map names. Override these
+guards with `--settle-minutes` and `--minimum-chapter` only when the source is
+known to be historical and stable. If a later map appears on a subsequent run,
+its provider game key associates it with and extends the existing hosted game.
 
 `pnpm dev:docker` force-recreates the three application containers so the web
 proxy and API cannot retain different authentication environments. Named

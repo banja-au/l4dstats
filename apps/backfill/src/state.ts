@@ -146,6 +146,7 @@ export class BackfillState {
   public pending(
     limit: number,
     settleMinutes = 0,
+    minimumChapter = 1,
     at = new Date(),
   ): PendingDemo[] {
     const cutoff = new Date(
@@ -153,20 +154,28 @@ export class BackfillState {
     ).toISOString();
     const rows = this.db
       .prepare(
-        `WITH catalog AS (
-          SELECT i.*,
-            MAX(published_at) OVER (PARTITION BY source_id,game_hint) AS game_recency
-          FROM source_items i
+        `WITH group_metrics AS (
+          SELECT source_id,game_hint,
+            MAX(published_at) AS game_recency,
+            MAX(CAST(json_extract(discovery_metadata_json,'$.chapterHint') AS INTEGER)) AS max_chapter,
+            COUNT(DISTINCT json_extract(discovery_metadata_json,'$.mapKey')) AS distinct_maps
+          FROM source_items GROUP BY source_id,game_hint
         ), eligible AS (
-          SELECT * FROM catalog
-          WHERE state NOT IN ('complete','permanent_failure')
-            AND (next_attempt_at IS NULL OR next_attempt_at<=?)
-            AND game_recency<=?
+          SELECT i.*,m.game_recency,m.max_chapter,m.distinct_maps
+          FROM source_items i JOIN group_metrics m
+            ON m.source_id=i.source_id AND m.game_hint IS i.game_hint
+          WHERE i.state NOT IN ('complete','permanent_failure')
+            AND (i.next_attempt_at IS NULL OR i.next_attempt_at<=?)
+            AND m.game_recency<=?
+            AND (m.max_chapter>=? OR (m.max_chapter IS NULL AND m.distinct_maps>=?))
         )
         SELECT * FROM eligible
         ORDER BY game_recency DESC,source_id,game_hint,published_at ASC,source_item_key`,
       )
-      .all(at.toISOString(), cutoff) as Record<string, unknown>[];
+      .all(at.toISOString(), cutoff, minimumChapter, minimumChapter) as Record<
+      string,
+      unknown
+    >[];
     const pending = rows.map((row) => ({
       sourceId: String(row.source_id),
       sourceItemKey: String(row.source_item_key),

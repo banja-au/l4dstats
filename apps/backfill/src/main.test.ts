@@ -3,8 +3,21 @@ import { importedGameUrls, parseArguments } from "./main.js";
 
 describe("backfill arguments", () => {
   it("accepts explicit concurrency and maximum demo count", () => {
-    expect(parseArguments(["--concurrency", "4", "--max-demos", "25"])).toEqual(
-      expect.objectContaining({ concurrency: 4, maxDemos: 25 }),
+    expect(
+      parseArguments([
+        "--concurrency",
+        "4",
+        "--max-demos",
+        "25",
+        "--minimum-chapter",
+        "4",
+      ]),
+    ).toEqual(
+      expect.objectContaining({
+        concurrency: 4,
+        maxDemos: 25,
+        minimumChapter: 4,
+      }),
     );
   });
 

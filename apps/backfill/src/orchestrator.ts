@@ -56,6 +56,7 @@ export async function runBackfill(input: {
   concurrency: number;
   maxDemos: number;
   settleMinutes: number;
+  minimumChapter: number;
   log?: (message: string) => void;
   signal?: AbortSignal;
 }): Promise<BackfillSummary> {
@@ -95,9 +96,13 @@ export async function runBackfill(input: {
     );
     throw error;
   }
-  const selected = input.state.pending(input.maxDemos, input.settleMinutes);
+  const selected = input.state.pending(
+    input.maxDemos,
+    input.settleMinutes,
+    input.minimumChapter,
+  );
   log(
-    `catalog checkpoint complete; selected ${selected.length} demos from whole source games quiet for at least ${input.settleMinutes} minutes`,
+    `catalog checkpoint complete; selected ${selected.length} demos from whole source games quiet for at least ${input.settleMinutes} minutes and at chapter/map ${input.minimumChapter}+`,
   );
   let completed = 0;
   let failed = 0;
