@@ -1,0 +1,54 @@
+{
+  "format": "witchwatch-map-catalog-v1",
+  "sourceKind": "steam-dedicated-server",
+  "steamAppId": 222860,
+  "steamBuildId": "23990100",
+  "extractor": "@witchwatch/map-source1@0.1.0",
+  "maps": [
+    {
+      "map": "c5m1_waterfront",
+      "sourceBspSha256": "80bdc1099e4ba4c7ba86b9281e3749d439e48f39d13424d490b71b4741e09dab",
+      "sourceBytes": 17860648,
+      "bspVersion": 21,
+      "mapRevision": 1,
+      "emittedTriangles": 32053,
+      "contentRoot": "left4dead2"
+    },
+    {
+      "map": "c5m2_park",
+      "sourceBspSha256": "cd534c83482ee373da9ba2ebce0371431038b8250f58db700f27dc76e66a2b1e",
+      "sourceBytes": 24511312,
+      "bspVersion": 21,
+      "mapRevision": 49,
+      "emittedTriangles": 47359,
+      "contentRoot": "left4dead2"
+    },
+    {
+      "map": "c5m3_cemetery",
+      "sourceBspSha256": "e198df55c0fe772e65929c59e6adbada69d14f51306c0320a4e491b7f3bb04ae",
+      "sourceBytes": 30794304,
+      "bspVersion": 21,
+      "mapRevision": 139,
+      "emittedTriangles": 71551,
+      "contentRoot": "left4dead2"
+    },
+    {
+      "map": "c5m4_quarter",
+      "sourceBspSha256": "a74f47e542aba8ef6278e547909779c7f73ab0fca825b621fa9a7f29f9f1ea3e",
+      "sourceBytes": 26881912,
+      "bspVersion": 21,
+      "mapRevision": 41,
+      "emittedTriangles": 44592,
+      "contentRoot": "left4dead2"
+    },
+    {
+      "map": "c5m5_bridge",
+      "sourceBspSha256": "551aee30470adf70563c3e9be1b28f024f34d234a54abc7d183410bc71d0917e",
+      "sourceBytes": 24143612,
+      "bspVersion": 21,
+      "mapRevision": 96,
+      "emittedTriangles": 24214,
+      "contentRoot": "left4dead2"
+    }
+  ]
+}
