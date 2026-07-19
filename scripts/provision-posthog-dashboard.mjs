@@ -106,7 +106,7 @@ const insights = [
     description: "End-to-end backend processing latency in seconds.",
     query: trend([
       event("hosted_analysis_succeeded", "p50 seconds", {
-        math: "p50",
+        math: "median",
         math_property: "durationSeconds",
       }),
       event("hosted_analysis_succeeded", "p95 seconds", {
