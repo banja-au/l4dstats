@@ -324,6 +324,39 @@ export async function handleDeveloperConsole(
     }
     const accountId = await sessionAccount(client, request);
     if (!accountId) return json(401, { error: "Sign in required" });
+    if (
+      request.method === "DELETE" &&
+      url.pathname === "/developer-api/account"
+    ) {
+      const value = await body(request);
+      if (value.confirm !== "DELETE")
+        return json(400, { error: "Type DELETE to confirm account removal" });
+      await client.batch(
+        [
+          "developer_upload_grants",
+          "developer_request_logs",
+          "developer_daily_usage",
+          "developer_api_keys",
+          "developer_sessions",
+        ].map((table) => ({
+          sql: `DELETE FROM ${table} WHERE account_id = ?`,
+          args: [accountId],
+        })),
+        "write",
+      );
+      await client.execute({
+        sql: "DELETE FROM developer_accounts WHERE id = ?",
+        args: [accountId],
+      });
+      return json(
+        200,
+        { ok: true },
+        {
+          "set-cookie":
+            "l4dstats_dev_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+        },
+      );
+    }
     if (request.method === "GET" && url.pathname === "/developer-api/me") {
       const [account, keys, logs, usage] = await Promise.all([
         client.execute({

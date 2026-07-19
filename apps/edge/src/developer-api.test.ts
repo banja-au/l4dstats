@@ -174,4 +174,31 @@ describe("developer account boundary", () => {
     );
     expect(Number(grants.rows[0]?.count)).toBe(0);
   });
+
+  it("deletes an account and all account-owned operational data", async () => {
+    const database = client();
+    const session = await register(database);
+    const response = await handleDeveloperConsole(
+      new Request("https://developers.l4dstats.gg/developer-api/account", {
+        method: "DELETE",
+        headers: {
+          origin: "https://developers.l4dstats.gg",
+          cookie: session,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      }),
+      environment,
+      database,
+    );
+    expect(response?.status).toBe(200);
+    const accounts = await database.execute(
+      "SELECT COUNT(*) AS count FROM developer_accounts",
+    );
+    const sessions = await database.execute(
+      "SELECT COUNT(*) AS count FROM developer_sessions",
+    );
+    expect(Number(accounts.rows[0]?.count)).toBe(0);
+    expect(Number(sessions.rows[0]?.count)).toBe(0);
+  });
 });
