@@ -58,13 +58,16 @@
     "/api/uploads": {
       "post": {
         "operationId": "uploadDemo",
-        "description": "Streams one .dem file into local storage and enqueues it for analysis.",
+        "description": "Streams one raw or explicitly supported compressed demo, validates and expands it within bounded limits, and enqueues the canonical .dem bytes for analysis.",
         "parameters": [
           {
             "name": "filename",
             "in": "query",
             "required": true,
-            "schema": { "type": "string", "pattern": "\\.dem$" }
+            "schema": {
+              "type": "string",
+              "pattern": "\\.dem(?:\\.(?:zip|gz|xz|bz2|zst))?$"
+            }
           }
         ],
         "requestBody": {

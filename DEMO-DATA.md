@@ -1,5 +1,14 @@
 # Demo data contract
 
+## Source containers and hashes
+
+Hosted input may be a raw `.dem` or one explicitly supported single-demo
+compressed container. The uploaded object and expanded demo have separate
+SHA-256 and byte-size provenance. Parser, statistics and detector lineage always
+key the canonical demo to the expanded `.dem` bytes; the uploaded-object hash is
+retained as acquisition lineage. Compression never changes field availability,
+and a missing or rejected expansion is never represented as a zero-valued demo.
+
 This is the source of truth for what L4DStats extracts from L4D2 SourceTV
 `.dem` files. Update it in the same change as any decoder, projection, artifact,
 or statistic change. Never present an unavailable value as zero.

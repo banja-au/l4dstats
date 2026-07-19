@@ -6,6 +6,23 @@ import {
 } from "@l4dstats/storage";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const SUPPORTED_UPLOAD_SUFFIXES = [
+  ".dem",
+  ".dem.zip",
+  ".dem.gz",
+  ".dem.xz",
+  ".dem.bz2",
+  ".dem.zst",
+] as const;
+export function isSupportedUploadFilename(filename: string): boolean {
+  return (
+    Boolean(filename) &&
+    !/[/\\\0]/.test(filename) &&
+    SUPPORTED_UPLOAD_SUFFIXES.some((suffix) =>
+      filename.toLowerCase().endsWith(suffix),
+    )
+  );
+}
 const SHA256 = /^[a-f0-9]{64}$/;
 const UPLOAD_ID = /^[a-f0-9-]{16,64}$/;
 
@@ -54,7 +71,12 @@ interface ContainerNamespace {
   getByName(name: string): ContainerStub;
 }
 
+interface AssetsBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
 export interface EdgeEnvironment {
+  ASSETS: AssetsBinding;
   TEMPORARY_DEMOS: R2BucketBinding;
   DERIVED_ARTIFACTS: R2BucketBinding;
   ANALYSIS_QUEUE: QueueBinding<{ jobId: string }>;
@@ -141,8 +163,11 @@ async function upload(
     return json(400, { error: "invalid upload ID" });
   const url = new URL(request.url);
   const filename = url.searchParams.get("filename") ?? "";
-  if (!filename.toLowerCase().endsWith(".dem") || /[/\\]/.test(filename))
-    return json(400, { error: "filename must be a basename ending in .dem" });
+  if (!isSupportedUploadFilename(filename))
+    return json(400, {
+      error:
+        "filename must be a safe basename ending in .dem, .dem.zip, .dem.gz, .dem.xz, .dem.bz2, or .dem.zst",
+    });
   const sha256 = request.headers.get("x-content-sha256") ?? "";
   if (!SHA256.test(sha256))
     return json(400, { error: "x-content-sha256 is required" });
@@ -228,6 +253,30 @@ export async function fetchHandler(
       environment: environment.L4DSTATS_ENVIRONMENT,
     });
   const parts = url.pathname.split("/").filter(Boolean);
+  if (
+    request.method === "GET" &&
+    parts[0] === "api" &&
+    parts[1] === "maps" &&
+    parts[2] &&
+    parts[3] === "geometry" &&
+    parts.length === 4
+  ) {
+    if (!/^[A-Za-z0-9_]{1,96}$/.test(parts[2]))
+      return json(400, { error: "map name is invalid" });
+    const assetUrl = new URL(request.url);
+    assetUrl.pathname = `/map-geometry/${parts[2].toLowerCase()}.json`;
+    assetUrl.search = "";
+    const asset = await environment.ASSETS.fetch(new Request(assetUrl));
+    if (!asset.ok || !asset.headers.get("content-type")?.includes("json"))
+      return json(404, { error: "map geometry is unavailable" });
+    const headers = new Headers(asset.headers);
+    headers.set(
+      "cache-control",
+      "public, max-age=3600, stale-while-revalidate=86400",
+    );
+    headers.set("x-content-type-options", "nosniff");
+    return new Response(asset.body, { status: 200, headers });
+  }
   if (request.method === "POST" && url.pathname === "/api/uploads")
     return compatibleUpload(request, environment);
   if (
@@ -258,6 +307,11 @@ export async function fetchHandler(
     const engineResult = JSON.parse(
       new TextDecoder().decode(await object.arrayBuffer()),
     );
+    const gameId = await repo.assignAnalysisToGame({
+      jobId: job.id,
+      demoSha256: reference.demoSha256,
+      engineResult,
+    });
     return json(200, {
       ...job,
       analysis: {
@@ -266,15 +320,62 @@ export async function fetchHandler(
         sourceManifest: {
           kind: "hosted-upload",
           sha256: reference.demoSha256,
-          bytes: job.source.bytes,
+          bytes:
+            typeof engineResult?.demo?.bytes === "number"
+              ? engineResult.demo.bytes
+              : job.source.bytes,
+          sourceObjectSha256: job.source.sha256,
+          sourceObjectBytes: job.source.bytes,
           availability: "deleted-after-extraction",
         },
         engineResult,
         engineResultSha256: reference.resultSha256,
-        gameId: null,
+        gameId,
         createdAt: reference.createdAt,
       },
     });
+  }
+  if (
+    request.method === "GET" &&
+    parts[0] === "api" &&
+    parts[1] === "games" &&
+    parts[2] &&
+    parts.length === 3
+  ) {
+    const repo = repository(environment);
+    await repo.migrate();
+    const game = await repo.getGame(parts[2]);
+    if (!game) return json(404, { error: "game not found" });
+    const analyses = await Promise.all(
+      game.analyses.map(async (reference) => {
+        const object = await environment.DERIVED_ARTIFACTS.get(
+          reference.resultKey,
+        );
+        if (!object || object.size !== reference.resultBytes)
+          throw new Error("derived analysis is unavailable");
+        const engineResult = JSON.parse(
+          new TextDecoder().decode(await object.arrayBuffer()),
+        );
+        return {
+          jobId: reference.jobId,
+          demoSha256: reference.demoSha256,
+          sourceManifest: {
+            kind: "hosted-upload",
+            sha256: reference.demoSha256,
+            bytes:
+              typeof engineResult?.demo?.bytes === "number"
+                ? engineResult.demo.bytes
+                : 0,
+            availability: "deleted-after-extraction",
+          },
+          engineResult,
+          engineResultSha256: reference.resultSha256,
+          gameId: game.id,
+          createdAt: reference.createdAt,
+        };
+      }),
+    );
+    return json(200, { ...game, analyses });
   }
   return json(404, { error: "not found" });
 }
@@ -336,9 +437,10 @@ async function queueHandler(
       };
       if (
         result.schemaVersion !== 1 ||
-        result.demo?.sha256 !== job.source.sha256
+        typeof result.demo?.sha256 !== "string" ||
+        !SHA256.test(result.demo.sha256)
       )
-        throw new Error("container result does not match the source demo");
+        throw new Error("container result has invalid demo provenance");
       const resultSha256 = await digest(resultBytes);
       const resultKey = `sha256/${resultSha256.slice(0, 2)}/${resultSha256}`;
       const stored = await environment.DERIVED_ARTIFACTS.put(
@@ -347,7 +449,7 @@ async function queueHandler(
         {
           customMetadata: {
             sha256: resultSha256,
-            demoSha256: job.source.sha256,
+            demoSha256: result.demo.sha256,
           },
           httpMetadata: { contentType: "application/json" },
         },
@@ -356,10 +458,11 @@ async function queueHandler(
         throw new Error("derived artifact write was not confirmed");
       await repo.recordAnalysis({
         jobId: job.id,
-        demoSha256: job.source.sha256,
+        demoSha256: result.demo.sha256,
         resultKey,
         resultSha256,
         resultBytes: resultBytes.byteLength,
+        engineResult: result,
       });
       await environment.TEMPORARY_DEMOS.delete(job.source.key);
       if (await environment.TEMPORARY_DEMOS.head(job.source.key))

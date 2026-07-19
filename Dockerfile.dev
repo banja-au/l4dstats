@@ -16,6 +16,9 @@ RUN apt-get update \
     libicu72 \
     libssl3 \
     libstdc++6 \
+    util-linux \
+    xz-utils \
+    bzip2 \
     zlib1g \
   && rm -rf /var/lib/apt/lists/*
 

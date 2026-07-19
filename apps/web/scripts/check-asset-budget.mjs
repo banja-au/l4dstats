@@ -48,10 +48,12 @@ const measured = await Promise.all(
 const sizeOf = (predicate) =>
   measured.filter(predicate).reduce((total, file) => total + file.bytes, 0);
 const totals = {
-  total: sizeOf(() => true),
+  total: sizeOf((file) => !file.path.startsWith("map-geometry/")),
   javascript: sizeOf((file) => file.extension === ".js"),
   css: sizeOf((file) => file.extension === ".css"),
-  transferTotal: measured.reduce((total, file) => total + file.gzipBytes, 0),
+  transferTotal: measured
+    .filter((file) => !file.path.startsWith("map-geometry/"))
+    .reduce((total, file) => total + file.gzipBytes, 0),
   transferJavascript: measured
     .filter((file) => file.extension === ".js")
     .reduce((total, file) => total + file.gzipBytes, 0),
@@ -65,6 +67,7 @@ const totals = {
   ),
   infected: sizeOf((file) => file.path.startsWith("art/si/")),
   html: sizeOf((file) => file.extension === ".html"),
+  geometry: sizeOf((file) => file.path.startsWith("map-geometry/")),
 };
 
 const failures = Object.entries(budgets).flatMap(([category, limit]) =>
@@ -82,11 +85,20 @@ if (totals.brand === 0)
   failures.push("brand: expected infected-mark and favicon assets");
 if (measured.filter((file) => file.path.startsWith("art/si/")).length !== 8)
   failures.push("infected: expected all eight realistic infected portraits");
+if (
+  measured.filter((file) => file.path.startsWith("map-geometry/")).length !== 58
+)
+  failures.push("geometry: expected 57 bounded map meshes and one catalog");
+if (totals.geometry > 110 * kib * kib)
+  failures.push(`geometry: ${totals.geometry} bytes exceeds 110 MiB`);
 
 for (const category of Object.keys(budgets))
   process.stdout.write(
     `${category.padEnd(10)} ${String(totals[category]).padStart(7)} / ${budgets[category]} bytes\n`,
   );
+process.stdout.write(
+  `${"geometry".padEnd(10)} ${String(totals.geometry).padStart(7)} / ${110 * kib * kib} bytes (lazy)\n`,
+);
 if (failures.length) {
   process.stderr.write(`Asset budget failed:\n- ${failures.join("\n- ")}\n`);
   process.exitCode = 1;

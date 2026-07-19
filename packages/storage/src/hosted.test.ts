@@ -191,6 +191,51 @@ describe("HostedJobRepository", () => {
       close();
     }
   });
+
+  it("persists a durable game association for hosted analyses", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const job = await repo.enqueue(source, "upload:hosted-game");
+      const engineResult = {
+        demo: {
+          mapName: "c5m4_quarter",
+          session: {
+            serverToken: "server-token",
+            rosterToken: "roster-token",
+            campaign: "c5",
+            serverCount: 4,
+            chapter: 4,
+            evidence: ["server-token", "roster-token"],
+          },
+        },
+      };
+      await repo.recordAnalysis({
+        jobId: job.id,
+        demoSha256: "b".repeat(64),
+        resultKey: "sha256/bb/result",
+        resultSha256: "c".repeat(64),
+        resultBytes: 1024,
+        engineResult,
+      });
+      const gameId = await repo.getGameIdForJob(job.id);
+      expect(gameId).toMatch(/^[a-f0-9-]{36}$/);
+      await expect(repo.getGame(gameId!)).resolves.toMatchObject({
+        id: gameId,
+        confidence: "provisional",
+        evidence: ["server-token", "roster-token"],
+        analyses: [{ jobId: job.id, demoSha256: "b".repeat(64) }],
+      });
+      await expect(
+        repo.assignAnalysisToGame({
+          jobId: job.id,
+          demoSha256: "b".repeat(64),
+          engineResult,
+        }),
+      ).resolves.toBe(gameId);
+    } finally {
+      close();
+    }
+  });
 });
 
 class MemoryR2 implements R2BucketLike {

@@ -22,7 +22,8 @@ const english = {
   "brand.by": "by",
   "upload.choose": "Choose demo files",
   "upload.drop": "DROP DEMOS",
-  "upload.hint": "or choose .dem files · maximum {maximum}",
+  "upload.hint":
+    "or choose .dem, .zip, .gz, .xz, .bz2 or .zst · maximum {maximum}",
   "upload.unavailable": "Demo source is unavailable",
   "upload.queued": "Queued for analysis",
   "upload.failed": "Upload failed",
@@ -235,7 +236,7 @@ const spanish: Record<keyof typeof english, string> = {
   "brand.by": "por",
   "upload.choose": "Elegir archivos de demo",
   "upload.drop": "SUELTA LAS DEMOS",
-  "upload.hint": "o elige archivos .dem · máximo {maximum}",
+  "upload.hint": "o elige .dem, .zip, .gz, .xz, .bz2 o .zst · máximo {maximum}",
   "upload.unavailable": "La fuente de la demo no está disponible",
   "upload.queued": "En cola para el análisis",
   "upload.failed": "Error al subir",

@@ -13,7 +13,15 @@ export type ReviewStatus =
   | "needs-context"
   | "resolved";
 export type IngestSource =
-  | { kind: "local"; path: string; sha256: string; bytes: number }
+  | {
+      kind: "local";
+      path: string;
+      sha256: string;
+      bytes: number;
+      sourceObjectSha256?: string;
+      sourceObjectBytes?: number;
+      sourceObjectFormat?: string;
+    }
   | { kind: "remote"; url: string };
 
 export interface Job {

@@ -3,6 +3,7 @@ declare class Buffer extends Uint8Array {
   static concat(parts: readonly Uint8Array[]): Buffer;
   static from(
     value: string | ArrayBuffer | ArrayLike<number> | Uint8Array,
+    encoding?: string,
   ): Buffer;
   readUInt16LE(offset: number): number;
   readUInt32LE(offset: number): number;

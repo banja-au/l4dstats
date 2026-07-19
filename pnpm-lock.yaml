@@ -24,6 +24,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@l4dstats/acquisition':
+        specifier: workspace:*
+        version: link:../../packages/acquisition
       '@l4dstats/storage':
         specifier: workspace:*
         version: link:../../packages/storage

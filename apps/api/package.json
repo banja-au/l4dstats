@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@l4dstats/acquisition": "workspace:*",
     "@l4dstats/storage": "workspace:*"
   },
   "devDependencies": {

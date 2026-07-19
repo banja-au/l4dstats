@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { sha256, WorkbenchRepository } from "@l4dstats/storage";
 import { createApi } from "./server.js";
@@ -444,7 +445,7 @@ describe("review API", () => {
     const response = await fetch(`${base}/api/uploads?filename=match.dem`, {
       method: "POST",
       headers: { "content-type": "application/octet-stream" },
-      body: "HL2DEMO-upload-fixture",
+      body: Buffer.from("HL2DEMO\0upload-fixture"),
     });
     expect(response.status).toBe(202);
     const payload = (await response.json()) as {
@@ -463,6 +464,42 @@ describe("review API", () => {
     expect(payload.job.source.path).toMatch(/uploads\/.*\.dem$/);
   });
 
+  it("expands a bounded compressed browser upload before enqueueing it", async () => {
+    const { base } = await fixture();
+    const demo = Buffer.from("HL2DEMO\0compressed-upload-fixture");
+    const compressed = gzipSync(demo);
+    const response = await fetch(`${base}/api/uploads?filename=match.dem.gz`, {
+      method: "POST",
+      headers: { "content-type": "application/octet-stream" },
+      body: compressed,
+    });
+    expect(response.status).toBe(202);
+    const payload = (await response.json()) as {
+      job: {
+        source: {
+          sha256: string;
+          bytes: number;
+          sourceObjectSha256: string;
+          sourceObjectBytes: number;
+          sourceObjectFormat: string;
+        };
+      };
+      upload: { sha256: string; bytes: number; filename: string };
+    };
+    expect(payload.upload).toEqual({
+      filename: "match.dem.gz",
+      bytes: demo.byteLength,
+      sha256: sha256(demo),
+    });
+    expect(payload.job.source).toMatchObject({
+      sha256: sha256(demo),
+      bytes: demo.byteLength,
+      sourceObjectSha256: sha256(compressed),
+      sourceObjectBytes: compressed.byteLength,
+      sourceObjectFormat: "gzip",
+    });
+  });
+
   it("rejects invalid and oversized browser uploads", async () => {
     const { base } = await fixture();
     expect(
@@ -470,6 +507,14 @@ describe("review API", () => {
         await fetch(`${base}/api/uploads?filename=match.txt`, {
           method: "POST",
           body: "not a demo",
+        })
+      ).status,
+    ).toBe(416);
+    expect(
+      (
+        await fetch(`${base}/api/uploads?filename=match.dem.gz`, {
+          method: "POST",
+          body: "not gzip",
         })
       ).status,
     ).toBe(416);

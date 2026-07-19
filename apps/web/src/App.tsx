@@ -88,6 +88,18 @@ const routeTab = (): Tab => {
 };
 
 const MAX_DEMOS = 10;
+const DEMO_FILE_SUFFIXES = [
+  ".dem",
+  ".dem.zip",
+  ".dem.gz",
+  ".dem.xz",
+  ".dem.bz2",
+  ".dem.zst",
+] as const;
+const isDemoUploadFilename = (value: string) => {
+  const lower = value.toLowerCase();
+  return DEMO_FILE_SUFFIXES.some((suffix) => lower.endsWith(suffix));
+};
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const activeNumberLocale = () =>
   document.documentElement.lang === "es" ? "es-ES" : "en-US";
@@ -432,12 +444,13 @@ function App() {
   }
 
   function addFiles(files: File[]) {
-    const demos = files.filter((file) =>
-      file.name.toLowerCase().endsWith(".dem"),
-    );
+    const demos = files.filter((file) => isDemoUploadFilename(file.name));
     if (!demos.length) {
       setUploadError(
-        tx("Choose one or more .dem files.", "Elige uno o más archivos .dem."),
+        tx(
+          "Choose one or more supported demo or compressed-demo files.",
+          "Elige uno o más archivos de demo o demo comprimida compatibles.",
+        ),
       );
       return;
     }
@@ -795,7 +808,7 @@ function App() {
       hidden
       type="file"
       aria-label={t("upload.choose")}
-      accept=".dem"
+      accept={DEMO_FILE_SUFFIXES.join(",")}
       multiple
       onChange={(event) => {
         addFiles([...(event.target.files ?? [])]);
@@ -947,7 +960,9 @@ function App() {
                   ? (selectedCampaignName ??
                     gameAnalyses[0]?.engineResult.demo.session?.campaign?.toUpperCase() ??
                     t("results.defaultGame"))
-                  : (analyses[0]?.engineResult.demo.mapName ??
+                  : (gameCampaignName(analyses) ??
+                    analyses[0]?.engineResult.demo.session?.campaign ??
+                    analyses[0]?.engineResult.demo.mapName ??
                     t("results.defaultMatch"))}
               </h1>
             </div>
@@ -6563,11 +6578,9 @@ function Timeline({
         : 2;
   });
   const [fullscreen, setFullscreen] = useState(false);
-  const [timelineView, setTimelineView] = useState<"hits" | "timeline">(() =>
-    initialTimelineParameters.get("storyView") === "timeline"
-      ? "timeline"
-      : "hits",
-  );
+  // Story is the canonical timeline presentation. Legacy storyView values are
+  // intentionally ignored so old links cannot reopen the retired lane view.
+  const [timelineView] = useState<"hits" | "timeline">("hits");
   const [storyLimit, setStoryLimit] = useState(100);
   const [moreTimelineFilters, setMoreTimelineFilters] = useState(
     initialTimelineParameters.get("storyMore") === "1",
@@ -6961,14 +6974,12 @@ function Timeline({
       key: `${demo.sha256}:${observedRound}`,
       label:
         observedRound >= 0
-          ? tx("Round {number}", "Ronda {number}", {
-              number: observedRound + 1,
-            })
-          : tx("Unsegmented", "Sin segmentar"),
+          ? tx("Swap sides", "Cambio de lados")
+          : tx("Round start", "Inicio de ronda"),
       detail:
         observedRound >= 0
-          ? `${survivorRoster ? tx("Team {id} Survivors · ", "Supervivientes del equipo {id} · ", { id: survivorRoster.id }) : ""}${tx("Observed boundary", "Límite observado")} · ${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
-          : tx("Boundary unavailable", "Límite no disponible"),
+          ? `${survivorRoster ? tx("Team {id} now Survivors · ", "El equipo {id} ahora es Superviviente · ", { id: survivorRoster.id }) : ""}${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
+          : tx("Beginning of retained demo", "Inicio de la demo conservada"),
     };
   };
   const storyRoundContext = (story: (typeof storyItems)[number]) => {
@@ -7240,58 +7251,10 @@ function Timeline({
           ))}
         </span>
       </div>
-      <div
-        className="timeline-view-tabs"
-        role="tablist"
-        aria-label={tx(
-          "Match story view",
-          "Vista de la historia de la partida",
-        )}
-      >
-        <button
-          id={storyTabId}
-          type="button"
-          role="tab"
-          aria-controls={storyPanelId}
-          aria-selected={timelineView === "hits"}
-          tabIndex={timelineView === "hits" ? 0 : -1}
-          className={timelineView === "hits" ? "active" : ""}
-          onClick={() => setTimelineView("hits")}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-              event.preventDefault();
-              setTimelineView("timeline");
-              document.getElementById(timelineTabId)?.focus();
-            }
-          }}
-        >
-          {tx("Story", "Historia")}
-        </button>
-        <button
-          id={timelineTabId}
-          type="button"
-          role="tab"
-          aria-controls={timelinePanelId}
-          aria-selected={timelineView === "timeline"}
-          tabIndex={timelineView === "timeline" ? 0 : -1}
-          className={timelineView === "timeline" ? "active" : ""}
-          onClick={() => setTimelineView("timeline")}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-              event.preventDefault();
-              setTimelineView("hits");
-              document.getElementById(storyTabId)?.focus();
-            }
-          }}
-        >
-          {tx("Timeline", "Cronología")}
-        </button>
-      </div>
       {timelineView === "hits" && (
         <section
           id={storyPanelId}
-          role="tabpanel"
-          aria-labelledby={storyTabId}
+          aria-label={tx("Match story", "Historia de la partida")}
           className={`hit-roundup hit-density-${zoom}`}
         >
           <header>
@@ -7465,7 +7428,7 @@ function Timeline({
                                       number: hitRoundContext(story.summary)
                                         .round,
                                     })
-                                  : tx("Unsegmented", "Sin segmentar"),
+                                  : tx("Round start", "Inicio de ronda"),
                                 hit: String(
                                   hitRoundContext(story.summary).hit,
                                 ).padStart(2, "0"),
@@ -7672,15 +7635,6 @@ function Timeline({
                   )}
                 </small>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  openHit(selectedHitSummary);
-                  setTimelineView("timeline");
-                }}
-              >
-                {tx("Inspect hit range", "Inspeccionar intervalo del ataque")}
-              </button>
             </article>
           )}
           {active && !selectedHitSummary && (
@@ -7698,9 +7652,6 @@ function Timeline({
                   })}
                 </small>
               </div>
-              <button type="button" onClick={() => setTimelineView("timeline")}>
-                {tx("Inspect on Timeline", "Inspeccionar en la cronología")}
-              </button>
             </article>
           )}
         </section>

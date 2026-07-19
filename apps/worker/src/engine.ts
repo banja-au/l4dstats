@@ -214,6 +214,13 @@ async function prepareDemo(
         origin: "validated-local-file",
         sha256: artifact.sha256,
         bytes: artifact.bytes,
+        ...(job.source.sourceObjectSha256
+          ? {
+              sourceObjectSha256: job.source.sourceObjectSha256,
+              sourceObjectBytes: job.source.sourceObjectBytes,
+              sourceObjectFormat: job.source.sourceObjectFormat,
+            }
+          : {}),
       },
     };
   }

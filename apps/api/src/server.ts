@@ -6,13 +6,17 @@ import {
 import { once } from "node:events";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, statSync } from "node:fs";
-import { open, unlink } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { open, readFile, unlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   telemetryLimits,
   type ReviewStatus,
   type WorkbenchRepository,
 } from "@l4dstats/storage";
+import {
+  isSupportedDemoFilename,
+  prepareUploadedDemo,
+} from "@l4dstats/acquisition";
 import { exportReport } from "./report.js";
 import { validateSource, type IngestionPolicy } from "./validation.js";
 
@@ -231,15 +235,12 @@ async function receiveDemoUpload(
   filename: string,
   maxBytes: number,
 ) {
-  if (
-    !filename ||
-    filename.length > 240 ||
-    extname(filename).toLowerCase() !== ".dem"
-  )
-    throw new RangeError("upload must have a .dem filename");
+  if (!filename || filename.length > 240 || !isSupportedDemoFilename(filename))
+    throw new RangeError("upload filename is invalid");
   mkdirSync(root, { recursive: true });
-  const path = join(root, `${randomUUID()}.dem`);
-  const file = await open(path, "wx", 0o600);
+  const uploadPath = join(root, `${randomUUID()}.upload`);
+  const demoPath = join(root, `${randomUUID()}.dem`);
+  const file = await open(uploadPath, "wx", 0o600);
   const hash = createHash("sha256");
   let bytes = 0;
   try {
@@ -253,10 +254,37 @@ async function receiveDemoUpload(
     }
     if (bytes === 0) throw new RangeError("uploaded demo is empty");
     await file.close();
-    return { path, bytes, sha256: hash.digest("hex"), filename };
+    const sourceObjectSha256 = hash.digest("hex");
+    const prepared = await prepareUploadedDemo(
+      filename,
+      await readFile(uploadPath),
+      {
+        maxSourceBytes: maxBytes,
+        maxDemoBytes: maxBytes,
+        maxCompressionRatio: 100,
+        maxZipEntries: 16,
+        timeoutMs: 30_000,
+      },
+    ).catch((error: unknown) => {
+      throw new RangeError(
+        error instanceof Error ? error.message : "compressed demo is invalid",
+      );
+    });
+    await writeFile(demoPath, prepared.bytes, { flag: "wx", mode: 0o600 });
+    await unlink(uploadPath);
+    return {
+      path: demoPath,
+      bytes: prepared.bytes.byteLength,
+      sha256: prepared.sha256,
+      filename,
+      sourceObjectSha256,
+      sourceObjectBytes: bytes,
+      sourceObjectFormat: prepared.sourceFormat,
+    };
   } catch (error) {
     await file.close().catch(() => undefined);
-    await unlink(path).catch(() => undefined);
+    await unlink(uploadPath).catch(() => undefined);
+    await unlink(demoPath).catch(() => undefined);
     throw error;
   }
 }
@@ -671,6 +699,9 @@ export function createApi(
             path: uploaded.path,
             sha256: uploaded.sha256,
             bytes: uploaded.bytes,
+            sourceObjectSha256: uploaded.sourceObjectSha256,
+            sourceObjectBytes: uploaded.sourceObjectBytes,
+            sourceObjectFormat: uploaded.sourceObjectFormat,
           },
           `upload:${uploaded.sha256}`,
         );

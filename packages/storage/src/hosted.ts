@@ -36,6 +36,15 @@ export interface HostedAnalysisReference {
   createdAt: string;
 }
 
+export interface HostedGameReference {
+  id: string;
+  confidence: "high" | "provisional" | "unassociated";
+  evidence: string[];
+  createdAt: string;
+  updatedAt: string;
+  analyses: HostedAnalysisReference[];
+}
+
 export interface SqlResult {
   rows: Array<Record<string, unknown>>;
   rowsAffected: number;
@@ -106,6 +115,27 @@ export const hostedMigrations = [
     result_bytes INTEGER NOT NULL,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS hosted_games (
+    id TEXT PRIMARY KEY,
+    server_token TEXT,
+    roster_token TEXT,
+    campaign TEXT,
+    confidence TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS hosted_game_demos (
+    game_id TEXT NOT NULL REFERENCES hosted_games(id) ON DELETE CASCADE,
+    job_id TEXT NOT NULL UNIQUE REFERENCES hosted_jobs(id) ON DELETE CASCADE,
+    demo_sha256 TEXT NOT NULL,
+    map_name TEXT NOT NULL,
+    server_count INTEGER,
+    chapter INTEGER,
+    PRIMARY KEY(game_id,job_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS hosted_game_demos_game_idx
+     ON hosted_game_demos(game_id,chapter,server_count)`,
 ] as const;
 
 function parseJob(row: Record<string, unknown>): HostedJob {
@@ -136,8 +166,13 @@ function validateSource(source: HostedSource): void {
     throw new Error("hosted source SHA-256 is invalid");
   if (!Number.isSafeInteger(source.bytes) || source.bytes < 1)
     throw new Error("hosted source byte size is invalid");
-  if (!source.filename.toLowerCase().endsWith(".dem"))
-    throw new Error("hosted source must be a .dem file");
+  if (
+    ![".dem", ".dem.zip", ".dem.gz", ".dem.xz", ".dem.bz2", ".dem.zst"].some(
+      (suffix) => source.filename.toLowerCase().endsWith(suffix),
+    ) ||
+    /[/\\\0]/.test(source.filename)
+  )
+    throw new Error("hosted source filename is invalid or unsupported");
 }
 
 /**
@@ -436,7 +471,9 @@ export class HostedJobRepository {
   }
 
   public async recordAnalysis(
-    input: Omit<HostedAnalysisReference, "createdAt">,
+    input: Omit<HostedAnalysisReference, "createdAt"> & {
+      engineResult?: unknown;
+    },
     at = new Date(),
   ): Promise<HostedAnalysisReference> {
     if (
@@ -479,7 +516,200 @@ export class HostedJobRepository {
       demoSha256: input.demoSha256,
       resultSha256: input.resultSha256,
     });
+    if (input.engineResult)
+      await this.assignGame({
+        jobId: input.jobId,
+        demoSha256: input.demoSha256,
+        engineResult: input.engineResult,
+      });
     return stored;
+  }
+
+  private async assignGame(input: {
+    jobId: string;
+    demoSha256: string;
+    engineResult: unknown;
+  }): Promise<string> {
+    const result = input.engineResult as {
+      demo?: {
+        mapName?: unknown;
+        session?: {
+          serverToken?: unknown;
+          rosterToken?: unknown;
+          serverCount?: unknown;
+          campaign?: unknown;
+          chapter?: unknown;
+          evidence?: unknown;
+        };
+      };
+    };
+    const session = result.demo?.session;
+    const serverToken =
+      typeof session?.serverToken === "string" ? session.serverToken : null;
+    const rosterToken =
+      typeof session?.rosterToken === "string" ? session.rosterToken : null;
+    const campaign =
+      typeof session?.campaign === "string" ? session.campaign : null;
+    const serverCount =
+      typeof session?.serverCount === "number" ? session.serverCount : null;
+    const chapter =
+      typeof session?.chapter === "number" ? session.chapter : null;
+    const evidence = Array.isArray(session?.evidence)
+      ? session.evidence.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+    const possible =
+      serverToken && rosterToken
+        ? (
+            await this.client.execute(
+              `SELECT DISTINCT g.id,g.created_at FROM hosted_games g
+           JOIN hosted_game_demos d ON d.game_id=g.id
+           WHERE g.server_token=? AND g.roster_token=? AND g.campaign IS ?
+             AND (? IS NULL OR d.server_count IS NULL OR ABS(d.server_count-?)<=1)
+             AND (? IS NULL OR d.chapter IS NULL OR ABS(d.chapter-?)<=1)
+           ORDER BY g.created_at,g.id`,
+              [
+                serverToken,
+                rosterToken,
+                campaign,
+                serverCount,
+                serverCount,
+                chapter,
+                chapter,
+              ],
+            )
+          ).rows
+        : [];
+    const candidates: string[] = [];
+    for (const candidate of possible) {
+      const existing = (
+        await this.client.execute(
+          "SELECT demo_sha256,server_count,chapter FROM hosted_game_demos WHERE game_id=?",
+          [candidate.id],
+        )
+      ).rows;
+      if (
+        existing.some((row) => row.demo_sha256 === input.demoSha256) ||
+        !existing.some(
+          (row) =>
+            (serverCount !== null &&
+              Number(row.server_count) === serverCount) ||
+            (chapter !== null && Number(row.chapter) === chapter),
+        )
+      )
+        candidates.push(String(candidate.id));
+    }
+    const gameId = candidates[0] ?? randomUUID();
+    const timestamp = iso();
+    if (!candidates.length)
+      await this.client.execute(
+        `INSERT INTO hosted_games VALUES(?,?,?,?,?,?,?,?)`,
+        [
+          gameId,
+          serverToken,
+          rosterToken,
+          campaign,
+          serverToken && rosterToken ? "provisional" : "unassociated",
+          JSON.stringify(evidence),
+          timestamp,
+          timestamp,
+        ],
+      );
+    for (const duplicate of candidates.slice(1)) {
+      await this.client.execute(
+        "UPDATE hosted_game_demos SET game_id=? WHERE game_id=?",
+        [gameId, duplicate],
+      );
+      await this.client.execute("DELETE FROM hosted_games WHERE id=?", [
+        duplicate,
+      ]);
+    }
+    await this.client.execute(
+      `INSERT INTO hosted_game_demos VALUES(?,?,?,?,?,?)
+       ON CONFLICT(job_id) DO NOTHING`,
+      [
+        gameId,
+        input.jobId,
+        input.demoSha256,
+        String(result.demo?.mapName ?? "unknown"),
+        serverCount,
+        chapter,
+      ],
+    );
+    const count = Number(
+      (
+        await this.client.execute(
+          "SELECT COUNT(*) AS count FROM hosted_game_demos WHERE game_id=?",
+          [gameId],
+        )
+      ).rows[0]?.count ?? 0,
+    );
+    await this.client.execute(
+      "UPDATE hosted_games SET confidence=?,updated_at=? WHERE id=?",
+      [
+        serverToken && rosterToken && count > 1
+          ? "high"
+          : serverToken && rosterToken
+            ? "provisional"
+            : "unassociated",
+        timestamp,
+        gameId,
+      ],
+    );
+    return gameId;
+  }
+
+  public async assignAnalysisToGame(input: {
+    jobId: string;
+    demoSha256: string;
+    engineResult: unknown;
+  }): Promise<string> {
+    const existing = await this.getGameIdForJob(input.jobId);
+    return existing ?? this.assignGame(input);
+  }
+
+  public async getGameIdForJob(jobId: string): Promise<string | null> {
+    const row = (
+      await this.client.execute(
+        "SELECT game_id FROM hosted_game_demos WHERE job_id=?",
+        [jobId],
+      )
+    ).rows[0];
+    return row ? String(row.game_id) : null;
+  }
+
+  public async getGame(
+    gameId: string,
+  ): Promise<HostedGameReference | undefined> {
+    const game = (
+      await this.client.execute("SELECT * FROM hosted_games WHERE id=?", [
+        gameId,
+      ])
+    ).rows[0];
+    if (!game) return undefined;
+    const rows = (
+      await this.client.execute(
+        `SELECT a.* FROM hosted_game_demos d JOIN hosted_analyses a ON a.job_id=d.job_id
+       WHERE d.game_id=? ORDER BY COALESCE(d.chapter,2147483647),COALESCE(d.server_count,2147483647),d.job_id`,
+        [gameId],
+      )
+    ).rows;
+    return {
+      id: gameId,
+      confidence: String(game.confidence) as HostedGameReference["confidence"],
+      evidence: JSON.parse(String(game.evidence_json)) as string[],
+      createdAt: String(game.created_at),
+      updatedAt: String(game.updated_at),
+      analyses: rows.map((row) => ({
+        jobId: String(row.job_id),
+        demoSha256: String(row.demo_sha256),
+        resultKey: String(row.result_key),
+        resultSha256: String(row.result_sha256),
+        resultBytes: Number(row.result_bytes),
+        createdAt: String(row.created_at),
+      })),
+    };
   }
 
   public async getAnalysis(

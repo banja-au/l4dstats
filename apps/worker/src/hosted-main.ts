@@ -4,12 +4,23 @@ import { createServer, type IncomingMessage } from "node:http";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { engineCommand, validateNativeParserAttestation } from "./engine.js";
+import {
+  isSupportedDemoFilename,
+  prepareUploadedDemo,
+} from "@l4dstats/acquisition";
 
 const MAX_SOURCE_BYTES = 100 * 1024 * 1024;
 const MAX_RESULT_BYTES = 16 * 1024 * 1024;
 const MAX_ERROR_BYTES = 64 * 1024;
 const PARSER_TIMEOUT_MS = 5 * 60 * 1_000;
 const SHA256 = /^[a-f0-9]{64}$/;
+const DEMO_LIMITS = {
+  maxSourceBytes: MAX_SOURCE_BYTES,
+  maxDemoBytes: MAX_SOURCE_BYTES,
+  maxCompressionRatio: 100,
+  maxZipEntries: 16,
+  timeoutMs: 30_000,
+} as const;
 
 async function requestBytes(request: IncomingMessage): Promise<Uint8Array> {
   const chunks: Buffer[] = [];
@@ -128,6 +139,12 @@ createServer(async (request, response) => {
       declaredBytes > MAX_SOURCE_BYTES
     )
       throw new Error("source content length is invalid");
+    const sourceFilename = request.headers["x-source-filename"];
+    if (
+      typeof sourceFilename !== "string" ||
+      !isSupportedDemoFilename(sourceFilename)
+    )
+      throw new Error("source filename is invalid or unsupported");
     if (!process.env.L4DSTATS_PSEUDONYM_KEY)
       throw new Error("analysis pseudonym key is unavailable");
     const directory = join(workRoot, randomUUID());
@@ -140,7 +157,12 @@ createServer(async (request, response) => {
       const digest = createHash("sha256").update(bytes).digest("hex");
       if (digest !== expectedSha256)
         throw new Error("source SHA-256 verification failed");
-      await writeFile(path, bytes, { flag: "wx", mode: 0o600 });
+      const prepared = await prepareUploadedDemo(
+        sourceFilename,
+        bytes,
+        DEMO_LIMITS,
+      );
+      await writeFile(path, prepared.bytes, { flag: "wx", mode: 0o600 });
       const result = await analyze(path);
       response.writeHead(200, {
         "content-type": "application/json",

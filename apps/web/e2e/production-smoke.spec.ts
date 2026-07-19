@@ -50,3 +50,32 @@ test("analyzes a real demo through the production browser path", async ({
   }
   expect(browserErrors).toEqual([]);
 });
+
+test.describe("production localization", () => {
+  test.use({ locale: "es-ES" });
+
+  test("serves Spanish from browser preference and persists an English override", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByText("SUELTA LAS DEMOS")).toBeVisible();
+    await page.getByRole("button", { name: "Idioma: English" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByText("DROP DEMOS")).toBeVisible();
+    expect(
+      await page.evaluate(() => localStorage.getItem("l4dstats.locale")),
+    ).toBe("en");
+    expect(
+      (await context.cookies()).find(
+        (cookie) => cookie.name === "l4dstats_locale",
+      )?.value,
+    ).toBe("en");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(
+      page.getByRole("button", { name: "Language: Español" }),
+    ).toBeVisible();
+  });
+});

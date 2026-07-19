@@ -21,7 +21,7 @@ not yet a replacement for the production Compose path.
 
 ![L4DStats demo deep dive](docs/assets/l4dstats-overview.jpg)
 
-L4DStats turns up to ten SourceTV `.dem` files into a fast, privacy-conscious match report. There are no accounts, uploads to a hosted service, projects, dashboards, or setup screens: drop the files and analysis begins immediately. Demos are streamed, hashed, queued, and analyzed in parallel.
+L4DStats turns up to ten SourceTV `.dem` files into a fast, privacy-conscious match report. The hosted app also accepts one demo per `.dem.zip`, `.dem.gz`, `.dem.xz`, `.dem.bz2`, or `.dem.zst` file through a bounded, fail-closed expansion boundary. Demos are streamed, hashed, queued, and analyzed in parallel.
 
 The result is statistics first. Detector output is deliberately secondary and is always presented as a review signal - not a cheating verdict.
 

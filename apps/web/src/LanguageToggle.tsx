@@ -1,6 +1,7 @@
-import { Languages } from "lucide-react";
 import { captureAnalyticsEvent } from "./analytics";
 import { useI18n } from "./i18n";
+
+const languageCodes = { en: "EN", es: "ES" } as const;
 
 export function LanguageToggle() {
   const { locale, setLocale, t } = useI18n();
@@ -16,8 +17,15 @@ export function LanguageToggle() {
         captureAnalyticsEvent("language_changed", { locale: next });
       }}
     >
-      <Languages aria-hidden="true" />
-      <span>{locale.toUpperCase()}</span>
+      <span className={locale === "en" ? "active" : undefined}>
+        {languageCodes.en}
+      </span>
+      <span className="language-toggle-separator" aria-hidden="true">
+        /
+      </span>
+      <span className={locale === "es" ? "active" : undefined}>
+        {languageCodes.es}
+      </span>
     </button>
   );
 }
