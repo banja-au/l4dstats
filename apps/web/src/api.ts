@@ -50,6 +50,48 @@ export interface ApiPlayerHistory {
   }>;
 }
 
+export interface ApiPublicStats {
+  generatedAt: string;
+  totals: {
+    demosProcessed: number;
+    demosLast24Hours: number;
+    demosLast30Days: number;
+    gamesProcessed: number;
+    signalsIdentified: number;
+    averageSignalsPerDemo: number | null;
+  };
+  players: {
+    byGames: Array<{
+      displayName: string;
+      lookup: string;
+      games: number;
+      demos: number;
+    }>;
+    bySignals: Array<{
+      displayName: string;
+      lookup: string;
+      games: number;
+      signals: number;
+    }>;
+    byRating: Array<{
+      displayName: string;
+      lookup: string;
+      games: number;
+      rating: number;
+    }>;
+    ratingMinimumGames: 100;
+    ratingAvailability: "available" | "unavailable";
+  };
+  recentGames: Array<{
+    id: string;
+    campaign: string | null;
+    mapCount: number;
+    playerCount: number;
+    signals: number;
+    processedAt: string;
+  }>;
+}
+
 export interface PlayerStats {
   id: string;
   alias: string;
@@ -571,6 +613,9 @@ export interface TelemetryWindow {
 }
 
 export const workbenchApi = {
+  stats() {
+    return requestJson<ApiPublicStats>("/api/stats");
+  },
   async mapGeometry(map: string): Promise<MapGeometry | null> {
     const response = await fetch(
       `/api/maps/${encodeURIComponent(map)}/geometry`,

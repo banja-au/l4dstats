@@ -51,7 +51,10 @@ const sizeOf = (predicate) =>
   measured.filter(predicate).reduce((total, file) => total + file.bytes, 0);
 const isMainAsset = (file) =>
   !file.path.startsWith("map-geometry/") &&
-  !file.path.startsWith("developers/");
+  !file.path.startsWith("developers/") &&
+  // The hidden aggregate dashboard is a route-level lazy chunk and does not
+  // contribute to the upload/results first load guarded by these budgets.
+  !file.path.startsWith("assets/StatsPage-");
 const totals = {
   total: sizeOf(isMainAsset),
   javascript: sizeOf((file) => isMainAsset(file) && file.extension === ".js"),

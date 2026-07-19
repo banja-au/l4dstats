@@ -111,6 +111,11 @@ interface PreparedDemo {
   sourceManifest: unknown;
 }
 
+export interface LocalDemoAnalysis {
+  result: EngineAnalysisResult;
+  serialized: Uint8Array;
+}
+
 export interface EngineDependencies {
   artifactRoot: string;
   allowedHosts: readonly string[];
@@ -192,6 +197,48 @@ function canonical(value: unknown): string {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`)
     .join(",")}}`;
+}
+
+export function serializeEngineAnalysis(
+  result: EngineAnalysisResult,
+): Uint8Array {
+  return new TextEncoder().encode(canonical(result));
+}
+
+/** Analyze already-expanded local demo bytes through the production parser boundary. */
+export async function analyzeLocalDemo(input: {
+  path: string;
+  sha256: string;
+  bytes: number;
+  pseudonymKey: string;
+  progress?: (value: number, message: string) => void;
+}): Promise<LocalDemoAnalysis> {
+  if (!/^[a-f0-9]{64}$/.test(input.sha256))
+    throw new Error("local demo SHA-256 is invalid");
+  if (!Number.isSafeInteger(input.bytes) || input.bytes < 1)
+    throw new Error("local demo byte size is invalid");
+  if (!input.pseudonymKey)
+    throw new Error("L4DSTATS_PSEUDONYM_KEY is required");
+  const actual = await readFile(input.path);
+  if (actual.byteLength !== input.bytes || sha256(actual) !== input.sha256)
+    throw new Error("Local demo changed after validation");
+  const result = await analyzeWithCli(
+    {
+      path: input.path,
+      sha256: input.sha256,
+      bytes: input.bytes,
+      sourceManifest: { kind: "local-backfill" },
+    },
+    {
+      isCancelled: () => false,
+      progress: input.progress ?? (() => undefined),
+    },
+    undefined,
+    input.pseudonymKey,
+  );
+  if (result.demo.sha256 !== input.sha256)
+    throw new Error("Engine result demo hash does not match local artifact");
+  return { result, serialized: serializeEngineAnalysis(result) };
 }
 
 async function prepareDemo(

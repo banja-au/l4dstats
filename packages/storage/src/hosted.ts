@@ -9,7 +9,7 @@ import type {
 const SHA256 = /^[a-f0-9]{64}$/;
 
 export interface HostedSource {
-  kind: "object";
+  kind: "object" | "local-backfill";
   bucket: string;
   key: string;
   sha256: string;

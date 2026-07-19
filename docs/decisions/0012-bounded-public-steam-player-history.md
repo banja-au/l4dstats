@@ -24,6 +24,12 @@ key. That credential must never be sent to the browser or written to logs.
   slot, user ID, or approximate name matching.
 - Expose one exact lookup endpoint. Do not expose a player directory, prefix
   search, or bulk enumeration endpoint.
+- The hidden aggregate `/stats` surface is an explicit, owner-approved
+  exception: it may rank observed display names and link each row into exact
+  player lookup. Its bounded ranking response may contain the exact SteamID64
+  needed for those links, summarizes signals as review workload rather than a
+  finding about cheating, and does not add prefix search or a general bulk
+  player API.
 - Accept a bare SteamID64 or a strict HTTPS `steamcommunity.com/profiles/...`
   URL without external resolution.
 - Accept a strict HTTPS `steamcommunity.com/id/...` URL only when the hosted

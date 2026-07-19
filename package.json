@@ -26,6 +26,7 @@
     "test:sandbox": "pnpm --filter @l4dstats/worker build && pnpm --filter @l4dstats/cli build && node --conditions=production scripts/test-parser-sandbox.mjs",
     "test:recovery": "pnpm --filter @l4dstats/storage build && node scripts/test-backup-restore.mjs",
     "dev:cli": "pnpm native:prepare && pnpm --filter @l4dstats/cli dev",
+    "backfill": "pnpm --filter @l4dstats/backfill dev",
     "maps:install": "docker compose --profile maps run --rm maps-install",
     "maps:extract": "docker compose --profile maps run --rm maps-extract",
     "maps:export": "bash ./scripts/export-map-geometry.sh",

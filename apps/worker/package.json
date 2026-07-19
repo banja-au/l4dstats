@@ -3,6 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": {
+      "production": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "build": "node ../../scripts/build-parser-sandbox.mjs && tsc -p tsconfig.json --noEmit false --outDir dist",
     "check": "tsc -p tsconfig.json --pretty false",

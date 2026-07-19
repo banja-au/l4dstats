@@ -7,7 +7,7 @@ cd "$repository_root"
 # Compose starts services through a login shell, whose system profile may
 # replace the image PATH. Resolve the copied Rust toolchain independently of
 # the caller's shell initialization.
-native_cargo_home="${CARGO_HOME:-/usr/local/cargo}"
+native_cargo_home="${CARGO_HOME:-${HOME}/.cargo}"
 export PATH="${native_cargo_home}/bin:${PATH}"
 
 if ! command -v cargo >/dev/null 2>&1; then

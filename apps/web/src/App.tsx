@@ -1,4 +1,13 @@
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   Activity,
@@ -53,6 +62,7 @@ import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
 import { INFECTED_CLASSES, InfectedIcon } from "./visual";
 import { useI18n } from "./i18n";
 import { captureAnalyticsEvent } from "./analytics";
+const StatsPage = lazy(() => import("./StatsPage"));
 
 type UploadItem = {
   key: string;
@@ -382,6 +392,15 @@ function Ring({ value, label }: { value: number; label: string }) {
 }
 
 function App() {
+  if (
+    window.location.pathname === "/stats" ||
+    window.location.pathname === "/stats/"
+  )
+    return (
+      <Suspense fallback={null}>
+        <StatsPage />
+      </Suspense>
+    );
   const { locale, t, tx } = useI18n();
   const requestedPlayerProfile = parsePlayerProfilePath(
     window.location.pathname,

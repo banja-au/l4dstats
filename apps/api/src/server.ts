@@ -594,6 +594,10 @@ export function createApi(
         send(response, 200, openApiDocument);
         return;
       }
+      if (request.method === "GET" && url.pathname === "/api/stats") {
+        send(response, 200, repo.publicStats());
+        return;
+      }
       if (
         request.method === "GET" &&
         parts[0] === "api" &&

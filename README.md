@@ -121,6 +121,32 @@ parser implementation; an
 addon load or compatibility failure stops analysis rather than selecting another
 parser.
 
+### Local hosted backfill
+
+Authorized external corpora can be downloaded and parsed locally while only
+verified result JSON and compact indexes are published to the hosted R2/Turso
+deployment. Configure the variables documented in `.env.example`, use the same
+`L4DSTATS_PSEUDONYM_KEY` as the hosted parser, and run:
+
+```bash
+pnpm backfill --concurrency 2 --max-demos 20
+```
+
+Run `pnpm native:prepare` first after parser source changes or on a checkout
+without the native addon. The backfill command itself verifies parser lineage
+and fails closed if the addon is missing or stale.
+
+The command currently discovers L4D2Center demos, checkpoints source items in
+`data/backfill/state.sqlite`, and retains downloaded and expanded bytes under
+the ignored `data/backfill/objects` content-addressed store. It processes the
+newest source games first and maps within a likely source game chronologically.
+Source filename game prefixes are scheduling hints only; hosted grouping uses
+embedded server, roster, campaign, chapter and generation evidence. Re-running
+the command skips completed source items and retries eligible transient
+failures. See [ADR 0014](docs/decisions/0014-local-hosted-backfill.md).
+The local source-object cap is 100 MiB; expanded demos are bounded at the native
+parser's 512 MiB hard input cap and a 200:1 compression ratio.
+
 `pnpm dev:docker` force-recreates the three application containers so the web
 proxy and API cannot retain different authentication environments. Named
 volumes are preserved, so this does not delete existing analyses or downloaded

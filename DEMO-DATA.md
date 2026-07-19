@@ -8,6 +8,11 @@ SHA-256 and byte-size provenance. Parser, statistics and detector lineage always
 key the canonical demo to the expanded `.dem` bytes; the uploaded-object hash is
 retained as acquisition lineage. Compression never changes field availability,
 and a missing or rejected expansion is never represented as a zero-valued demo.
+Operator backfills preserve the same two hashes while retaining source bytes
+only in ignored local storage. Their hosted source lineage is explicitly marked
+`local-backfill`; it must not imply that a raw source exists in hosted object
+storage. Source listing timestamps, filenames and game identifiers are
+acquisition provenance and scheduling hints, not demo-internal game identity.
 
 This is the source of truth for what L4DStats extracts from L4D2 SourceTV
 `.dem` files. Update it in the same change as any decoder, projection, artifact,

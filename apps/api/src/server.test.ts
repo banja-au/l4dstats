@@ -11,6 +11,24 @@ const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
   await Promise.all(cleanups.splice(0).map((fn) => fn()));
 });
+
+describe("aggregate stats", () => {
+  it("returns explicit empty-state metrics without manufacturing averages", async () => {
+    const { base } = await fixture();
+    const response = await fetch(`${base}/api/stats`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      totals: {
+        demosProcessed: 0,
+        gamesProcessed: 0,
+        signalsIdentified: 0,
+        averageSignalsPerDemo: null,
+      },
+      players: { ratingAvailability: "unavailable", ratingMinimumGames: 100 },
+      recentGames: [],
+    });
+  });
+});
 async function fixture(apiOptions: Parameters<typeof createApi>[2] = {}) {
   const root = await mkdtemp(join(tmpdir(), "l4dstats-api-")),
     inbox = join(root, "inbox"),

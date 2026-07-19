@@ -159,6 +159,48 @@ export interface OperationalMetrics {
   oldestQueuedAgeSeconds: number | null;
 }
 
+export interface PublicStats {
+  generatedAt: string;
+  totals: {
+    demosProcessed: number;
+    demosLast24Hours: number;
+    demosLast30Days: number;
+    gamesProcessed: number;
+    signalsIdentified: number;
+    averageSignalsPerDemo: number | null;
+  };
+  players: {
+    byGames: Array<{
+      displayName: string;
+      lookup: string;
+      games: number;
+      demos: number;
+    }>;
+    bySignals: Array<{
+      displayName: string;
+      lookup: string;
+      games: number;
+      signals: number;
+    }>;
+    byRating: Array<{
+      displayName: string;
+      lookup: string;
+      games: number;
+      rating: number;
+    }>;
+    ratingMinimumGames: 100;
+    ratingAvailability: "available" | "unavailable";
+  };
+  recentGames: Array<{
+    id: string;
+    campaign: string | null;
+    mapCount: number;
+    playerCount: number;
+    signals: number;
+    processedAt: string;
+  }>;
+}
+
 const migrations = [
   `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS jobs (
@@ -279,6 +321,160 @@ export class WorkbenchRepository {
               0,
               (at.getTime() - new Date(oldest.created_at).getTime()) / 1_000,
             ),
+    };
+  }
+  public publicStats(at = new Date()): PublicStats {
+    const rows = this.db
+      .prepare(
+        `SELECT g.id AS game_id,g.campaign,g.updated_at AS game_updated_at,
+              a.job_id,a.created_at,a.engine_result_json
+       FROM games g JOIN game_demos d ON d.game_id=g.id
+       JOIN job_analyses a ON a.job_id=d.job_id
+       ORDER BY a.created_at DESC,a.job_id`,
+      )
+      .all() as Array<Record<string, unknown>>;
+    const day = at.getTime() - 24 * 60 * 60 * 1000;
+    const month = at.getTime() - 30 * 24 * 60 * 60 * 1000;
+    const players = new Map<
+      string,
+      {
+        displayName: string;
+        games: Set<string>;
+        demos: number;
+        signals: number;
+      }
+    >();
+    const games = new Map<
+      string,
+      {
+        id: string;
+        campaign: string | null;
+        maps: Set<string>;
+        players: Set<string>;
+        signals: number;
+        processedAt: string;
+      }
+    >();
+    let totalSignals = 0;
+    for (const row of rows) {
+      const result = JSON.parse(String(row.engine_result_json)) as {
+        demo?: {
+          mapName?: unknown;
+          stats?: {
+            players?: Array<{
+              alias?: unknown;
+              evidenceWindows?: unknown;
+              identity?: { displayName?: unknown; steamId64?: unknown } | null;
+            }>;
+          };
+        };
+        cases?: Array<{
+          evidence?: unknown[];
+          presentation?: { evidence?: unknown[] };
+        }>;
+      };
+      const gameId = String(row.game_id);
+      const demoPlayers = result.demo?.stats?.players ?? [];
+      const demoSignals = (result.cases ?? []).reduce(
+        (sum, item) =>
+          sum +
+          (item.presentation?.evidence?.length ?? item.evidence?.length ?? 0),
+        0,
+      );
+      totalSignals += demoSignals;
+      const game = games.get(gameId) ?? {
+        id: gameId,
+        campaign: row.campaign === null ? null : String(row.campaign),
+        maps: new Set<string>(),
+        players: new Set<string>(),
+        signals: 0,
+        processedAt: String(row.created_at),
+      };
+      game.maps.add(String(result.demo?.mapName ?? "unknown"));
+      game.signals += demoSignals;
+      if (String(row.created_at) > game.processedAt)
+        game.processedAt = String(row.created_at);
+      for (const player of demoPlayers) {
+        const steamId = player.identity?.steamId64;
+        if (typeof steamId !== "string" || !/^7656119\d{10}$/.test(steamId))
+          continue;
+        const displayName = String(
+          player.identity?.displayName ?? player.alias ?? "Unknown player",
+        )
+          .trim()
+          .slice(0, 128);
+        const aggregate = players.get(steamId) ?? {
+          displayName,
+          games: new Set<string>(),
+          demos: 0,
+          signals: 0,
+        };
+        aggregate.displayName = displayName || aggregate.displayName;
+        aggregate.games.add(gameId);
+        aggregate.demos += 1;
+        aggregate.signals +=
+          typeof player.evidenceWindows === "number"
+            ? player.evidenceWindows
+            : 0;
+        players.set(steamId, aggregate);
+        game.players.add(steamId);
+      }
+      games.set(gameId, game);
+    }
+    const ranked = [...players.entries()].map(([lookup, value]) => ({
+      displayName: value.displayName,
+      lookup,
+      games: value.games.size,
+      demos: value.demos,
+      signals: value.signals,
+    }));
+    const demoTimes = rows.map((row) =>
+      new Date(String(row.created_at)).getTime(),
+    );
+    return {
+      generatedAt: at.toISOString(),
+      totals: {
+        demosProcessed: rows.length,
+        demosLast24Hours: demoTimes.filter((value) => value >= day).length,
+        demosLast30Days: demoTimes.filter((value) => value >= month).length,
+        gamesProcessed: games.size,
+        signalsIdentified: totalSignals,
+        averageSignalsPerDemo: rows.length ? totalSignals / rows.length : null,
+      },
+      players: {
+        byGames: ranked
+          .slice()
+          .sort(
+            (a, b) =>
+              b.games - a.games ||
+              b.demos - a.demos ||
+              a.displayName.localeCompare(b.displayName),
+          )
+          .slice(0, 10),
+        bySignals: ranked
+          .slice()
+          .sort(
+            (a, b) =>
+              b.signals - a.signals ||
+              b.games - a.games ||
+              a.displayName.localeCompare(b.displayName),
+          )
+          .slice(0, 10),
+        byRating: [],
+        ratingMinimumGames: 100,
+        ratingAvailability: "unavailable",
+      },
+      recentGames: [...games.values()]
+        .sort((a, b) => b.processedAt.localeCompare(a.processedAt))
+        .slice(0, 20)
+        .map((game) => ({
+          id: game.id,
+          campaign: game.campaign,
+          mapCount: game.maps.size,
+          playerCount: game.players.size,
+          signals: game.signals,
+          processedAt: game.processedAt,
+        })),
     };
   }
   private migrate(): void {

@@ -1,0 +1,26 @@
+{
+  "name": "@l4dstats/backfill",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "l4dstats-backfill": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "check": "tsc -p tsconfig.json --pretty false",
+    "dev": "tsx src/main.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.888.0",
+    "@l4dstats/acquisition": "workspace:*",
+    "@l4dstats/storage": "workspace:*",
+    "@l4dstats/worker": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.21.0",
+    "vitest": "3.2.6"
+  }
+}

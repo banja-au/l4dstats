@@ -86,6 +86,14 @@ the source must be confirmed before the job becomes successful. Large result
 and telemetry JSON stays out of Turso. Cloudflare placement is provider-selected
 and does not guarantee Los Angeles execution.
 
+The operator backfill path in ADR 0014 replaces hosted parser compute with a
+restartable local discovery and native-parser application. Raw source and
+expanded demos remain in an ignored local content-addressed store. The
+application uploads verified result JSON directly to the private derived R2
+bucket, then commits compact Turso references and invokes the same embedded
+game/player association logic. Source-provided game IDs and filenames may
+prioritize work but never override canonical session evidence.
+
 ## Visualization ladder
 
 1. Tick timeline and detector lanes.
