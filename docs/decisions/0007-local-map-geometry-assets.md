@@ -2,6 +2,7 @@
 
 - Status: accepted for implementation
 - Date: 2026-07-17
+- Amended: 2026-07-19
 
 ## Decision
 
@@ -28,15 +29,19 @@ instance. The web viewer uses an orthographic top-down camera by default and
 may offer an analytical 3D tilt. Demo event positions remain in unmodified
 world coordinates and are overlaid directly on the mesh.
 
-Until counsel or an explicit Valve licence establishes redistribution rights,
-neither BSPs nor derived mesh artifacts are committed, published in releases,
-uploaded to a hosted CDN, or shared between installations. Each installation
-derives its own cache. A shared analysis URL is therefore complete only on an
-instance that has the matching local map artifact; otherwise the UI states
-that geometry is unavailable and retains the coordinate-only fallback. A demo
-does not carry the source BSP hash or Steam build identifier, so resolving a
-local artifact by map name does not prove that it is the exact map revision
-used by the recorded server. The UI must expose this version limitation.
+Source BSPs and other game assets are never committed. Following project-owner
+legal review, bounded derived mesh JSON may be committed when it contains no
+textures, lightmaps, models, sounds, entity text, BSP bytes, or other source
+assets and retains the source BSP hash, source byte count, Steam build ID when
+available, content root, extractor version, map revision, coverage, and catalog
+lineage. The initial committed scope is the five Parish chapters. A demo does
+not carry the source BSP hash or Steam build identifier, so resolving an
+artifact by map name does not prove that it is the exact map revision used by
+the recorded server. The UI must expose this version limitation.
+
+Development resolves geometry in precedence order: the writable local cache
+first, then the committed derived subset. This preserves local full-installation
+and custom-map overrides while making covered maps available on a fresh clone.
 
 ## Why this is feasible without an installed game
 
@@ -174,8 +179,9 @@ static-prop collision meshes, each with distinct provenance and coverage.
 
 - **Extract geometry from the demo:** impossible; static map geometry is not
   embedded in SourceTV demos.
-- **Commit official overview screenshots or BSPs:** violates the repository's
-  asset policy and creates unresolved redistribution risk.
+- **Commit official overview screenshots or BSPs:** source game assets remain
+  prohibited; the committed analytical JSON contains only bounded derived mesh
+  data with explicit provenance.
 - **Hotlink community overview images:** availability, alignment, licensing and
   version provenance are not dependable.
 - **Use NAV polygons as “actual map geometry”:** misleading and incomplete.
@@ -196,11 +202,11 @@ static-prop collision meshes, each with distinct provenance and coverage.
 
 ## Consequences
 
-Users can obtain official-map geometry without owning or installing the L4D2
-client, but the first geometry setup is a substantial optional download. Map
-visuals are reproducible for a recorded BSP hash and use the same Source world
-coordinate system as demo positions. Exact map-revision equivalence to a demo
-remains unverified because the demo does not identify its BSP bytes. Custom
-campaigns still require the user to mount their own BSP. Public hosted service
-deployment needs a separate legal review; absence of a locally matching BSP is
-an explicit quality state, not a reason to fabricate geometry.
+The committed Parish subset works on a fresh checkout. Users can derive the
+remaining official-map geometry from a local L4D2 installation; that setup is a
+substantial optional download. Map visuals are reproducible for a recorded BSP
+hash and use the same Source world coordinate system as demo positions. Exact
+map-revision equivalence to a demo remains unverified because the demo does not
+identify its BSP bytes. Custom campaigns still require the user to mount their
+own BSP. Absence of a matching artifact remains an explicit quality state, not
+a reason to fabricate geometry.

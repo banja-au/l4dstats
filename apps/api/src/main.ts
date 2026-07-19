@@ -1,6 +1,6 @@
 import { WorkbenchRepository } from "@witchwatch/storage";
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { delimiter, dirname } from "node:path";
 import { createApi } from "./server.js";
 import { seedControlledWorkbench } from "./seed.js";
 const port = Number(process.env.PORT ?? 8787),
@@ -30,6 +30,14 @@ createApi(
   {
     uploadRoot: process.env.WITCHWATCH_UPLOAD_ROOT ?? "data/uploads",
     geometryRoot: process.env.WITCHWATCH_GEOMETRY_ROOT ?? "data/geometry",
+    ...(process.env.WITCHWATCH_GEOMETRY_ROOTS
+      ? {
+          geometryRoots:
+            process.env.WITCHWATCH_GEOMETRY_ROOTS.split(delimiter).filter(
+              Boolean,
+            ),
+        }
+      : {}),
     mutationRateLimit: {
       requests: Number(process.env.WITCHWATCH_MUTATION_RATE_LIMIT ?? 120),
       windowMs: Number(

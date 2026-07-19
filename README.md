@@ -117,9 +117,13 @@ dependencies.
 
 ### Optional official-map geometry
 
-Actual map geometry is derived locally and is never committed or downloaded by
-normal demo analysis. To install the anonymous L4D2 dedicated-server depot into
-a Docker volume and extract provenance-stamped analytical meshes:
+The repository includes provenance-stamped analytical meshes for The Parish
+(`c5m1`-`c5m5`). `pnpm dev:docker` uses locally extracted geometry first and
+falls back to the committed subset automatically, so Parish reports render real
+static BSP-derived geometry on a fresh checkout.
+
+To build the complete 57-map local cache, install the L4D2 dedicated-server
+depot into a Docker volume and extract the analytical meshes:
 
 ```bash
 pnpm maps:install
@@ -135,8 +139,9 @@ sudo ./scripts/setup-maps-ubuntu.sh
 ```
 
 It is safe to rerun. It preserves the named source-assets and workbench-data
-volumes and never invokes volume cleanup. The resulting BSPs and derived
-geometry remain local to that Ubuntu installation.
+volumes and never invokes volume cleanup. The source BSPs remain local to that
+Ubuntu installation. A complete local cache takes precedence over the committed
+Parish subset.
 
 This is a substantial optional Steam download. The generated BSPs and geometry
 cache remain inside local named volumes. Extraction writes one analytical mesh

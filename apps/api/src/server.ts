@@ -304,6 +304,7 @@ export function createApi(
     uploadRoot?: string;
     maxUploadBytes?: number;
     geometryRoot?: string;
+    geometryRoots?: readonly string[];
     mutationRateLimit?: { requests: number; windowMs: number };
     authFailureRateLimit?: { requests: number; windowMs: number };
     apiToken?: string;
@@ -576,12 +577,31 @@ export function createApi(
         const map = parts[2];
         if (!/^[a-z0-9_]+$/i.test(map))
           throw new RangeError("map name is invalid");
-        const geometryRoot = options.geometryRoot ?? "data/geometry";
-        const path = join(geometryRoot, `${map}.json`);
+        const geometryRoots = options.geometryRoots ?? [
+          options.geometryRoot ?? "data/geometry",
+        ];
+        let geometryRoot: string | undefined;
+        let path: string | undefined;
         let metadata;
-        try {
-          metadata = statSync(path);
-        } catch {
+        for (const candidate of geometryRoots) {
+          const candidatePath = join(candidate, `${map}.json`);
+          try {
+            const candidateMetadata = statSync(candidatePath);
+            geometryRoot = candidate;
+            path = candidatePath;
+            metadata = candidateMetadata;
+            break;
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              "code" in error &&
+              error.code === "ENOENT"
+            )
+              continue;
+            throw error;
+          }
+        }
+        if (!geometryRoot || !path || !metadata) {
           send(response, 404, {
             error: "map geometry is unavailable on this instance",
             map,

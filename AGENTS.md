@@ -10,7 +10,7 @@ Build a reproducible L4D2 demo review aid. Optimize for evidence quality, simple
 
 1. Never label a player a cheater. Use `review priority`, `insufficient data`, or `highly anomalous`.
 2. Never add automated enforcement, public accusation, or threshold-based banning.
-3. Never commit demos, archives, player identifiers, databases, map assets, clips, or secrets.
+3. Never commit demos, archives, player identifiers, databases, source map assets (including BSPs, textures, models, sounds, or entities), clips, or secrets. Bounded derived geometry JSON may be committed only with provenance and catalog lineage under the policy recorded in ADR 0007.
 4. Preserve demo hash, source, parser/detector/model versions, config, map asset version, and derivation lineage.
 5. Unknown or missing telemetry must be explicit. Do not impute zeros or manufacture precision.
 6. Remote ingestion requires an allowlist, time/size limits, archive traversal and decompression-bomb defenses, hashing, and idempotency.

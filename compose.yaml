@@ -10,6 +10,7 @@ services:
       WITCHWATCH_DB: /var/lib/witchwatch/workbench.sqlite
       WITCHWATCH_UPLOAD_ROOT: /var/lib/witchwatch/uploads
       WITCHWATCH_GEOMETRY_ROOT: /var/lib/witchwatch/geometry
+      WITCHWATCH_GEOMETRY_ROOTS: /var/lib/witchwatch/geometry:/workspace/map-geometry
       WITCHWATCH_LOCAL_ROOTS: /data/inbox
       WITCHWATCH_ALLOWED_HOSTS: cedapug.com
       WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}

@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { sha256, WorkbenchRepository } from "@witchwatch/storage";
 import { createApi } from "./server.js";
@@ -309,6 +310,45 @@ describe("review API", () => {
       (await fetch(`${base}/api/maps/c2m2_fairgrounds/geometry`)).status,
     ).toBe(416);
     expect((await fetch(`${base}/api/maps/bad-map/geometry`)).status).toBe(416);
+  });
+  it("falls back to committed geometry after the writable local cache", async () => {
+    const fallback = await mkdtemp(join(tmpdir(), "witchwatch-geometry-"));
+    cleanups.push(() => rm(fallback, { recursive: true, force: true }));
+    await writeFile(
+      join(fallback, "c5m1_waterfront.json"),
+      JSON.stringify(geometryArtifact("c5m1_waterfront")),
+    );
+    const { base } = await fixture({
+      geometryRoots: [join(fallback, "empty-local-cache"), fallback],
+    });
+    const response = await fetch(`${base}/api/maps/c5m1_waterfront/geometry`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      provenance: { map: "c5m1_waterfront" },
+    });
+  });
+  it("serves the committed Parish geometry with its extraction lineage", async () => {
+    const committedGeometry = fileURLToPath(
+      new URL("../../../map-geometry", import.meta.url),
+    );
+    const { base } = await fixture({
+      geometryRoots: [committedGeometry],
+    });
+    const response = await fetch(`${base}/api/maps/c5m1_waterfront/geometry`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-source-bsp-sha256")).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+    expect(await response.json()).toMatchObject({
+      format: "witchwatch-map-mesh-v1",
+      provenance: {
+        map: "c5m1_waterfront",
+        sourceKind: "steam-dedicated-server",
+        steamAppId: 222860,
+        steamBuildId: "23990100",
+        extractor: "@witchwatch/map-source1@0.1.0",
+      },
+    });
   });
   it("rejects incomplete or self-contradictory geometry provenance", async () => {
     const { base, geometry } = await fixture();
