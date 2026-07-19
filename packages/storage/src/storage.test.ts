@@ -500,5 +500,7 @@ describe("ContentAddressedStore", () => {
     await expect(
       store.read(first.sha256, { start: 0, endExclusive: 99 }),
     ).rejects.toThrow(RangeError);
+    expect(await store.delete(first.sha256)).toBe(true);
+    expect(await store.delete(first.sha256)).toBe(false);
   });
 });

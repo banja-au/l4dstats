@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, open, readFile, rename, stat } from "node:fs/promises";
+import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -63,5 +63,16 @@ export class ContentAddressedStore {
       await file.close();
     }
     return output;
+  }
+
+  public async delete(hash: string): Promise<boolean> {
+    const target = this.path(hash);
+    try {
+      await unlink(target);
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
   }
 }

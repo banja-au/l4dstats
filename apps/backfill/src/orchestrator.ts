@@ -55,6 +55,7 @@ export async function runBackfill(input: {
   concurrency: number;
   maxDemos: number;
   log?: (message: string) => void;
+  signal?: AbortSignal;
 }): Promise<BackfillSummary> {
   const log = input.log ?? console.log;
   const discoveryStarted = Date.now();
@@ -69,7 +70,7 @@ export async function runBackfill(input: {
   input.state.beginDiscovery(input.source.id);
   let discovered;
   try {
-    discovered = await input.source.discover();
+    discovered = await input.source.discover(input.signal);
     clearInterval(discoveryHeartbeat);
     log(
       `checkpointing ${discovered.length} catalog entries locally (discovery only; demos are not processed yet)`,
@@ -99,6 +100,22 @@ export async function runBackfill(input: {
   let completed = 0;
   let failed = 0;
   const store = new ContentAddressedStore(input.objectRoot);
+  const activeObjects = new Map<string, number>();
+  const retain = (hash: string) =>
+    activeObjects.set(hash, (activeObjects.get(hash) ?? 0) + 1);
+  const release = async (hash: string | undefined) => {
+    if (!hash) return;
+    const remaining = (activeObjects.get(hash) ?? 1) - 1;
+    if (remaining > 0) {
+      activeObjects.set(hash, remaining);
+      return;
+    }
+    activeObjects.delete(hash);
+    const deleted = await store.delete(hash);
+    log(
+      `local object cleanup: sha256=${hash}, deleted=${deleted ? "yes" : "already absent"}`,
+    );
+  };
   const grouped = new Map<string, PendingDemo[]>();
   for (const item of selected) {
     const key = item.gameHint
@@ -110,6 +127,9 @@ export async function runBackfill(input: {
   }
   await parallel([...grouped.values()], input.concurrency, async (group) => {
     for (const item of group) {
+      if (input.signal?.aborted) return;
+      let sourceHash: string | undefined;
+      let demoHash: string | undefined;
       input.state.start(item);
       try {
         log(
@@ -120,7 +140,10 @@ export async function runBackfill(input: {
           store: input.objectRoot,
           maxBytes: SOURCE_LIMIT,
           timeoutMs: 30_000,
+          ...(input.signal ? { signal: input.signal } : {}),
         });
+        sourceHash = manifest.sha256;
+        retain(sourceHash);
         log(
           `[${item.gameHint ?? "unassociated"}] source acquired: bytes=${manifest.bytes}, sha256=${manifest.sha256}`,
         );
@@ -135,6 +158,8 @@ export async function runBackfill(input: {
           `[${item.gameHint ?? "unassociated"}] expanded: format=${prepared.sourceFormat}, bytes=${prepared.bytes.byteLength}, demoSha256=${prepared.sha256}`,
         );
         const demoArtifact = await store.put(prepared.bytes);
+        demoHash = demoArtifact.sha256;
+        retain(demoHash);
         input.state.recordDemo(item, demoArtifact.sha256, demoArtifact.bytes);
         log(`[${item.gameHint ?? "unassociated"}] processing ${item.filename}`);
         const analysis = await analyzeLocalDemo({
@@ -142,6 +167,7 @@ export async function runBackfill(input: {
           sha256: demoArtifact.sha256,
           bytes: demoArtifact.bytes,
           pseudonymKey: input.pseudonymKey,
+          isCancelled: () => input.signal?.aborted ?? false,
           progress: (value, message) =>
             log(
               `[${item.gameHint ?? "unassociated"}] parser ${Math.round(value * 100)}%: ${message}`,
@@ -173,6 +199,9 @@ export async function runBackfill(input: {
         log(
           `[${item.gameHint ?? "unassociated"}] failed ${item.filename}: ${detail}`,
         );
+      } finally {
+        await release(demoHash);
+        await release(sourceHash);
       }
     }
   });

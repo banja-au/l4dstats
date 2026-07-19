@@ -59,6 +59,16 @@ async function main(): Promise<void> {
   const started = Date.now();
   const log = (message: string) =>
     process.stdout.write(`[${new Date().toISOString()}] ${message}\n`);
+  const shutdown = new AbortController();
+  const stop = (signal: NodeJS.Signals) => {
+    if (shutdown.signal.aborted) return;
+    log(
+      `${signal} received; cancelling active work and cleaning local demo bytes`,
+    );
+    shutdown.abort(new Error(signal));
+  };
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
   const pseudonymKey = process.env.L4DSTATS_PSEUDONYM_KEY;
   if (!pseudonymKey) throw new Error("L4DSTATS_PSEUDONYM_KEY is required");
   const state = new BackfillState(workspacePath(options.state));
@@ -76,12 +86,15 @@ async function main(): Promise<void> {
       concurrency: options.concurrency,
       maxDemos: options.maxDemos,
       log,
+      signal: shutdown.signal,
     });
     log(
       `backfill finished in ${((Date.now() - started) / 1_000).toFixed(1)}s: ${JSON.stringify(summary)}`,
     );
     if (summary.failed > 0) process.exitCode = 1;
   } finally {
+    process.removeListener("SIGINT", stop);
+    process.removeListener("SIGTERM", stop);
     publisher.close();
     state.close();
   }

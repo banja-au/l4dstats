@@ -166,7 +166,7 @@ export interface PublicStats {
     demosLast24Hours: number;
     demosLast30Days: number;
     gamesProcessed: number;
-    signalsIdentified: number;
+    signalsIdentified: number | null;
     averageSignalsPerDemo: number | null;
   };
   players: {
@@ -196,7 +196,7 @@ export interface PublicStats {
     campaign: string | null;
     mapCount: number;
     playerCount: number;
-    signals: number;
+    signals: number | null;
     processedAt: string;
   }>;
 }

@@ -250,7 +250,8 @@ function StatsPage() {
                     {
                       maps: game.mapCount,
                       players: game.playerCount,
-                      signals: game.signals,
+                      signals:
+                        game.signals ?? tx("unavailable", "no disponible"),
                     },
                   )}
                 </small>

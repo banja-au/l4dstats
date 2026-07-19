@@ -4,6 +4,7 @@ import type {
   JobState,
   OperationalMetrics,
   PlayerHistory,
+  PublicStats,
 } from "./repository.js";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -824,6 +825,81 @@ export class HostedJobRepository {
       profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
       updatedAt: String(player.updated_at),
       games: [...games.values()],
+    };
+  }
+
+  public async publicStats(at = new Date()): Promise<PublicStats> {
+    const cutoff24Hours = new Date(
+      at.getTime() - 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const cutoff30Days = new Date(
+      at.getTime() - 30 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const totals = (
+      await this.client.execute(
+        `SELECT COUNT(*) AS demos_processed,
+          SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END) AS demos_last_24_hours,
+          SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END) AS demos_last_30_days
+         FROM hosted_analyses`,
+        [cutoff24Hours, cutoff30Days],
+      )
+    ).rows[0];
+    const gameTotal = (
+      await this.client.execute("SELECT COUNT(*) AS count FROM hosted_games")
+    ).rows[0];
+    const ranked = (
+      await this.client.execute(
+        `SELECT p.steam_id64,p.display_name,COUNT(DISTINCT d.game_id) AS games,
+                COUNT(*) AS demos
+         FROM hosted_players p JOIN hosted_player_demos d ON d.steam_id64=p.steam_id64
+         GROUP BY p.steam_id64,p.display_name
+         ORDER BY games DESC,demos DESC,p.display_name ASC LIMIT 10`,
+      )
+    ).rows.map((row) => ({
+      displayName:
+        row.display_name === null ? "Unknown player" : String(row.display_name),
+      lookup: String(row.steam_id64),
+      games: Number(row.games),
+      demos: Number(row.demos),
+    }));
+    const recent = (
+      await this.client.execute(
+        `SELECT g.id,g.campaign,MAX(a.created_at) AS processed_at,
+                COUNT(DISTINCT d.map_name) AS map_count,
+                COUNT(DISTINCT p.steam_id64) AS player_count
+         FROM hosted_games g
+         JOIN hosted_game_demos d ON d.game_id=g.id
+         JOIN hosted_analyses a ON a.job_id=d.job_id
+         LEFT JOIN hosted_player_demos p ON p.game_id=g.id
+         GROUP BY g.id,g.campaign
+         ORDER BY processed_at DESC,g.id LIMIT 20`,
+      )
+    ).rows;
+    return {
+      generatedAt: at.toISOString(),
+      totals: {
+        demosProcessed: Number(totals?.demos_processed ?? 0),
+        demosLast24Hours: Number(totals?.demos_last_24_hours ?? 0),
+        demosLast30Days: Number(totals?.demos_last_30_days ?? 0),
+        gamesProcessed: Number(gameTotal?.count ?? 0),
+        signalsIdentified: null,
+        averageSignalsPerDemo: null,
+      },
+      players: {
+        byGames: ranked,
+        bySignals: [],
+        byRating: [],
+        ratingMinimumGames: 100,
+        ratingAvailability: "unavailable",
+      },
+      recentGames: recent.map((row) => ({
+        id: String(row.id),
+        campaign: row.campaign === null ? null : String(row.campaign),
+        mapCount: Number(row.map_count),
+        playerCount: Number(row.player_count),
+        signals: null,
+        processedAt: String(row.processed_at),
+      })),
     };
   }
 

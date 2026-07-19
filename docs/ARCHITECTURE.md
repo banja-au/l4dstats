@@ -94,6 +94,12 @@ bucket, then commits compact Turso references and invokes the same embedded
 game/player association logic. Source-provided game IDs and filenames may
 prioritize work but never override canonical session evidence.
 
+The hidden aggregate statistics route reads bounded counts, recent games, and
+player-frequency rankings directly from hosted Turso indexes. Signal totals and
+career ratings remain unavailable on the hosted surface until their inputs are
+materialized with complete historical coverage; missing values are never
+rendered as zero.
+
 ## Visualization ladder
 
 1. Tick timeline and detector lanes.

@@ -212,6 +212,7 @@ export async function analyzeLocalDemo(input: {
   bytes: number;
   pseudonymKey: string;
   progress?: (value: number, message: string) => void;
+  isCancelled?: () => boolean;
 }): Promise<LocalDemoAnalysis> {
   if (!/^[a-f0-9]{64}$/.test(input.sha256))
     throw new Error("local demo SHA-256 is invalid");
@@ -230,7 +231,7 @@ export async function analyzeLocalDemo(input: {
       sourceManifest: { kind: "local-backfill" },
     },
     {
-      isCancelled: () => false,
+      isCancelled: input.isCancelled ?? (() => false),
       progress: input.progress ?? (() => undefined),
     },
     undefined,

@@ -39,6 +39,30 @@ const source = {
 };
 
 describe("HostedJobRepository", () => {
+  it("reports empty hosted aggregates without manufacturing unavailable signals", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      await expect(
+        repo.publicStats(new Date("2026-07-20T00:00:00.000Z")),
+      ).resolves.toMatchObject({
+        totals: {
+          demosProcessed: 0,
+          gamesProcessed: 0,
+          signalsIdentified: null,
+          averageSignalsPerDemo: null,
+        },
+        players: {
+          byGames: [],
+          bySignals: [],
+          ratingAvailability: "unavailable",
+        },
+        recentGames: [],
+      });
+    } finally {
+      close();
+    }
+  });
+
   it("enqueues idempotently and leases one job", async () => {
     const { repository: repo, close } = await repository();
     try {

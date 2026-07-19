@@ -466,6 +466,15 @@ export async function fetchHandler(
       status: "ok",
       environment: environment.L4DSTATS_ENVIRONMENT,
     });
+  if (request.method === "GET" && url.pathname === "/api/stats") {
+    const repo = repository(environment);
+    await repo.migrate();
+    return Response.json(await repo.publicStats(), {
+      headers: {
+        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+      },
+    });
+  }
   const parts = url.pathname.split("/").filter(Boolean);
   if (request.method === "GET" && url.pathname === "/api/players/resolve") {
     const lookup = parseSteamLookup(url.searchParams.get("q") ?? "");
