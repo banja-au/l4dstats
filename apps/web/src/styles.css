@@ -4951,6 +4951,181 @@ body.timeline-fullscreen-open {
   letter-spacing: 0.16em;
   font-size: 11px;
 }
+.landing-actions {
+  position: absolute;
+  z-index: 3;
+  left: clamp(4vw, 8vw, 130px);
+  bottom: clamp(6vh, 10vh, 126px);
+  display: grid;
+  grid-template-columns: minmax(360px, 1.35fr) minmax(300px, 0.85fr);
+  width: min(980px, 72vw);
+  min-height: clamp(290px, 36vh, 430px);
+  gap: 16px;
+  align-items: stretch;
+}
+.phase-landing .landing-actions .dropzone {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  min-height: 100%;
+}
+.player-lookup {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(24px, 3vw, 38px);
+  overflow: auto;
+  border: 1px solid rgb(237 244 239 / 18%);
+  background: rgb(5 9 6 / 90%);
+  box-shadow: 12px 12px 0 rgb(0 0 0 / 24%);
+  transform: rotate(0.65deg);
+}
+.player-lookup::after {
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgb(167 255 56 / 10%);
+  content: "";
+  pointer-events: none;
+}
+.player-lookup-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.player-lookup-heading > svg {
+  width: 32px;
+  height: 32px;
+  color: var(--green);
+}
+.player-lookup-heading div {
+  display: grid;
+  gap: 4px;
+}
+.player-lookup-heading strong {
+  font-size: clamp(20px, 2vw, 29px);
+  letter-spacing: -0.04em;
+}
+.player-lookup-heading span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.player-lookup form {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+}
+.player-lookup input {
+  width: 100%;
+  min-width: 0;
+  padding: 13px 14px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  outline: 0;
+  background: #090e0b;
+}
+.player-lookup input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px rgb(167 255 56 / 16%);
+}
+.player-lookup form button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #080b09;
+  background: var(--green);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+.player-lookup form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.player-lookup-error {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.player-history {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+.player-history > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.player-history > header div {
+  display: grid;
+  min-width: 0;
+}
+.player-history > header strong,
+.player-history > header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-history > header span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.player-history > header a {
+  flex: none;
+  color: var(--green);
+  font-size: 11px;
+}
+.player-game-list {
+  display: grid;
+  gap: 6px;
+  overflow: auto;
+}
+.player-game-list > a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px;
+  color: inherit;
+  border: 1px solid var(--line);
+  background: rgb(17 26 21 / 86%);
+  text-decoration: none;
+}
+.player-game-list > a:hover,
+.player-game-list > a:focus-visible {
+  border-color: var(--green);
+}
+.player-game-list > a > span:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.player-game-list small,
+.player-game-maps {
+  color: var(--muted);
+  font-size: 10px;
+}
+.player-game-maps {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-game-list > a > svg {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  color: var(--green);
+}
 .banja-attribution {
   position: absolute;
   z-index: 4;
@@ -5303,8 +5478,10 @@ body.timeline-fullscreen-open {
 }
 
 @media (min-width: 1400px) and (min-height: 800px) {
-  .phase-landing .dropzone {
-    width: min(855px, 59vw);
+  .landing-actions {
+    width: min(1100px, 76vw);
+  }
+  .phase-landing .landing-actions .dropzone {
     min-height: min(540px, 54vh);
   }
 }
@@ -5362,6 +5539,29 @@ body.timeline-fullscreen-open {
     left: 18px;
     right: auto;
     bottom: 7vh;
+  }
+  .landing-screen {
+    min-height: 900px;
+    overflow: auto;
+  }
+  .landing-actions {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    grid-template-columns: 1fr;
+    width: calc(100% - 36px);
+    min-height: 0;
+    margin: 300px 18px 90px;
+  }
+  .phase-landing .landing-actions .dropzone {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    min-height: 210px;
+  }
+  .player-lookup {
+    max-height: none;
+    padding: 24px 20px;
   }
   .banja-attribution:not(.banja-attribution-report) {
     bottom: 0;

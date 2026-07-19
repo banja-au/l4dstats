@@ -2,11 +2,13 @@ import process from "node:process";
 
 const allowed = new Set([
   "Apache-2.0",
+  "BSD-2-Clause",
   "BSD-3-Clause",
   "BlueOak-1.0.0",
   "CC-BY-4.0",
   "ISC",
   "MIT",
+  "MIT OR Apache-2.0",
   "MPL-2.0",
   "OFL-1.1",
 ]);

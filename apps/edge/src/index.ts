@@ -87,6 +87,7 @@ export interface EdgeEnvironment {
   L4DSTATS_ENVIRONMENT: string;
   POSTHOG_PROJECT_TOKEN?: string;
   POSTHOG_HOST?: string;
+  STEAM_WEB_API_KEY?: string;
 }
 
 type OperationalEvent = "hosted_analysis_failed" | "hosted_analysis_succeeded";
@@ -141,6 +142,68 @@ function json(status: number, value: unknown): Response {
     status,
     headers: { "cache-control": "no-store" },
   });
+}
+
+const STEAM_ID64 = /^7656119\d{10}$/;
+
+export function parseSteamLookup(
+  value: string,
+): { kind: "id"; value: string } | { kind: "vanity"; value: string } | null {
+  const input = value.trim();
+  if (STEAM_ID64.test(input)) return { kind: "id", value: input };
+  if (input.length > 240 || input.includes("..")) return null;
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return null;
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.hostname.toLowerCase() !== "steamcommunity.com" ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password ||
+    url.port
+  )
+    return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length !== 2) return null;
+  if (parts[0] === "profiles" && STEAM_ID64.test(parts[1]!))
+    return { kind: "id", value: parts[1]! };
+  if (parts[0] === "id" && /^[A-Za-z0-9_-]{2,64}$/.test(parts[1]!))
+    return { kind: "vanity", value: parts[1]! };
+  return null;
+}
+
+async function resolveSteamId64(
+  lookup: ReturnType<typeof parseSteamLookup> & {},
+  environment: EdgeEnvironment,
+): Promise<string | null> {
+  if (lookup.kind === "id") return lookup.value;
+  if (!environment.STEAM_WEB_API_KEY)
+    throw new Error("steam vanity resolution is not configured");
+  const endpoint = new URL(
+    "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/",
+  );
+  endpoint.searchParams.set("key", environment.STEAM_WEB_API_KEY);
+  endpoint.searchParams.set("vanityurl", lookup.value);
+  endpoint.searchParams.set("url_type", "1");
+  const response = await fetch(endpoint, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(4_000),
+  });
+  if (!response.ok)
+    throw new Error("steam vanity resolution is temporarily unavailable");
+  const body = (await response.json()) as {
+    response?: { success?: number; steamid?: unknown };
+  };
+  return body.response?.success === 1 &&
+    typeof body.response.steamid === "string" &&
+    STEAM_ID64.test(body.response.steamid)
+    ? body.response.steamid
+    : null;
 }
 
 function repository(environment: EdgeEnvironment): HostedJobRepository {
@@ -253,6 +316,41 @@ export async function fetchHandler(
       environment: environment.L4DSTATS_ENVIRONMENT,
     });
   const parts = url.pathname.split("/").filter(Boolean);
+  if (request.method === "GET" && url.pathname === "/api/players/resolve") {
+    const lookup = parseSteamLookup(url.searchParams.get("q") ?? "");
+    if (!lookup)
+      return json(400, {
+        error: "enter a SteamID64 or complete Steam profile URL",
+      });
+    let steamId64: string | null;
+    try {
+      steamId64 = await resolveSteamId64(lookup, environment);
+    } catch (error) {
+      return json(
+        error instanceof Error && error.message.includes("not configured")
+          ? 422
+          : 503,
+        {
+          error: error instanceof Error ? error.message : "Steam lookup failed",
+        },
+      );
+    }
+    if (!steamId64) return json(404, { error: "Steam profile was not found" });
+    const repo = repository(environment);
+    await repo.migrate();
+    const player = await repo.getPlayerHistory(steamId64);
+    if (!player)
+      return json(404, {
+        error: "No retained L4DStats games include this Steam player",
+        steamId64,
+        profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
+      });
+    return Response.json(player, {
+      headers: {
+        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+      },
+    });
+  }
   if (
     request.method === "GET" &&
     parts[0] === "api" &&

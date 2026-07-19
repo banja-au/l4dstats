@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import type { JobState, OperationalMetrics } from "./repository.js";
+import type {
+  JobState,
+  OperationalMetrics,
+  PlayerHistory,
+} from "./repository.js";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 
@@ -136,6 +140,22 @@ export const hostedMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS hosted_game_demos_game_idx
      ON hosted_game_demos(game_id,chapter,server_count)`,
+  `CREATE TABLE IF NOT EXISTS hosted_players (
+    steam_id64 TEXT PRIMARY KEY,
+    display_name TEXT,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS hosted_player_demos (
+    steam_id64 TEXT NOT NULL REFERENCES hosted_players(steam_id64) ON DELETE CASCADE,
+    game_id TEXT NOT NULL REFERENCES hosted_games(id) ON DELETE CASCADE,
+    job_id TEXT NOT NULL REFERENCES hosted_jobs(id) ON DELETE CASCADE,
+    demo_sha256 TEXT NOT NULL,
+    map_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(steam_id64,job_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS hosted_player_demos_player_idx
+     ON hosted_player_demos(steam_id64,created_at DESC)`,
 ] as const;
 
 function parseJob(row: Record<string, unknown>): HostedJob {
@@ -621,6 +641,10 @@ export class HostedJobRepository {
         "UPDATE hosted_game_demos SET game_id=? WHERE game_id=?",
         [gameId, duplicate],
       );
+      await this.client.execute(
+        "UPDATE hosted_player_demos SET game_id=? WHERE game_id=?",
+        [gameId, duplicate],
+      );
       await this.client.execute("DELETE FROM hosted_games WHERE id=?", [
         duplicate,
       ]);
@@ -657,7 +681,77 @@ export class HostedJobRepository {
         gameId,
       ],
     );
+    await this.indexPlayers({
+      gameId,
+      jobId: input.jobId,
+      demoSha256: input.demoSha256,
+      mapName: String(result.demo?.mapName ?? "unknown"),
+      engineResult: input.engineResult,
+      at: timestamp,
+    });
     return gameId;
+  }
+
+  private async indexPlayers(input: {
+    gameId: string;
+    jobId: string;
+    demoSha256: string;
+    mapName: string;
+    engineResult: unknown;
+    at: string;
+  }): Promise<void> {
+    const result = input.engineResult as {
+      demo?: {
+        stats?: {
+          players?: Array<{
+            alias?: unknown;
+            identity?: { displayName?: unknown; steamId64?: unknown } | null;
+          }>;
+          spectators?: Array<{ displayName?: unknown; steamId64?: unknown }>;
+        };
+      };
+    };
+    const identities = [
+      ...(result.demo?.stats?.players ?? []).map((player) => ({
+        steamId64: player.identity?.steamId64,
+        displayName: player.identity?.displayName ?? player.alias,
+      })),
+      ...(result.demo?.stats?.spectators ?? []),
+    ];
+    const unique = new Map<string, string | null>();
+    for (const identity of identities) {
+      if (
+        typeof identity.steamId64 !== "string" ||
+        !/^7656119\d{10}$/.test(identity.steamId64)
+      )
+        continue;
+      const displayName =
+        typeof identity.displayName === "string" && identity.displayName.trim()
+          ? identity.displayName.trim().slice(0, 128)
+          : null;
+      unique.set(identity.steamId64, displayName);
+    }
+    for (const [steamId64, displayName] of unique) {
+      await this.client.execute(
+        `INSERT INTO hosted_players VALUES(?,?,?)
+         ON CONFLICT(steam_id64) DO UPDATE SET
+           display_name=COALESCE(excluded.display_name,hosted_players.display_name),
+           updated_at=excluded.updated_at`,
+        [steamId64, displayName, input.at],
+      );
+      await this.client.execute(
+        `INSERT INTO hosted_player_demos VALUES(?,?,?,?,?,?)
+         ON CONFLICT(steam_id64,job_id) DO NOTHING`,
+        [
+          steamId64,
+          input.gameId,
+          input.jobId,
+          input.demoSha256,
+          input.mapName,
+          input.at,
+        ],
+      );
+    }
   }
 
   public async assignAnalysisToGame(input: {
@@ -666,7 +760,65 @@ export class HostedJobRepository {
     engineResult: unknown;
   }): Promise<string> {
     const existing = await this.getGameIdForJob(input.jobId);
-    return existing ?? this.assignGame(input);
+    if (!existing) return this.assignGame(input);
+    await this.indexPlayers({
+      gameId: existing,
+      jobId: input.jobId,
+      demoSha256: input.demoSha256,
+      mapName: String(
+        (input.engineResult as { demo?: { mapName?: unknown } }).demo
+          ?.mapName ?? "unknown",
+      ),
+      engineResult: input.engineResult,
+      at: iso(),
+    });
+    return existing;
+  }
+
+  public async getPlayerHistory(
+    steamId64: string,
+  ): Promise<PlayerHistory | undefined> {
+    if (!/^7656119\d{10}$/.test(steamId64)) return undefined;
+    const player = (
+      await this.client.execute(
+        "SELECT * FROM hosted_players WHERE steam_id64=?",
+        [steamId64],
+      )
+    ).rows[0];
+    if (!player) return undefined;
+    const rows = (
+      await this.client.execute(
+        `SELECT d.*,g.confidence,g.updated_at AS game_updated_at
+       FROM hosted_player_demos d JOIN hosted_games g ON g.id=d.game_id
+       WHERE d.steam_id64=? ORDER BY g.updated_at DESC,d.created_at,d.job_id`,
+        [steamId64],
+      )
+    ).rows;
+    const games = new Map<string, PlayerHistory["games"][number]>();
+    for (const row of rows) {
+      const id = String(row.game_id);
+      const game = games.get(id) ?? {
+        id,
+        confidence: String(row.confidence) as HostedGameReference["confidence"],
+        updatedAt: String(row.game_updated_at),
+        demos: [],
+      };
+      game.demos.push({
+        jobId: String(row.job_id),
+        demoSha256: String(row.demo_sha256),
+        mapName: String(row.map_name),
+        createdAt: String(row.created_at),
+      });
+      games.set(id, game);
+    }
+    return {
+      steamId64,
+      displayName:
+        player.display_name === null ? null : String(player.display_name),
+      profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
+      updatedAt: String(player.updated_at),
+      games: [...games.values()],
+    };
   }
 
   public async getGameIdForJob(jobId: string): Promise<string | null> {

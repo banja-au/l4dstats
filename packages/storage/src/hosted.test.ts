@@ -207,6 +207,17 @@ describe("HostedJobRepository", () => {
             chapter: 4,
             evidence: ["server-token", "roster-token"],
           },
+          stats: {
+            players: [
+              {
+                alias: "Coach",
+                identity: {
+                  displayName: "Coach",
+                  steamId64: "76561198000000007",
+                },
+              },
+            ],
+          },
         },
       };
       await repo.recordAnalysis({
@@ -232,6 +243,18 @@ describe("HostedJobRepository", () => {
           engineResult,
         }),
       ).resolves.toBe(gameId);
+      await expect(
+        repo.getPlayerHistory("76561198000000007"),
+      ).resolves.toMatchObject({
+        steamId64: "76561198000000007",
+        displayName: "Coach",
+        games: [
+          {
+            id: gameId,
+            demos: [{ jobId: job.id, mapName: "c5m4_quarter" }],
+          },
+        ],
+      });
     } finally {
       close();
     }

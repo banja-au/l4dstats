@@ -705,6 +705,49 @@ test("presents a focused, responsive upload-first landing page", async ({
   expect(width[1]).toBeLessThanOrEqual(width[0] + 1);
 });
 
+test("finds a Steam player and opens a durable game URL", async ({ page }) => {
+  await page.route("**/api/players/resolve?*", async (route) => {
+    expect(new URL(route.request().url()).searchParams.get("q")).toBe(
+      "76561198000000007",
+    );
+    await route.fulfill({
+      json: {
+        steamId64: "76561198000000007",
+        displayName: "Coach",
+        profileUrl: "https://steamcommunity.com/profiles/76561198000000007",
+        updatedAt: "2026-07-19T00:00:00.000Z",
+        games: [
+          {
+            id: "game-player-1",
+            confidence: "high",
+            updatedAt: "2026-07-19T00:00:00.000Z",
+            demos: [
+              {
+                jobId: "job-player-1",
+                demoSha256: "a".repeat(64),
+                mapName: "c5m4_quarter",
+                createdAt: "2026-07-19T00:00:00.000Z",
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+  await page.goto("/");
+  await page
+    .getByLabel("SteamID64 or Steam profile URL")
+    .fill("76561198000000007");
+  await page.getByRole("button", { name: "SEARCH", exact: true }).click();
+  await expect(page.getByText("Coach", { exact: true })).toBeVisible();
+  await expect(page.getByText("The Parish", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\?player=76561198000000007$/);
+  await expect(page.getByRole("link", { name: /The Parish/ })).toHaveAttribute(
+    "href",
+    "/game/game-player-1/overview",
+  );
+});
+
 test("keeps the reusable Banja contact signature on the loading state", async ({
   page,
 }) => {
@@ -758,7 +801,7 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     },
   ]);
   await expect(
-    page.getByRole("heading", { name: "c2m3_coaster" }),
+    page.getByRole("heading", { name: "Dark Carnival" }),
   ).toBeVisible();
   const reportAttribution = page.locator(".banja-attribution-report");
   await expect(
@@ -1008,22 +1051,11 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     combatHistoryLength,
   );
   await expect(page.getByText("8 tick-addressed moments")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(page.locator(".timeline-view-tabs")).toHaveCount(0);
+  await expect(page.locator(".match-timeline")).toHaveCount(0);
   await expect(page.locator(".story-round-divider")).toContainText(
-    "Unsegmented",
+    "Round start",
   );
-  const storyTab = page.getByRole("tab", { name: "Story" });
-  await storyTab.focus();
-  await storyTab.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await page.getByRole("tab", { name: "Timeline" }).press("ArrowLeft");
-  await expect(storyTab).toHaveAttribute("aria-selected", "true");
   const compactStoryEvents = page.locator(".story-event-row");
   await expect(
     compactStoryEvents.filter({ hasText: "2 linked moments" }).first(),
@@ -1036,12 +1068,9 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   expect(Math.max(...compactStoryEventHeights)).toBeLessThanOrEqual(72);
   await compactStoryEvents.first().click();
   await expect(page.locator(".story-inspector")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Inspect on Timeline" }),
-  ).toBeVisible();
   const hitSummary = page.locator(".hit-summary-card:not(.story-event-row)");
   await expect(hitSummary).toHaveCount(1);
-  await expect(hitSummary).toContainText("Unsegmented · Hit 01");
+  await expect(hitSummary).toContainText("Round start · Hit 01");
   await expect(hitSummary.locator(".infected-icon")).toBeVisible();
   await expect(hitSummary).toContainText("Player 10BDEE");
   await expect(hitSummary).toContainText("Hunter");
@@ -1050,9 +1079,6 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   await expect(page.locator(".hit-inspector")).toContainText(
     "18 observed HP loss",
   );
-  await expect(
-    page.getByRole("button", { name: "Inspect hit range" }),
-  ).toBeVisible();
   await visualAudit(page, "story");
   if ((page.viewportSize()?.width ?? 0) <= 700)
     await page.getByRole("button", { name: "More", exact: true }).click();
@@ -1074,102 +1100,119 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     .getByRole("button", { name: "spacious", exact: true })
     .click();
   await expect(page.locator(".hit-roundup")).toHaveClass(/hit-density-4/);
-  await page
-    .locator(".timeline-view-tabs")
-    .getByRole("tab", { name: "Timeline" })
-    .click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        Object.fromEntries(new URLSearchParams(location.search)),
-      ),
-    )
-    .toMatchObject({
-      storyView: "timeline",
-      storyFilter: "all",
-      storyDensity: "4",
+  await expect(page.locator(".timeline-view-tabs")).toHaveCount(0);
+  await expect(page.locator(".match-timeline")).toHaveCount(0);
+  /* The retired horizontal lane implementation has deliberately no reachable
+     control. Keep its former assertions unreachable until its dead JSX is
+     removed in the follow-up bundle cleanup. */
+  if (false) {
+    await page
+      .locator(".timeline-view-tabs")
+      .getByRole("tab", { name: "Timeline" })
+      .click();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.fromEntries(new URLSearchParams(location.search)),
+        ),
+      )
+      .toMatchObject({
+        storyView: "timeline",
+        storyFilter: "all",
+        storyDensity: "4",
+      });
+    await expect(
+      page.getByText("One independent clock per demo"),
+    ).toBeVisible();
+    if ((page.viewportSize()?.width ?? 0) <= 700) {
+      await expect(page.locator(".mobile-timeline-list")).toBeVisible();
+      await expect(page.locator(".match-timeline")).toHaveCount(0);
+      const mobileEvents = page.locator(".mobile-timeline-event");
+      expect(await mobileEvents.count()).toBeGreaterThan(0);
+      expect(await mobileEvents.count()).toBeLessThanOrEqual(100);
+      await mobileEvents.first().click();
+      await expect(page.locator(".timeline-focus")).toBeVisible();
+      await page.getByRole("button", { name: "Lane chart" }).click();
+    }
+    await expect(page.getByText("SI actions", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Pins + clears", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Bosses", { exact: true })).toBeVisible();
+    await expect(page.locator(".timeline-lane")).toHaveCount(6);
+    await expect(page.locator(".timeline-band.hit").first()).toBeVisible();
+    await expect(page.locator(".timeline-band.pin").first()).toBeVisible();
+    await expect(page.locator(".timeline-band.tank").first()).toBeVisible();
+    await expect(
+      page.locator('.infected-icon[data-infected-class="Hunter"]').first(),
+    ).toBeVisible();
+    await expect(
+      page.locator(".timeline-lane button.infected-marker").first(),
+    ).not.toContainText("HU");
+    const infectedMarker = page
+      .locator(".timeline-lane button.infected-marker")
+      .first();
+    const infectedMarkerStyle = await infectedMarker.evaluate((element) => {
+      const markerStyle = getComputedStyle(element);
+      const icon = element.querySelector(".infected-icon");
+      const iconStyle = icon ? getComputedStyle(icon) : null;
+      return {
+        background: markerStyle.backgroundColor,
+        iconWidth: iconStyle ? Number.parseFloat(iconStyle.width) : 0,
+        iconHeight: iconStyle ? Number.parseFloat(iconStyle.height) : 0,
+      };
     });
-  await expect(page.getByText("One independent clock per demo")).toBeVisible();
-  if ((page.viewportSize()?.width ?? 0) <= 700) {
-    await expect(page.locator(".mobile-timeline-list")).toBeVisible();
-    await expect(page.locator(".match-timeline")).toHaveCount(0);
-    const mobileEvents = page.locator(".mobile-timeline-event");
-    expect(await mobileEvents.count()).toBeGreaterThan(0);
-    expect(await mobileEvents.count()).toBeLessThanOrEqual(100);
-    await mobileEvents.first().click();
+    expect(infectedMarkerStyle.background).toBe("rgba(0, 0, 0, 0)");
+    expect(infectedMarkerStyle.iconWidth).toBeGreaterThanOrEqual(28);
+    expect(infectedMarkerStyle.iconHeight).toBeGreaterThanOrEqual(28);
+    const firstTimelineMarker = page.locator(".timeline-lane button").first();
+    await firstTimelineMarker.click({ force: true });
+    await expect(firstTimelineMarker).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator(".timeline-focus")).toBeVisible();
-    await page.getByRole("button", { name: "Lane chart" }).click();
-  }
-  await expect(page.getByText("SI actions", { exact: true })).toBeVisible();
-  await expect(page.getByText("Pins + clears", { exact: true })).toBeVisible();
-  await expect(page.getByText("Bosses", { exact: true })).toBeVisible();
-  await expect(page.locator(".timeline-lane")).toHaveCount(6);
-  await expect(page.locator(".timeline-band.hit").first()).toBeVisible();
-  await expect(page.locator(".timeline-band.pin").first()).toBeVisible();
-  await expect(page.locator(".timeline-band.tank").first()).toBeVisible();
-  await expect(
-    page.locator('.infected-icon[data-infected-class="Hunter"]').first(),
-  ).toBeVisible();
-  await expect(
-    page.locator(".timeline-lane button.infected-marker").first(),
-  ).not.toContainText("HU");
-  const infectedMarker = page
-    .locator(".timeline-lane button.infected-marker")
-    .first();
-  const infectedMarkerStyle = await infectedMarker.evaluate((element) => {
-    const markerStyle = getComputedStyle(element);
-    const icon = element.querySelector(".infected-icon");
-    const iconStyle = icon ? getComputedStyle(icon) : null;
-    return {
-      background: markerStyle.backgroundColor,
-      iconWidth: iconStyle ? Number.parseFloat(iconStyle.width) : 0,
-      iconHeight: iconStyle ? Number.parseFloat(iconStyle.height) : 0,
-    };
-  });
-  expect(infectedMarkerStyle.background).toBe("rgba(0, 0, 0, 0)");
-  expect(infectedMarkerStyle.iconWidth).toBeGreaterThanOrEqual(28);
-  expect(infectedMarkerStyle.iconHeight).toBeGreaterThanOrEqual(28);
-  const firstTimelineMarker = page.locator(".timeline-lane button").first();
-  await firstTimelineMarker.click({ force: true });
-  await expect(firstTimelineMarker).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".timeline-focus")).toBeVisible();
-  await expect
-    .poll(async () => {
-      const marker = await firstTimelineMarker.boundingBox();
-      const label = await firstTimelineMarker
-        .locator("xpath=ancestor::div[contains(@class,'timeline-lane')]/strong")
-        .boundingBox();
-      return marker && label ? marker.x - (label.x + label.width) : -1;
-    })
-    .toBeGreaterThan(0);
-  if ((page.viewportSize()?.width ?? 0) > 700) {
-    await firstTimelineMarker.hover({ force: true });
-    const floatingTooltip = page.locator("body > .timeline-float-tooltip");
-    await expect(floatingTooltip).toBeVisible();
+    await expect
+      .poll(async () => {
+        const marker = await firstTimelineMarker.boundingBox();
+        const label = await firstTimelineMarker
+          .locator(
+            "xpath=ancestor::div[contains(@class,'timeline-lane')]/strong",
+          )
+          .boundingBox();
+        return marker && label ? marker.x - (label.x + label.width) : -1;
+      })
+      .toBeGreaterThan(0);
+    if ((page.viewportSize()?.width ?? 0) > 700) {
+      await firstTimelineMarker.hover({ force: true });
+      const floatingTooltip = page.locator("body > .timeline-float-tooltip");
+      await expect(floatingTooltip).toBeVisible();
+      expect(
+        await floatingTooltip.evaluate((element) =>
+          Number.parseInt(getComputedStyle(element).zIndex, 10),
+        ),
+      ).toBeGreaterThan(10000);
+    }
+    await page
+      .getByRole("button", { name: "Open fullscreen timeline" })
+      .click();
+    await expect(page.locator(".timeline-panel")).toHaveClass(/is-fullscreen/);
+    await page
+      .getByRole("button", { name: "Exit fullscreen timeline" })
+      .click();
+    await visualAudit(page, "timeline");
     expect(
-      await floatingTooltip.evaluate((element) =>
-        Number.parseInt(getComputedStyle(element).zIndex, 10),
-      ),
-    ).toBeGreaterThan(10000);
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth + 1));
+    if ((await page.evaluate(() => window.innerWidth)) <= 700)
+      expect(
+        await page
+          .locator(".timeline-scroll")
+          .evaluate((element) => element.scrollWidth > element.clientWidth),
+      ).toBe(true);
+    await page
+      .getByRole("button", { name: /cleared Player/ })
+      .first()
+      .click();
+    await expect(page.getByText(/cleared Player/).first()).toBeVisible();
   }
-  await page.getByRole("button", { name: "Open fullscreen timeline" }).click();
-  await expect(page.locator(".timeline-panel")).toHaveClass(/is-fullscreen/);
-  await page.getByRole("button", { name: "Exit fullscreen timeline" }).click();
-  await visualAudit(page, "timeline");
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth),
-  ).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth + 1));
-  if ((await page.evaluate(() => window.innerWidth)) <= 700)
-    expect(
-      await page
-        .locator(".timeline-scroll")
-        .evaluate((element) => element.scrollWidth > element.clientWidth),
-    ).toBe(true);
-  await page
-    .getByRole("button", { name: /cleared Player/ })
-    .first()
-    .click();
-  await expect(page.getByText(/cleared Player/).first()).toBeVisible();
   await page.getByRole("button", { name: "signals" }).click();
   await expect(page.getByText("Signals are not verdicts")).toBeVisible();
   await visualAudit(page, "signals");
@@ -1180,11 +1223,9 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     .click();
   await expect(page).toHaveURL(/\/timeline\?demo=.*&tick=\d+(?:&|$)/);
   expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
-  await page
-    .locator(".timeline-view-tabs")
-    .getByRole("tab", { name: "Timeline" })
-    .click();
-  await expect(page.locator(".timeline-focus")).toContainText("tick");
+  await expect(page.locator(".timeline-view-tabs")).toHaveCount(0);
+  await expect(page.locator(".match-timeline")).toHaveCount(0);
+  await expect(page.locator(".hit-roundup")).toBeVisible();
   await page.getByRole("button", { name: "data coverage" }).click();
   await expect(
     page.getByText("What could be reconstructed, and what could not"),
@@ -1247,9 +1288,7 @@ test("bounds dense spatial interaction on the heaviest committed Parish geometry
     mimeType: "application/octet-stream",
     buffer: Buffer.from("HL2DEMO-dense-c5m3"),
   });
-  await expect(
-    page.getByRole("heading", { name: "c5m3_cemetery" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The Parish" })).toBeVisible();
   await page.getByRole("button", { name: "combat" }).click();
   const workspace = page.locator(".spatial-workspace");
   await expect(
@@ -1437,16 +1476,13 @@ test("bounds dense spatial interaction on the heaviest committed Parish geometry
     workspace.getByText("2000 positioned combat moments on c5m3_cemetery"),
   ).toBeVisible();
   await page.getByRole("button", { name: "timeline", exact: true }).click();
-  await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(page.locator(".timeline-view-tabs")).toHaveCount(0);
   expect(await page.locator(".hit-summary-card").count()).toBeLessThanOrEqual(
     100,
   );
   await expect(page.locator(".story-round-divider")).toContainText([
-    "Round 1",
-    "Round 2",
+    "Swap sides",
+    "Swap sides",
   ]);
   await expect(page.locator(".story-show-more")).toBeVisible();
   await visualAudit(page, "dense-story");
@@ -1512,7 +1548,7 @@ test("restores a persisted analysis at its dedicated URL", async ({ page }) => {
     );
   }
   await expect(
-    page.getByRole("heading", { level: 1, name: "c2m5_concert" }),
+    page.getByRole("heading", { level: 1, name: "Dark Carnival" }),
   ).toBeVisible();
 });
 
@@ -1546,32 +1582,24 @@ test("restores a complete grouped game and scopes every tab by enabled maps", as
   await expect(
     page.getByRole("heading", { level: 1, name: "Hard Rain" }),
   ).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(page.locator(".timeline-view-tabs")).toHaveCount(0);
+  await expect(page.locator(".match-timeline")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "All maps" })).toHaveCount(0);
   await page.getByRole("button", { name: "c4m2_sugarmill_a" }).click();
-  await page.getByRole("tab", { name: "Timeline" }).click();
-  if ((page.viewportSize()?.width ?? 0) <= 700)
-    await page.getByRole("button", { name: "Lane chart" }).click();
-  await expect(page.locator(".match-timeline")).toHaveCount(1);
-  await expect(page.locator(".match-timeline h3")).toHaveText(
-    "c4m2_sugarmill_a",
-  );
+  await expect(page.locator(".hit-roundup")).toBeVisible();
   await expect(page.getByText("2 maps grouped as one game")).toBeVisible();
   const historyLength = await page.evaluate(() => window.history.length);
   await page.locator(".half-toggle summary").click();
   await page.locator(".half-toggle input").first().uncheck();
-  await expect(page.locator(".match-timeline")).toHaveCount(1);
+  await expect(page.locator(".hit-roundup")).toBeVisible();
   await page.locator(".half-toggle input").first().check();
-  await expect(page.locator(".match-timeline")).toHaveCount(1);
+  await expect(page.locator(".hit-roundup")).toBeVisible();
   await page.locator(".map-toggle:not(.half-toggle) summary").click();
   await expect(
     page.locator(".map-toggle:not(.half-toggle) label strong"),
   ).toHaveText(["c4m1_milltown_a", "c4m2_sugarmill_a"]);
   await page.locator(".map-toggle:not(.half-toggle) input").nth(1).uncheck();
-  await expect(page.locator(".match-timeline")).toHaveCount(1);
+  await expect(page.locator(".hit-roundup")).toBeVisible();
   for (const tab of [
     "overview",
     "players",
@@ -1625,7 +1653,7 @@ test("moves a single completed upload onto its analysis URL", async ({
   });
   await expect(page).toHaveURL(/\/analysis\/job1\/overview$/);
   await expect(
-    page.getByRole("heading", { name: "c2m3_coaster" }),
+    page.getByRole("heading", { name: "Dark Carnival" }),
   ).toBeVisible();
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fetchHandler,
   isSupportedUploadFilename,
+  parseSteamLookup,
   type EdgeEnvironment,
 } from "./index.js";
 
@@ -76,6 +77,30 @@ describe("edge dispatcher", () => {
       "match.dem\0.zip",
     ])
       expect(isSupportedUploadFilename(filename)).toBe(false);
+  });
+  it("accepts only numeric Steam identities and strict profile URLs", () => {
+    expect(parseSteamLookup("76561198000000007")).toEqual({
+      kind: "id",
+      value: "76561198000000007",
+    });
+    expect(
+      parseSteamLookup(
+        "https://steamcommunity.com/profiles/76561198000000007/",
+      ),
+    ).toEqual({ kind: "id", value: "76561198000000007" });
+    expect(parseSteamLookup("https://steamcommunity.com/id/coach_7/")).toEqual({
+      kind: "vanity",
+      value: "coach_7",
+    });
+    for (const unsafe of [
+      "7656119800000000",
+      "coach_7",
+      "http://steamcommunity.com/id/coach_7",
+      "https://evil.example/id/coach_7",
+      "https://steamcommunity.com/id/../profiles/76561198000000007",
+      "https://steamcommunity.com/id/coach_7?redirect=1",
+    ])
+      expect(parseSteamLookup(unsafe)).toBeNull();
   });
   it("serves a bounded unauthenticated health response", async () => {
     const response = await fetchHandler(

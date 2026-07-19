@@ -126,6 +126,24 @@ export interface GameAnalysis {
   analyses: unknown[];
 }
 
+export interface PlayerHistory {
+  steamId64: string;
+  displayName: string | null;
+  profileUrl: string;
+  updatedAt: string;
+  games: Array<{
+    id: string;
+    confidence: GameAnalysis["confidence"];
+    updatedAt: string;
+    demos: Array<{
+      jobId: string;
+      demoSha256: string;
+      mapName: string;
+      createdAt: string;
+    }>;
+  }>;
+}
+
 export interface RetentionPurgeResult {
   cutoff: string;
   dryRun: boolean;
@@ -833,6 +851,76 @@ export class WorkbenchRepository {
         createdAt: String(row.created_at),
         gameId,
       })),
+    };
+  }
+
+  public getPlayerHistory(steamId64: string): PlayerHistory | undefined {
+    if (!/^7656119\d{10}$/.test(steamId64)) return undefined;
+    const rows = this.db
+      .prepare(
+        `SELECT g.id AS game_id,g.confidence,g.updated_at AS game_updated_at,
+                a.job_id,a.demo_sha256,a.engine_result_json,a.created_at
+         FROM games g JOIN game_demos d ON d.game_id=g.id
+         JOIN job_analyses a ON a.job_id=d.job_id
+         ORDER BY g.updated_at DESC,a.created_at,a.job_id`,
+      )
+      .all() as Array<Record<string, unknown>>;
+    let displayName: string | null = null;
+    let updatedAt = "";
+    const games = new Map<string, PlayerHistory["games"][number]>();
+    for (const row of rows) {
+      const engineResult = JSON.parse(String(row.engine_result_json)) as {
+        demo?: {
+          mapName?: unknown;
+          stats?: {
+            players?: Array<{
+              alias?: unknown;
+              identity?: { displayName?: unknown; steamId64?: unknown } | null;
+            }>;
+            spectators?: Array<{ displayName?: unknown; steamId64?: unknown }>;
+          };
+        };
+      };
+      const identities = [
+        ...(engineResult.demo?.stats?.players ?? []).map((player) => ({
+          steamId64: player.identity?.steamId64,
+          displayName: player.identity?.displayName ?? player.alias,
+        })),
+        ...(engineResult.demo?.stats?.spectators ?? []),
+      ];
+      const identity = identities.find(
+        (candidate) => candidate.steamId64 === steamId64,
+      );
+      if (!identity) continue;
+      if (
+        typeof identity.displayName === "string" &&
+        identity.displayName.trim()
+      )
+        displayName = identity.displayName.trim().slice(0, 128);
+      const gameId = String(row.game_id);
+      const game = games.get(gameId) ?? {
+        id: gameId,
+        confidence: String(row.confidence) as GameAnalysis["confidence"],
+        updatedAt: String(row.game_updated_at),
+        demos: [],
+      };
+      game.demos.push({
+        jobId: String(row.job_id),
+        demoSha256: String(row.demo_sha256),
+        mapName: String(engineResult.demo?.mapName ?? "unknown"),
+        createdAt: String(row.created_at),
+      });
+      games.set(gameId, game);
+      if (String(row.created_at) > updatedAt)
+        updatedAt = String(row.created_at);
+    }
+    if (!games.size) return undefined;
+    return {
+      steamId64,
+      displayName,
+      profileUrl: `https://steamcommunity.com/profiles/${steamId64}`,
+      updatedAt,
+      games: [...games.values()],
     };
   }
   public getJobAnalysis(jobId: string): unknown {

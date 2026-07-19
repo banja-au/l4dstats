@@ -686,6 +686,29 @@ export function createApi(
         send(response, 200, parsed);
         return;
       }
+      if (request.method === "GET" && url.pathname === "/api/players/resolve") {
+        const query = (url.searchParams.get("q") ?? "").trim();
+        const numeric = /^7656119\d{10}$/.test(query)
+          ? query
+          : /^https:\/\/steamcommunity\.com\/profiles\/(7656119\d{10})\/?$/.exec(
+              query,
+            )?.[1];
+        if (!numeric) {
+          send(response, 400, {
+            error: "enter a SteamID64 or numeric Steam profile URL",
+          });
+          return;
+        }
+        const history = repo.getPlayerHistory(numeric);
+        send(
+          response,
+          history ? 200 : 404,
+          history ?? {
+            error: "No retained L4DStats games include this Steam player",
+          },
+        );
+        return;
+      }
       if (request.method === "POST" && url.pathname === "/api/uploads") {
         const uploaded = await receiveDemoUpload(
           request,

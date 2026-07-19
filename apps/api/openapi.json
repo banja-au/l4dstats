@@ -55,6 +55,25 @@
         }
       }
     },
+    "/api/players/resolve": {
+      "get": {
+        "operationId": "resolvePlayerHistory",
+        "description": "Resolves an exact SteamID64 or Steam profile URL and returns retained L4DStats game/demo navigation metadata. This is not an enumerable player directory.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "maxLength": 240 }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Exact Steam player history" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/api/uploads": {
       "post": {
         "operationId": "uploadDemo",

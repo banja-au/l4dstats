@@ -47,6 +47,7 @@ import {
 } from "./spatial-density";
 import { reconstructVersusScores } from "./score-reconstruction";
 import { PlayerProfile } from "./PlayerProfile";
+import { PlayerLookup } from "./PlayerLookup";
 import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
 import { INFECTED_CLASSES, InfectedIcon } from "./visual";
 import { useI18n } from "./i18n";
@@ -832,34 +833,37 @@ function App() {
             <span>L4D</span>
             <b>STATS</b>
           </div>
-          <button
-            className={`dropzone ${dragging ? "is-dragging" : ""}`}
-            onClick={() => input.current?.click()}
-            onDragEnter={(event) => {
-              event.preventDefault();
-              setDragging(true);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node))
+          <div className="landing-actions">
+            <button
+              className={`dropzone ${dragging ? "is-dragging" : ""}`}
+              onClick={() => input.current?.click()}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node))
+                  setDragging(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
                 setDragging(false);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragging(false);
-              addFiles([...event.dataTransfer.files]);
-            }}
-          >
-            {picker}
-            <UploadCloud />
-            <span>{t("upload.drop")}</span>
-            <small>{t("upload.hint", { maximum: MAX_DEMOS })}</small>
-            {uploadError && (
-              <em className="upload-error" role="alert">
-                {uploadError}
-              </em>
-            )}
-          </button>
+                addFiles([...event.dataTransfer.files]);
+              }}
+            >
+              {picker}
+              <UploadCloud />
+              <span>{t("upload.drop")}</span>
+              <small>{t("upload.hint", { maximum: MAX_DEMOS })}</small>
+              {uploadError && (
+                <em className="upload-error" role="alert">
+                  {uploadError}
+                </em>
+              )}
+            </button>
+            <PlayerLookup />
+          </div>
           <BanjaAttribution placement="homepage" />
         </main>
       )}

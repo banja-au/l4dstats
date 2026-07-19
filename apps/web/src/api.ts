@@ -31,6 +31,24 @@ export interface ApiJob {
   analysis?: JobAnalysis;
 }
 
+export interface ApiPlayerHistory {
+  steamId64: string;
+  displayName: string | null;
+  profileUrl: string;
+  updatedAt: string;
+  games: Array<{
+    id: string;
+    confidence: "high" | "provisional" | "unassociated";
+    updatedAt: string;
+    demos: Array<{
+      jobId: string;
+      demoSha256: string;
+      mapName: string;
+      createdAt: string;
+    }>;
+  }>;
+}
+
 export interface PlayerStats {
   id: string;
   alias: string;
@@ -623,6 +641,11 @@ export const workbenchApi = {
   },
   game(id: string) {
     return requestJson<ApiGame>(`/api/games/${encodeURIComponent(id)}`);
+  },
+  playerHistory(query: string) {
+    return requestJson<ApiPlayerHistory>(
+      `/api/players/resolve?q=${encodeURIComponent(query)}`,
+    );
   },
   cancelJob(id: string) {
     return requestJson<ApiJob>(`/api/jobs/${encodeURIComponent(id)}/cancel`, {

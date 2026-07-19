@@ -29,6 +29,7 @@ The result is statistics first. Detector output is deliberately secondary and is
 
 - Match duration, playback ticks, effective tick rate, map, file size, and SHA-256 provenance
 - Player names, Steam profile identities, epoch-safe joins, team/class, tracked duration, and sample count
+- Exact SteamID64/profile lookup for navigating retained hosted games without exposing an enumerable player directory
 - Movement distance, view-angle travel, observed position/angle coverage, and weapon usage
 - Total decoded events plus supported event-family counts
 - Field-by-field reconstruction availability and parser issue counts
