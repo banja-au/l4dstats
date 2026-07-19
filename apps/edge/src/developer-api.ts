@@ -100,7 +100,7 @@ async function passwordHash(
       name: "PBKDF2",
       hash: "SHA-256",
       salt: Uint8Array.from(salt).buffer,
-      iterations: 310_000,
+      iterations: 600_000,
     },
     key,
     256,
