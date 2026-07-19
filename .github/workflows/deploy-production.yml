@@ -99,7 +99,7 @@ jobs:
       - name: Install pinned dependencies
         run: pnpm install --frozen-lockfile
       - name: Build web and hosted dispatcher
-        run: pnpm --filter @l4dstats/web build && pnpm --filter @l4dstats/edge build
+        run: pnpm turbo run build --filter=@l4dstats/web --filter=@l4dstats/edge
       - name: Validate deployment configuration
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID"
