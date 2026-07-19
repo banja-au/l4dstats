@@ -6,15 +6,17 @@ import { gzipSync } from "node:zlib";
 const webRoot = fileURLToPath(new URL("..", import.meta.url));
 const distRoot = join(webRoot, "dist");
 const kib = 1024;
-// Keep roughly 10% headroom above the July 2026 production baseline. This is
-// intentionally wide enough for normal product work but still fails material
-// first-load regressions in both parse bytes and compressed transfer bytes.
+// Keep bounded headroom above the July 2026 production baseline. JavaScript
+// includes the complete English and Spanish catalogs so either locale works on
+// the first paint and offline; their measured gzip cost is about 5.5 KiB.
+// These limits still fail material first-load regressions in both parse and
+// compressed transfer bytes.
 const budgets = {
   total: 1370 * kib,
-  javascript: 385 * kib,
+  javascript: 415 * kib,
   css: 99 * kib,
   transferTotal: 1025 * kib,
-  transferJavascript: 116 * kib,
+  transferJavascript: 125 * kib,
   transferCss: 21 * kib,
   hero: 230 * kib,
   backdrop: 150 * kib,

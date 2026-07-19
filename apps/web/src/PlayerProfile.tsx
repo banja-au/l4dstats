@@ -9,16 +9,13 @@ import {
 import type { DemoStats, JobAnalysis, PlayerStats } from "./api";
 import { rateGamePlayers } from "./player-rating";
 import { PlayerIdentityLinks } from "./player-links";
+import { useI18n } from "./i18n";
 
-const whole = new Intl.NumberFormat("en");
 const duration = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
   const remaining = Math.floor(seconds % 60);
   return `${minutes}:${remaining.toString().padStart(2, "0")}`;
 };
-const value = (input: number | undefined) =>
-  input === undefined ? "N/A" : whole.format(input);
-
 function matchingMapPlayer(
   player: PlayerStats,
   stats: DemoStats,
@@ -44,6 +41,10 @@ export function PlayerProfile({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
+  const { locale, t } = useI18n();
+  const whole = new Intl.NumberFormat(locale);
+  const value = (input: number | undefined) =>
+    input === undefined ? t("common.notAvailable") : whole.format(input);
   const rating = rateGamePlayers(stats, players).players.find(
     (candidate) => candidate.playerId === player.id,
   );
@@ -53,7 +54,8 @@ export function PlayerProfile({
       ? [
           {
             name:
-              analyses[index]?.engineResult.demo.mapName ?? `Map ${index + 1}`,
+              analyses[index]?.engineResult.demo.mapName ??
+              t("filters.mapNumber", { number: index + 1 }),
             player: local,
           },
         ]
@@ -69,11 +71,11 @@ export function PlayerProfile({
         className="player-profile-back"
         href={`/game/${encodeURIComponent(gameId)}/players`}
       >
-        <ArrowLeft /> Back to players
+        <ArrowLeft /> {t("player.back")}
       </a>
       <header className="player-profile-hero">
         <div>
-          <span className="eyebrow">Game player profile</span>
+          <span className="eyebrow">{t("player.profile")}</span>
           <h2>{player.alias}</h2>
           <PlayerIdentityLinks
             gameId={gameId}
@@ -82,41 +84,53 @@ export function PlayerProfile({
           />
         </div>
         <div className="player-profile-rating">
-          <span>L4DStats Rating</span>
-          <strong>{rating?.rating?.toFixed(2) ?? "N/A"}</strong>
+          <span>{t("player.rating")}</span>
+          <strong>
+            {rating?.rating?.toFixed(2) ?? t("common.notAvailable")}
+          </strong>
           <small>
-            Survivor {rating?.survivor.score?.toFixed(2) ?? "N/A"} · Infected{" "}
-            {rating?.infected.score?.toFixed(2) ?? "N/A"}
+            {t("player.survivorRating", {
+              rating:
+                rating?.survivor.score?.toFixed(2) ?? t("common.notAvailable"),
+            })}{" "}
+            ·{" "}
+            {t("player.infectedRating", {
+              rating:
+                rating?.infected.score?.toFixed(2) ?? t("common.notAvailable"),
+            })}
           </small>
         </div>
       </header>
 
-      <section className="player-profile-kpis" aria-label="Player totals">
+      <section className="player-profile-kpis" aria-label={t("player.totals")}>
         <article>
           <Crosshair />
           <span>
-            SI kills<strong>{value(player.specialInfectedKills)}</strong>
+            {t("player.siKills")}
+            <strong>{value(player.specialInfectedKills)}</strong>
           </span>
         </article>
         <article>
           <Skull />
           <span>
-            Survivor deaths<strong>{value(player.survivorDeaths)}</strong>
+            {t("player.survivorDeaths")}
+            <strong>{value(player.survivorDeaths)}</strong>
           </span>
         </article>
         <article>
           <Shield />
           <span>
-            SI incaps<strong>{value(player.specialIncaps)}</strong>
+            {t("player.siIncaps")}
+            <strong>{value(player.specialIncaps)}</strong>
           </span>
         </article>
         <article>
           <Timer />
           <span>
-            Pin time
+            {t("player.pinTime")}
             <strong>
               {player.pinSeconds === undefined
-                ? "N/A"
+                ? t("common.notAvailable")
                 : duration(player.pinSeconds)}
             </strong>
           </span>
@@ -124,28 +138,29 @@ export function PlayerProfile({
         <article>
           <HeartPulse />
           <span>
-            Revives<strong>{value(player.revives)}</strong>
+            {t("player.revives")}
+            <strong>{value(player.revives)}</strong>
           </span>
         </article>
       </section>
 
       <section className="player-profile-section">
         <header>
-          <span className="eyebrow">Selected game</span>
-          <h3>Map by map</h3>
+          <span className="eyebrow">{t("player.selectedGame")}</span>
+          <h3>{t("player.mapByMap")}</h3>
         </header>
         <div
           className="player-profile-map-table"
           role="table"
-          aria-label="Map contributions"
+          aria-label={t("player.mapContributions")}
         >
           <div className="player-profile-map-head" role="row">
-            <span role="columnheader">Map</span>
-            <span role="columnheader">SI kills</span>
-            <span role="columnheader">All infected</span>
-            <span role="columnheader">Revives</span>
-            <span role="columnheader">SI incaps</span>
-            <span role="columnheader">Pin</span>
+            <span role="columnheader">{t("player.map")}</span>
+            <span role="columnheader">{t("player.siKills")}</span>
+            <span role="columnheader">{t("player.allInfected")}</span>
+            <span role="columnheader">{t("player.revives")}</span>
+            <span role="columnheader">{t("player.siIncaps")}</span>
+            <span role="columnheader">{t("player.pin")}</span>
           </div>
           {maps.map(({ name, player: local }) => (
             <div role="row" key={name}>
@@ -156,7 +171,7 @@ export function PlayerProfile({
               <span role="cell">{value(local.specialIncaps)}</span>
               <span role="cell">
                 {local.pinSeconds === undefined
-                  ? "N/A"
+                  ? t("common.notAvailable")
                   : duration(local.pinSeconds)}
               </span>
             </div>
@@ -167,68 +182,68 @@ export function PlayerProfile({
       <div className="player-profile-detail-grid">
         <section className="player-profile-section">
           <header>
-            <span className="eyebrow">Survivor contribution</span>
-            <h3>Threat removal and support</h3>
+            <span className="eyebrow">{t("player.survivorContribution")}</span>
+            <h3>{t("player.survivorContributionTitle")}</h3>
           </header>
           <dl>
             <div>
-              <dt>Total infected kills</dt>
+              <dt>{t("player.totalInfectedKills")}</dt>
               <dd>{value(player.checkpointInfectedKills)}</dd>
             </div>
             <div>
-              <dt>Special Infected kills</dt>
+              <dt>{t("player.specialInfectedKills")}</dt>
               <dd>{value(player.specialInfectedKills)}</dd>
             </div>
             <div>
-              <dt>Revives</dt>
+              <dt>{t("player.revives")}</dt>
               <dd>{value(player.revives)}</dd>
             </div>
             <div>
-              <dt>Incaps suffered</dt>
+              <dt>{t("player.incapsSuffered")}</dt>
               <dd>{value(player.survivorIncaps)}</dd>
             </div>
             <div>
-              <dt>Tank damage</dt>
+              <dt>{t("player.tankDamage")}</dt>
               <dd>{value(player.counters?.m_checkpointTankDamage)}</dd>
             </div>
             <div>
-              <dt>Witch damage</dt>
+              <dt>{t("player.witchDamage")}</dt>
               <dd>{value(player.counters?.m_checkpointWitchDamage)}</dd>
             </div>
           </dl>
         </section>
         <section className="player-profile-section">
           <header>
-            <span className="eyebrow">Infected contribution</span>
-            <h3>Control and conversion</h3>
+            <span className="eyebrow">{t("player.infectedContribution")}</span>
+            <h3>{t("player.infectedContributionTitle")}</h3>
           </header>
           <dl>
             <div>
-              <dt>SI deaths</dt>
+              <dt>{t("player.siDeaths")}</dt>
               <dd>{value(player.infectedDeaths)}</dd>
             </div>
             <div>
-              <dt>Survivors incapped</dt>
+              <dt>{t("player.survivorsIncapped")}</dt>
               <dd>{value(player.specialIncaps)}</dd>
             </div>
             <div>
-              <dt>Pounces</dt>
+              <dt>{t("player.pounces")}</dt>
               <dd>{value(player.pounces)}</dd>
             </div>
             <div>
-              <dt>Best pounce</dt>
+              <dt>{t("player.bestPounce")}</dt>
               <dd>{value(player.highestPounceDamage)}</dd>
             </div>
             <div>
-              <dt>Ghost time</dt>
+              <dt>{t("player.ghostTime")}</dt>
               <dd>
                 {player.ghostSeconds === undefined
-                  ? "N/A"
+                  ? t("common.notAvailable")
                   : duration(player.ghostSeconds)}
               </dd>
             </div>
             <div>
-              <dt>Tank damage dealt</dt>
+              <dt>{t("player.tankDamageDealt")}</dt>
               <dd>{value(player.counters?.m_checkpointPZTankDamage)}</dd>
             </div>
           </dl>
@@ -237,7 +252,7 @@ export function PlayerProfile({
 
       {counterEntries.length > 0 && (
         <details className="player-profile-counters">
-          <summary>Networked checkpoint counters</summary>
+          <summary>{t("player.networkCounters")}</summary>
           <div>
             {counterEntries.map(([name, count]) => (
               <span key={name}>

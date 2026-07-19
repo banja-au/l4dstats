@@ -1,16 +1,21 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { AnalyticsErrorBoundary } from "./AnalyticsErrorBoundary";
+import { LocalizedAnalyticsErrorBoundary } from "./AnalyticsErrorBoundary";
 import { initializeAnalytics } from "./analytics";
+import { I18nProvider } from "./i18n";
+import { LanguageToggle } from "./LanguageToggle";
 import "./styles.css";
 
 initializeAnalytics();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AnalyticsErrorBoundary>
-      <App />
-    </AnalyticsErrorBoundary>
+    <I18nProvider>
+      <LanguageToggle />
+      <LocalizedAnalyticsErrorBoundary>
+        <App />
+      </LocalizedAnalyticsErrorBoundary>
+    </I18nProvider>
   </StrictMode>,
 );

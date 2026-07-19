@@ -1,8 +1,9 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { captureAnalyticsException } from "./analytics";
+import { useI18n } from "./i18n";
 
 export class AnalyticsErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; detail: string; title: string },
   { failed: boolean }
 > {
   override state = { failed: false };
@@ -22,10 +23,26 @@ export class AnalyticsErrorBoundary extends Component<
     if (this.state.failed)
       return (
         <main className="shell">
-          <h1>L4DStats could not render this page</h1>
-          <p>Reload the page to try again.</p>
+          <h1>{this.props.title}</h1>
+          <p>{this.props.detail}</p>
         </main>
       );
     return this.props.children;
   }
+}
+
+export function LocalizedAnalyticsErrorBoundary({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <AnalyticsErrorBoundary
+      title={t("error.renderTitle")}
+      detail={t("error.renderDetail")}
+    >
+      {children}
+    </AnalyticsErrorBoundary>
+  );
 }

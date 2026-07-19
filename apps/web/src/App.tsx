@@ -49,6 +49,7 @@ import { reconstructVersusScores } from "./score-reconstruction";
 import { PlayerProfile } from "./PlayerProfile";
 import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
 import { INFECTED_CLASSES, InfectedIcon } from "./visual";
+import { useI18n } from "./i18n";
 
 type UploadItem = {
   key: string;
@@ -88,11 +89,19 @@ const routeTab = (): Tab => {
 
 const MAX_DEMOS = 10;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const compact = new Intl.NumberFormat("en", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const whole = new Intl.NumberFormat("en");
+const activeNumberLocale = () =>
+  document.documentElement.lang === "es" ? "es-ES" : "en-US";
+const compact = {
+  format: (value: number) =>
+    new Intl.NumberFormat(activeNumberLocale(), {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value),
+};
+const whole = {
+  format: (value: number) =>
+    new Intl.NumberFormat(activeNumberLocale()).format(value),
+};
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 const duration = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -104,7 +113,7 @@ const duration = (seconds: number) => {
 };
 const bytes = (value: number) =>
   value >= 1024 ** 2
-    ? `${(value / 1024 ** 2).toFixed(1)} MB`
+    ? `${new Intl.NumberFormat(activeNumberLocale(), { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(value / 1024 ** 2)} MB`
     : `${Math.round(value / 1024)} KB`;
 const counterLabel = (value: string) =>
   value
@@ -112,6 +121,139 @@ const counterLabel = (value: string) =>
     .replace(/^PZ/, "SI ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replaceAll("_", " ");
+
+const detectorSpanish: Record<string, string> = {
+  "Server-observed aim dynamics":
+    "Dinámica de puntería observada por el servidor",
+  "Audited hidden-target alignment": "Alineación auditada con objetivo oculto",
+  "Authoritative fire cadence invariant":
+    "Invariante autoritativa de cadencia de disparo",
+  "Authoritative movement invariant": "Invariante autoritativa de movimiento",
+  "SourceTV quantization and interpolation":
+    "Cuantización e interpolación de SourceTV",
+  "low tick rate": "baja frecuencia de ticks",
+  "spectator state is not direct mouse input":
+    "el estado del espectador no representa entradas directas del ratón",
+  "target selection uncertainty": "incertidumbre en la selección del objetivo",
+  "Shot timing was unavailable; the window is aim-only.":
+    "No estaba disponible el momento del disparo; la ventana solo contiene puntería.",
+  "A fast human flick can produce the same local shape.":
+    "Un flick humano rápido puede producir la misma forma local.",
+  "Residual target error is material rather than pixel-perfect.":
+    "El error residual respecto al objetivo es apreciable y no perfecto al píxel.",
+  "No authoritative shot occurred near the acquisition.":
+    "No ocurrió ningún disparo autoritativo cerca de la adquisición.",
+  "complete angle/position/time window":
+    "ventana completa de ángulo, posición y tiempo",
+  "shot timing unavailable": "momento del disparo no disponible",
+  "shot timing observed": "momento del disparo observado",
+  "server-observed rather than direct input":
+    "observado por el servidor, no como entrada directa",
+  "missing map collision": "falta la colisión del mapa",
+  "unmodeled callouts": "avisos de voz no modelados",
+  "sound propagation differs from distance":
+    "la propagación del sonido difiere de la distancia",
+  "target-selection ambiguity": "ambigüedad en la selección del objetivo",
+  "authoritative visibility source": "fuente de visibilidad autoritativa",
+  "audibility and prior knowledge audited":
+    "audibilidad y conocimiento previo auditados",
+  "dynamic occluders resolved": "oclusores dinámicos resueltos",
+  "Team voice communication is not represented.":
+    "La comunicación de voz del equipo no está representada.",
+  "Coincidental crosshair placement remains plausible.":
+    "Una colocación casual de la mira sigue siendo plausible.",
+  "A single audited alignment is weak evidence.":
+    "Una sola alineación auditada constituye evidencia débil.",
+  "weapon upgrades or mode changes absent from state":
+    "mejoras de arma o cambios de modo ausentes del estado",
+  "tick quantization": "cuantización de ticks",
+  "event duplication": "duplicación de eventos",
+  "authoritative state": "estado autoritativo",
+  "matching weapon": "arma coincidente",
+  "consistent ammo transitions": "transiciones de munición coherentes",
+  "A parser duplication or incomplete weapon-mode model can mimic this violation.":
+    "Una duplicación del analizador o un modelo incompleto del modo del arma puede imitar esta infracción.",
+  "knockback or map triggers": "retroceso o activadores del mapa",
+  "unmodeled temporary modifiers": "modificadores temporales no modelados",
+  teleports: "teletransportes",
+  "authoritative movement state": "estado de movimiento autoritativo",
+  "mode-specific bound": "límite específico del modo",
+  "An unmodeled impulse, trigger, or temporary modifier may explain the excess.":
+    "Un impulso, activador o modificador temporal no modelado podría explicar el exceso.",
+};
+
+const localizeDetectorCopy = (value: string, locale: "en" | "es") => {
+  if (locale === "en") return value;
+  const exact = detectorSpanish[value];
+  if (exact) return exact;
+  let match = value.match(
+    /^View direction moved ([\d.]+)°\/s and ended ([\d.]+)° from the selected target( near an observed shot)?\.$/,
+  );
+  if (match)
+    return `La dirección de la vista se movió a ${match[1]}°/s y terminó a ${match[2]}° del objetivo seleccionado${match[3] ? " cerca de un disparo observado" : ""}.`;
+  match = value.match(
+    /^View alignment was ([\d.]+)° from a target while the recorded visibility, audibility, and prior-knowledge channels were negative\.$/,
+  );
+  if (match)
+    return `La vista quedó alineada a ${match[1]}° de un objetivo mientras los canales registrados de visibilidad, audibilidad y conocimiento previo eran negativos.`;
+  match = value.match(
+    /^Two authoritative (.+) fire events were ([\d.]+)s apart, below its ([\d.]+)s cycle\.$/,
+  );
+  if (match)
+    return `Dos disparos autoritativos de ${match[1]} estuvieron separados por ${match[2]} s, por debajo de su ciclo de ${match[3]} s.`;
+  match = value.match(
+    /^Observed speed ([\d.]+) exceeded the (.+) bound ([\d.]+)\.$/,
+  );
+  if (match)
+    return `La velocidad observada ${match[1]} superó el límite ${match[2]} de ${match[3]}.`;
+  return value;
+};
+
+const ratingSpanish: Record<string, string> = {
+  "Threat removal": "Eliminación de amenazas",
+  Rescue: "Rescate",
+  Durability: "Resistencia",
+  "Boss output": "Rendimiento contra jefes",
+  Conversion: "Conversión",
+  Control: "Control",
+  Setup: "Preparación",
+  Tank: "Tank",
+  "SI kill rate": "Tasa de bajas de infectados especiales",
+  "Revive rate": "Tasa de reanimaciones",
+  "Death-correlated clear rate":
+    "Tasa de liberaciones correlacionadas con muertes",
+  "Death rate": "Tasa de muertes",
+  "Incap rate": "Tasa de incapacitación",
+  "Damage taken rate": "Tasa de daño recibido",
+  "Tank damage rate": "Tasa de daño al Tank",
+  "Witch damage rate": "Tasa de daño a la Witch",
+  "Damage per life": "Daño por vida",
+  "Incaps per life": "Incapacitaciones por vida",
+  "Kills per life": "Bajas por vida",
+  "Controls per life": "Controles por vida",
+  "Pin seconds per control": "Segundos de agarre por control",
+  "Booms per life": "Vómitos por vida",
+  "Pulls per life": "Arrastres por vida",
+  "Charge victims per life": "Víctimas de carga por vida",
+  "Pounces per life": "Abalanzamientos por vida",
+  "Tank punches per life": "Puñetazos de Tank por vida",
+  "Registered Tank throws per life":
+    "Lanzamientos de Tank registrados por vida",
+  "engine-counter": "contador del motor",
+  "game-event": "evento del juego",
+  sampled: "muestreado",
+  derived: "derivado",
+  "This is a selected-game performance index, not latent skill or win probability.":
+    "Este es un índice de rendimiento de la partida seleccionada, no de habilidad latente ni de probabilidad de victoria.",
+  "The v0.2 fallback baseline is game-relative because a representative frozen reference corpus does not yet exist.":
+    "La referencia alternativa v0.2 es relativa a la partida porque aún no existe un corpus de referencia congelado y representativo.",
+  "Engine damage counters are aggregate checkpoint values and do not provide event-level attacker attribution.":
+    "Los contadores de daño del motor son valores agregados de checkpoint y no atribuyen el atacante en cada evento.",
+  "Unavailable telemetry is omitted rather than imputed as zero; realized weights and coverage therefore vary.":
+    "La telemetría no disponible se omite en vez de imputarse como cero; por ello varían los pesos efectivos y la cobertura.",
+};
+const localizeRatingCopy = (value: string, locale: "en" | "es") =>
+  locale === "es" ? (ratingSpanish[value] ?? value) : value;
 
 function BrandMark() {
   return <img src="/art/infected-mark.webp" alt="" aria-hidden="true" />;
@@ -122,6 +264,7 @@ function BanjaAttribution({
 }: {
   placement: "homepage" | "loading" | "report";
 }) {
+  const { t } = useI18n();
   return (
     <div className={`banja-attribution banja-attribution-${placement}`}>
       <a
@@ -129,15 +272,15 @@ function BanjaAttribution({
         href={`https://banja.au/?utm_source=l4dstats&utm_medium=referral&utm_campaign=l4dstats_product&utm_content=${placement}_signature`}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Banja Labs (opens in a new tab)"
+        aria-label={t("brand.banjaTab")}
       >
-        <span>by</span> Banja Labs
+        <span>{t("brand.by")}</span> {t("brand.banjaName")}
       </a>
       <a
         className="banja-email"
         href="mailto:labs@banja.au"
-        aria-label="Email Banja Labs at labs@banja.au"
-        title="labs@banja.au"
+        aria-label={t("brand.banjaEmail")}
+        title={t("brand.banjaAddress")}
       >
         <Mail aria-hidden="true" />
       </a>
@@ -178,6 +321,7 @@ function Ring({ value, label }: { value: number; label: string }) {
 }
 
 function App() {
+  const { locale, t, tx } = useI18n();
   const requestedPlayerProfile = parsePlayerProfilePath(
     window.location.pathname,
   );
@@ -212,7 +356,9 @@ function App() {
         progress: job.progress,
         message:
           job.message ??
-          (job.state === "succeeded" ? "Analysis complete" : "Analyzing demo"),
+          (job.state === "succeeded"
+            ? t("analysis.complete")
+            : t("analysis.analyzing")),
         job,
         ...(job.analysis ? { analysis: job.analysis } : {}),
       });
@@ -237,19 +383,19 @@ function App() {
 
   async function process(item: UploadItem, updateUrl: boolean) {
     try {
-      if (!item.source) throw new Error("Demo source is unavailable");
+      if (!item.source) throw new Error(t("upload.unavailable"));
       const uploaded = await workbenchApi.uploadDemo(item.source);
       update(item.key, {
         state: "queued",
         progress: 0.05,
-        message: "Queued for analysis",
+        message: t("upload.queued"),
         job: uploaded.job,
       });
       await watchJob(item.key, uploaded.job.id, updateUrl);
     } catch (error) {
       update(item.key, {
         state: "failed",
-        message: error instanceof Error ? error.message : "Upload failed",
+        message: error instanceof Error ? error.message : t("upload.failed"),
       });
     }
   }
@@ -267,7 +413,10 @@ function App() {
           update(item.key, {
             state: "queued",
             progress: 0,
-            message: "Reanalyzing with the current engine",
+            message: tx(
+              "Reanalyzing with the current engine",
+              "Volviendo a analizar con el motor actual",
+            ),
             job,
           });
           await watchJob(item.key, job.id, false);
@@ -275,7 +424,9 @@ function App() {
       );
     } catch (error) {
       setUploadError(
-        error instanceof Error ? error.message : "Reanalysis failed",
+        error instanceof Error
+          ? error.message
+          : tx("Reanalysis failed", "El nuevo análisis falló"),
       );
     }
   }
@@ -285,11 +436,19 @@ function App() {
       file.name.toLowerCase().endsWith(".dem"),
     );
     if (!demos.length) {
-      setUploadError("Choose one or more .dem files.");
+      setUploadError(
+        tx("Choose one or more .dem files.", "Elige uno o más archivos .dem."),
+      );
       return;
     }
     if (items.length + demos.length > MAX_DEMOS) {
-      setUploadError(`You can analyze up to ${MAX_DEMOS} demos at once.`);
+      setUploadError(
+        tx(
+          "You can analyze up to {maximum} demos at once.",
+          "Puedes analizar hasta {maximum} demos a la vez.",
+          { maximum: MAX_DEMOS },
+        ),
+      );
       return;
     }
     setUploadError("");
@@ -299,7 +458,7 @@ function App() {
       source,
       state: "uploading" as const,
       progress: 0,
-      message: "Uploading demo",
+      message: tx("Uploading demo", "Subiendo demo"),
     }));
     setItems((current) => [...current, ...next]);
     const updateUrl = items.length === 0 && next.length === 1;
@@ -331,7 +490,7 @@ function App() {
               },
               state: "succeeded" as const,
               progress: 1,
-              message: "Analysis complete",
+              message: t("analysis.complete"),
               analysis,
             })),
           );
@@ -340,11 +499,13 @@ function App() {
           setItems([
             {
               key: `game:${id}:error`,
-              file: { name: "Saved game", size: 0 },
+              file: { name: tx("Saved game", "Partida guardada"), size: 0 },
               state: "failed",
               progress: 0,
               message:
-                error instanceof Error ? error.message : "Game not found",
+                error instanceof Error
+                  ? error.message
+                  : tx("Game not found", "Partida no encontrada"),
             },
           ]);
         },
@@ -364,10 +525,10 @@ function App() {
     setItems([
       {
         key,
-        file: { name: "Saved analysis", size: 0 },
+        file: { name: tx("Saved analysis", "Análisis guardado"), size: 0 },
         state: "running",
         progress: 0,
-        message: "Loading analysis",
+        message: tx("Loading analysis", "Cargando análisis"),
       },
     ]);
     void (async () => {
@@ -383,7 +544,7 @@ function App() {
               },
               state: "succeeded",
               progress: 1,
-              message: "Analysis complete",
+              message: t("analysis.complete"),
               job,
               analysis: job.analysis,
             },
@@ -401,7 +562,7 @@ function App() {
                   message:
                     error instanceof Error
                       ? error.message
-                      : "Analysis not found",
+                      : tx("Analysis not found", "Análisis no encontrado"),
                 }
               : item,
           ),
@@ -462,7 +623,9 @@ function App() {
   );
   useEffect(() => {
     if (!gameAnalyses.length) {
-      document.title = isWorking ? "Analyzing demos | L4DStats" : "L4DStats";
+      document.title = isWorking
+        ? tx("Analyzing demos | L4DStats", "Analizando demos | L4DStats")
+        : "L4DStats";
       return;
     }
     const campaign =
@@ -473,8 +636,19 @@ function App() {
     ).at(-1);
     document.title = finalScore?.complete
       ? `${campaign}: ${whole.format(finalScore.teamA)} - ${whole.format(finalScore.teamB ?? 0)} | L4DStats`
-      : `${campaign} analysis | L4DStats`;
-  }, [gameAnalyses, selectedCampaignName, canonicalScoreEntries, isWorking]);
+      : tx(
+          "{campaign} analysis | L4DStats",
+          "Análisis de {campaign} | L4DStats",
+          { campaign },
+        );
+  }, [
+    gameAnalyses,
+    selectedCampaignName,
+    canonicalScoreEntries,
+    isWorking,
+    locale,
+    tx,
+  ]);
   const visible = gameAnalyses.filter(
     (analysis) => !disabledDemos.includes(analysis.demoSha256),
   );
@@ -620,7 +794,7 @@ function App() {
       ref={input}
       hidden
       type="file"
-      aria-label="Choose demo files"
+      aria-label={t("upload.choose")}
       accept=".dem"
       multiple
       onChange={(event) => {
@@ -634,11 +808,11 @@ function App() {
     <div className={`stats-app phase-${phase}`}>
       {phase === "landing" && (
         <main className="landing-screen">
-          <h1 className="sr-only">L4DStats demo analyzer</h1>
+          <h1 className="sr-only">{t("analysis.heading")}</h1>
           <img
             className="landing-infected"
             src="/art/boomer-trace.webp"
-            alt="Illustrated bloated infected"
+            alt={t("analysis.illustration")}
           />
           <div className="poster-brand" aria-hidden="true">
             <BrandMark />
@@ -665,8 +839,8 @@ function App() {
           >
             {picker}
             <UploadCloud />
-            <span>DROP DEMOS</span>
-            <small>or choose .dem files · maximum {MAX_DEMOS}</small>
+            <span>{t("upload.drop")}</span>
+            <small>{t("upload.hint", { maximum: MAX_DEMOS })}</small>
             {uploadError && (
               <em className="upload-error" role="alert">
                 {uploadError}
@@ -687,17 +861,18 @@ function App() {
           />
           <div className="scanline" />
           <div className="loading-copy">
-            <span>RECONSTRUCTING THE VERSUS ROUND</span>
+            <span>{t("analysis.reconstructing")}</span>
             <h1>
-              THE HORDE
+              {t("analysis.horde")}
               <br />
-              LEAVES EVIDENCE<span>.</span>
+              {t("analysis.leavesEvidence")}
+              <span>.</span>
             </h1>
             <div className="loading-progress-meta">
               <strong>{Math.round(overallProgress * 100)}%</strong>
               <span>
                 {items.find((item) => item.state !== "succeeded")?.message ??
-                  "Safe room reached"}
+                  t("analysis.safeRoom")}
               </span>
             </div>
             <div className="master-progress">
@@ -747,7 +922,11 @@ function App() {
         <main className="results-screen">
           {picker}
           <div className="results-head">
-            <a className="grunge-wordmark" href="/" aria-label="L4DStats home">
+            <a
+              className="grunge-wordmark"
+              href="/"
+              aria-label={t("brand.home")}
+            >
               <BrandMark />
               <span>
                 L4D<b>STATS</b>
@@ -755,10 +934,10 @@ function App() {
             </a>
             <div>
               <span className="results-kicker">
-                ANALYSIS COMPLETE
+                {t("results.complete")}
                 <span className="results-parser-help">
                   <HeaderHelp
-                    label="Parser provenance"
+                    label={t("results.provenance")}
                     description={parserProvenance}
                   />
                 </span>
@@ -767,8 +946,9 @@ function App() {
                 {selectedGame
                   ? (selectedCampaignName ??
                     gameAnalyses[0]?.engineResult.demo.session?.campaign?.toUpperCase() ??
-                    "L4D2 GAME")
-                  : (analyses[0]?.engineResult.demo.mapName ?? "MATCH RESULTS")}
+                    t("results.defaultGame"))
+                  : (analyses[0]?.engineResult.demo.mapName ??
+                    t("results.defaultMatch"))}
               </h1>
             </div>
             <button
@@ -777,41 +957,39 @@ function App() {
               onClick={() => input.current?.click()}
             >
               <UploadCloud />{" "}
-              {items.length >= MAX_DEMOS ? "10 / 10 DEMOS" : "ADD DEMOS"}
+              {items.length >= MAX_DEMOS
+                ? t("results.demoLimit")
+                : t("results.addDemos")}
             </button>
           </div>
           <section className="results">
             {(hasLegacyAnalysis || hasOutdatedCompetitive) && (
               <aside className="legacy-analysis" role="status">
                 <div>
-                  <strong>Analysis update available</strong>
-                  <span>
-                    Re-run the selected demos to apply corrected hit HP,
-                    infected-kill semantics, and the latest competitive
-                    derivations.
-                  </span>
+                  <strong>{t("results.update")}</strong>
+                  <span>{t("results.updateDetail")}</span>
                 </div>
                 <button onClick={() => void reanalyzeLegacy()}>
-                  <RefreshCw /> Reanalyze
+                  <RefreshCw /> {t("results.reanalyze")}
                 </button>
               </aside>
             )}
             <div className="results-toolbar">
-              <nav aria-label="Statistics sections">
+              <nav aria-label={t("results.sections")}>
                 {TABS.map((value) => (
                   <button
                     key={value}
                     className={tab === value ? "active" : ""}
                     onClick={() => selectTab(value)}
                   >
-                    {value === "quality" ? "data coverage" : value}
+                    {t(`tabs.${value}`)}
                   </button>
                 ))}
               </nav>
               <div className="scope-filters">
                 {gameGroups.length > 1 && (
                   <label className="game-filter">
-                    <span>Game</span>
+                    <span>{t("filters.game")}</span>
                     <select
                       value={selectedGame ?? ""}
                       onChange={(event) => {
@@ -839,9 +1017,17 @@ function App() {
                         const campaignName = gameCampaignName(maps);
                         return (
                           <option key={gameId} value={gameId}>
-                            {campaignName ?? `Game ${index + 1}`} ·{" "}
-                            {maps.length} map
-                            {maps.length === 1 ? "" : "s"}
+                            {campaignName ??
+                              t("filters.gameNumber", {
+                                number: index + 1,
+                              })}{" "}
+                            ·{" "}
+                            {t(
+                              maps.length === 1
+                                ? "filters.mapCount"
+                                : "filters.mapCountPlural",
+                              { count: maps.length },
+                            )}
                           </option>
                         );
                       })}
@@ -861,7 +1047,11 @@ function App() {
                   }}
                 >
                   <summary>
-                    <Layers3 /> Maps {visible.length} / {gameAnalyses.length}
+                    <Layers3 />{" "}
+                    {t("filters.maps", {
+                      enabled: visible.length,
+                      total: gameAnalyses.length,
+                    })}
                     <ChevronDown />
                   </summary>
                   <div>
@@ -893,9 +1083,11 @@ function App() {
                               {analysis.engineResult.demo.mapName}
                             </strong>
                             <small>
-                              chapter{" "}
-                              {analysis.engineResult.demo.session?.chapter ??
-                                "N/A"}{" "}
+                              {t("filters.chapter", {
+                                chapter:
+                                  analysis.engineResult.demo.session?.chapter ??
+                                  t("common.notAvailable"),
+                              })}{" "}
                               · {analysis.demoSha256.slice(0, 8)}
                             </small>
                           </span>
@@ -917,8 +1109,11 @@ function App() {
                     }}
                   >
                     <summary>
-                      <Layers3 /> Rounds {enabledRoundCount} /{" "}
-                      {roundScopes.length}
+                      <Layers3 />{" "}
+                      {t("filters.rounds", {
+                        enabled: enabledRoundCount,
+                        total: roundScopes.length,
+                      })}
                       <ChevronDown />
                     </summary>
                     <div>
@@ -941,13 +1136,15 @@ function App() {
                             <span>
                               <strong>
                                 {half.id === "unknown"
-                                  ? "Observed round"
-                                  : `${half.id} half`}
+                                  ? t("filters.observedRound")
+                                  : t("filters.half", { half: half.id })}
                               </strong>
                               <small>
-                                {analysis.engineResult.demo.mapName} · ticks{" "}
-                                {whole.format(half.tickRange.start)} to{" "}
-                                {whole.format(half.tickRange.end)}
+                                {analysis.engineResult.demo.mapName} ·{" "}
+                                {t("filters.ticks", {
+                                  start: whole.format(half.tickRange.start),
+                                  end: whole.format(half.tickRange.end),
+                                })}
                               </small>
                             </span>
                           </label>
@@ -970,12 +1167,12 @@ function App() {
             )}
             {playerProfileRoute && !profilePlayer && (
               <section className="player-profile-missing" role="alert">
-                <h2>Player not found</h2>
-                <p>This identity is not present in the selected game data.</p>
+                <h2>{t("player.missing")}</h2>
+                <p>{t("player.missingDetail")}</p>
                 <a
                   href={`/game/${encodeURIComponent(selectedGame ?? playerProfileRoute.gameId)}/players`}
                 >
-                  Back to players
+                  {t("player.back")}
                 </a>
               </section>
             )}
@@ -983,22 +1180,22 @@ function App() {
             {!playerProfileRoute && selectedGame && (
               <aside className="game-grouping-note">
                 <strong>
-                  {gameAnalyses.length} maps grouped as one game
+                  {t("group.maps", { count: gameAnalyses.length })}
                   {gameConfidence === "high"
-                    ? " · high confidence"
+                    ? ` · ${t("group.highConfidence")}`
                     : gameConfidence === "provisional"
-                      ? " · provisional"
+                      ? ` · ${t("group.provisional")}`
                       : gameConfidence === "unassociated"
-                        ? " · unassociated"
+                        ? ` · ${t("group.unassociated")}`
                         : ""}
                 </strong>
                 <span>
                   {gameConfidence === "unassociated"
-                    ? "This map lacks enough compatible session evidence to merge safely."
+                    ? t("group.unassociatedDetail")
                     : gameConfidence === "provisional"
-                      ? "One map has strong session evidence. An adjacent compatible chapter is needed to confirm the game."
-                      : "Embedded server continuity, stable roster, campaign sequence, and Source server counters agree."}{" "}
-                  Disable a map or round above to recalculate every tab.
+                      ? t("group.provisionalDetail")
+                      : t("group.highDetail")}{" "}
+                  {t("group.recalculate")}
                 </span>
               </aside>
             )}
@@ -1103,6 +1300,7 @@ function Overview({
   scoreStats: DemoStats[];
   scoreAnalyses: JobAnalysis[];
 }) {
+  const { t } = useI18n();
   const ratings = rateGamePlayers(stats, players);
   const rankedRatings = [...ratings.players].sort(
     (left, right) =>
@@ -1127,6 +1325,7 @@ function Overview({
     }
   });
   const awardDefinitions: Array<{
+    id: string;
     label: string;
     unit: string;
     description: string;
@@ -1134,31 +1333,32 @@ function Overview({
     format?: (value: number) => string;
   }> = [
     {
-      label: "Most infected kills",
-      unit: "kills",
-      description:
-        "Total infected kills from the networked checkpoint counter. It includes Common and Special Infected and has no weapon attribution.",
+      id: "infectedKills",
+      label: t("awards.infectedKills"),
+      unit: t("awards.infectedKillsUnit"),
+      description: t("awards.infectedKillsHelp"),
       value: (player: PlayerStats) => player.checkpointInfectedKills ?? null,
     },
     {
-      label: "Most SI kills",
-      unit: "SI",
-      description: "Attributed Special Infected death events.",
+      id: "siKills",
+      label: t("awards.siKills"),
+      unit: t("awards.siUnit"),
+      description: t("awards.siKillsHelp"),
       value: (player: PlayerStats) => player.specialInfectedKills ?? null,
     },
     {
-      label: "Most Hunter kills",
-      unit: "Hunters",
-      description:
-        "Hunter death events. These are not claimed as airborne skeets.",
+      id: "hunterKills",
+      label: t("awards.hunterKills"),
+      unit: t("awards.hunterUnit"),
+      description: t("awards.hunterKillsHelp"),
       value: (player: PlayerStats) =>
         player.killsByInfectedClass?.Hunter ?? null,
     },
     {
-      label: "Most SI damage",
-      unit: "damage",
-      description:
-        "Engine checkpoint damage dealt while controlling non-Tank Special Infected.",
+      id: "siDamage",
+      label: t("awards.siDamage"),
+      unit: t("awards.damageUnit"),
+      description: t("awards.siDamageHelp"),
       value: (player: PlayerStats) => {
         const counters = [
           "m_checkpointPZHunterDamage",
@@ -1179,41 +1379,46 @@ function Overview({
       },
     },
     {
-      label: "Most clears",
-      unit: "clears",
-      description:
-        "Death-correlated teammate clears reconstructed from pin endings.",
+      id: "clears",
+      label: t("awards.clears"),
+      unit: t("awards.clearsUnit"),
+      description: t("awards.clearsHelp"),
       value: (player: PlayerStats) => clearTotals.get(player.id) ?? null,
     },
     {
-      label: "Most pin time",
-      unit: "seconds",
-      description: "Observed active SI control time across selected maps.",
+      id: "pinTime",
+      label: t("awards.pinTime"),
+      unit: t("awards.secondsUnit"),
+      description: t("awards.pinTimeHelp"),
       value: (player: PlayerStats) => player.pinSeconds ?? null,
       format: (value: number) => duration(value),
     },
     {
-      label: "Most revives",
-      unit: "revives",
-      description: "Networked checkpoint teammate revives.",
+      id: "revives",
+      label: t("awards.revives"),
+      unit: t("awards.revivesUnit"),
+      description: t("awards.revivesHelp"),
       value: (player: PlayerStats) => player.revives ?? null,
     },
     {
-      label: "Best pounce",
-      unit: "damage",
-      description: "Highest networked Hunter pounce-damage value.",
+      id: "bestPounce",
+      label: t("awards.bestPounce"),
+      unit: t("awards.damageUnit"),
+      description: t("awards.bestPounceHelp"),
       value: (player: PlayerStats) => player.highestPounceDamage ?? null,
     },
     {
-      label: "Most SI incaps",
-      unit: "incaps",
-      description: "Networked checkpoint Survivor incaps by SI.",
+      id: "siIncaps",
+      label: t("awards.siIncaps"),
+      unit: t("awards.incapsUnit"),
+      description: t("awards.siIncapsHelp"),
       value: (player: PlayerStats) => player.specialIncaps ?? null,
     },
     {
-      label: "Most Tank damage dealt",
-      unit: "damage",
-      description: "Engine checkpoint damage credited while controlling Tank.",
+      id: "tankDamage",
+      label: t("awards.tankDamage"),
+      unit: t("awards.damageUnit"),
+      description: t("awards.tankDamageHelp"),
       value: (player: PlayerStats) =>
         player.counters?.m_checkpointPZTankDamage ?? null,
     },
@@ -1283,15 +1488,23 @@ function Overview({
   const displayedScore = terminalScore?.complete
     ? terminalScore
     : latestConfirmedScore;
-  const winningTeam = terminalScore?.complete
+  const winningTeam: "a" | "b" | "draw" | null = terminalScore?.complete
     ? terminalScore.teamA === terminalScore.teamB
-      ? "Draw"
+      ? "draw"
       : terminalScore.teamA > (terminalScore.teamB ?? 0)
-        ? "Team A"
-        : "Team B"
+        ? "a"
+        : "b"
     : null;
   const winningScoreIndex =
-    winningTeam === "Team A" ? 0 : winningTeam === "Team B" ? 1 : null;
+    winningTeam === "a" ? 0 : winningTeam === "b" ? 1 : null;
+  const winningTeamLabel =
+    winningTeam === "a"
+      ? t("overview.teamA")
+      : winningTeam === "b"
+        ? t("overview.teamB")
+        : winningTeam === "draw"
+          ? t("overview.draw")
+          : null;
   const winningPlayerIds = new Set(
     winningScoreIndex !== null
       ? stats.flatMap((demo, demoIndex) => {
@@ -1331,30 +1544,36 @@ function Overview({
       {restartMaps > 0 && (
         <aside className="legacy-analysis restart-warning" role="status">
           <div>
-            <strong>Versus restart state observed</strong>
+            <strong>{t("overview.restartTitle")}</strong>
             <span>
-              {restartMaps} selected map{restartMaps === 1 ? "" : "s"} entered
-              the networked vote-restart state. Counter decreases remain reset
-              boundaries and are never subtracted from player output.
+              {t(
+                restartMaps === 1
+                  ? "overview.restartDetailOne"
+                  : "overview.restartDetailMany",
+                { count: restartMaps },
+              )}
             </span>
           </div>
           <SourceBadge kind="observed" />
         </aside>
       )}
-      <section className="rating-mvp overview-mvp" aria-label="Game MVP">
+      <section
+        className="rating-mvp overview-mvp"
+        aria-label={t("overview.gameMvp")}
+      >
         <div className="rating-crown">
           <MvpMark />
           <span>
             {ratings.mvp.status === "unavailable"
-              ? "MVP unavailable"
+              ? t("overview.mvpUnavailable")
               : ratings.mvp.status === "shared"
-                ? "MVP edge unresolved"
-                : "Game MVP"}
+                ? t("overview.mvpUnresolved")
+                : t("overview.gameMvp")}
           </span>
         </div>
         <strong>
           {ratings.mvp.status === "unavailable"
-            ? "Not enough eligible two-role data"
+            ? t("overview.mvpNoData")
             : mvpPlayers.map((player) => player.playerAlias).join(" · ")}
         </strong>
         {mvpPlayers.length > 0 && (
@@ -1373,11 +1592,20 @@ function Overview({
                       />
                     ) : null;
                   })()}
-                <b>{player.rating?.toFixed(2) ?? "N/A"}</b>
+                <b>{player.rating?.toFixed(2) ?? t("common.notAvailable")}</b>
                 <small>
-                  Survivor {player.survivor.score?.toFixed(2) ?? "N/A"} ·
-                  Infected {player.infected.score?.toFixed(2) ?? "N/A"} ·
-                  {pct(player.coverage)} coverage
+                  {t("player.survivorRating", {
+                    rating:
+                      player.survivor.score?.toFixed(2) ??
+                      t("common.notAvailable"),
+                  })}{" "}
+                  ·{" "}
+                  {t("player.infectedRating", {
+                    rating:
+                      player.infected.score?.toFixed(2) ??
+                      t("common.notAvailable"),
+                  })}{" "}
+                  · {t("overview.coverage", { value: pct(player.coverage) })}
                 </small>
               </span>
             ))}
@@ -1385,16 +1613,23 @@ function Overview({
         )}
         <small>
           {ratings.mvp.status === "shared"
-            ? `Leaders are within the declared ${ratings.mvp.resolution.toFixed(2)} resolution.`
-            : "Experimental L4DStats Rating v0.2 across the selected maps and rounds."}
+            ? t("overview.mvpShared", {
+                resolution: ratings.mvp.resolution.toFixed(2),
+              })
+            : t("overview.mvpMethod")}
         </small>
       </section>
       {spectators.length > 0 && (
         <details className="spectator-summary">
           <summary>
             <Users />
-            {spectators.length} spectator{spectators.length === 1 ? "" : "s"}
-            <span>excluded from player stats and ratings</span>
+            {t(
+              spectators.length === 1
+                ? "overview.spectatorOne"
+                : "overview.spectatorMany",
+              { count: spectators.length },
+            )}
+            <span>{t("overview.spectatorExcluded")}</span>
             <ChevronDown />
           </summary>
           <div>
@@ -1416,13 +1651,13 @@ function Overview({
         </details>
       )}
       {displayedScore && (
-        <article className="game-result" aria-label="Final Versus score">
+        <article className="game-result" aria-label={t("overview.finalScore")}>
           <div className="game-result-final">
             <span className="eyebrow">
               {terminalScore?.complete
-                ? "Final score"
-                : "Latest confirmed score"}{" "}
-              · neutral team index
+                ? t("overview.finalScore")
+                : t("overview.latestScore")}{" "}
+              · {t("overview.neutralIndex")}
             </span>
             <strong>
               <b>{whole.format(displayedScore.teamA)}</b>
@@ -1430,29 +1665,34 @@ function Overview({
               <b>{whole.format(displayedScore.teamB ?? 0)}</b>
             </strong>
             <span className={`game-winner ${winningTeam ? "" : "incomplete"}`}>
-              {winningTeam ?? "Final result unavailable"}
+              {winningTeamLabel ?? t("overview.finalUnavailable")}
             </span>
             <small>
               {!terminalScore?.complete
-                ? "The last demo ends after one side's score commits. A following map or second-half artifact is required before declaring the final result."
-                : winningTeam === "Draw"
-                  ? "The selected maps finish level."
-                  : `${winningTeam} wins. Roster-to-score naming remains unverified.`}
+                ? t("overview.scoreIncomplete")
+                : winningTeam === "draw"
+                  ? t("overview.drawDetail")
+                  : t("overview.winDetail", { team: winningTeamLabel ?? "" })}
             </small>
           </div>
-          <div className="map-score-strip" aria-label="Score after each map">
+          <div
+            className="map-score-strip"
+            aria-label={t("overview.scoreByMap")}
+          >
             {scoreRows.map((row, index) => (
               <div key={`${row.mapName}-${index}`}>
                 <span>{index + 1}</span>
                 <strong>{row.mapName}</strong>
                 <b>
                   {whole.format(row.teamA)} :{" "}
-                  {row.teamB === null ? "pending" : whole.format(row.teamB)}
+                  {row.teamB === null
+                    ? t("overview.pending")
+                    : whole.format(row.teamB)}
                 </b>
                 <small>
-                  chapter {whole.format(row.chapterA)} :{" "}
+                  {t("overview.chapter")} {whole.format(row.chapterA)} :{" "}
                   {row.chapterB === null
-                    ? "pending"
+                    ? t("overview.pending")
                     : whole.format(row.chapterB)}
                 </small>
               </div>
@@ -1463,10 +1703,8 @@ function Overview({
       <details className="round-progression-detail">
         <summary>
           <span>
-            <strong>Round progression and side detail</strong>
-            <small>
-              Score curves, Survivor distance and reconstructed halves
-            </small>
+            <strong>{t("overview.progressionDetail")}</strong>
+            <small>{t("overview.progressionDetailHelp")}</small>
           </span>
           <ChevronDown />
         </summary>
@@ -1497,35 +1735,40 @@ function Overview({
       <div className="metric-grid overview-metrics compact-mobile-metrics">
         <StatCard
           icon={Activity}
-          label="Play time"
+          label={t("overview.playTime")}
           value={duration(totals.duration)}
-          detail={`across ${totals.demos} demo${totals.demos === 1 ? "" : "s"}`}
+          detail={t(
+            totals.demos === 1
+              ? "overview.acrossDemoOne"
+              : "overview.acrossDemoMany",
+            { count: totals.demos },
+          )}
         />
         <StatCard
           icon={Users}
-          label="Players"
+          label={t("overview.players")}
           value={whole.format(totals.players)}
-          detail="unique competitive participants"
+          detail={t("overview.uniquePlayers")}
         />
         <StatCard
           icon={Activity}
-          label="Special Infected killed"
+          label={t("overview.siKilled")}
           value={whole.format(siKilled)}
-          detail="attributed death events"
+          detail={t("overview.attributedDeaths")}
         />
         <StatCard
           icon={ShieldAlert}
-          label="Survivor deaths"
+          label={t("overview.survivorDeaths")}
           value={whole.format(survivorDeaths)}
-          detail="across selected rounds"
+          detail={t("overview.selectedRounds")}
         />
       </div>
       <div className="overview-summary-grid">
         <article className="panel winning-team-panel">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">Final result</span>
-              <h3>Winning team</h3>
+              <span className="eyebrow">{t("overview.finalResult")}</span>
+              <h3>{t("overview.winningTeam")}</h3>
             </div>
             <Users />
           </div>
@@ -1547,7 +1790,7 @@ function Overview({
                       <a href={playersPath}>{player.playerAlias}</a>
                     )}
                     <span>
-                      {player.rating?.toFixed(2) ?? "N/A"}
+                      {player.rating?.toFixed(2) ?? t("common.notAvailable")}
                       <small>L4DStats</small>
                     </span>
                   </div>
@@ -1556,17 +1799,17 @@ function Overview({
             </div>
           ) : (
             <p className="muted">
-              {winningTeam === "Draw"
-                ? "The final score is tied."
-                : "A complete score and high-confidence side swap are required."}
+              {winningTeam === "draw"
+                ? t("overview.tied")
+                : t("overview.winnerUnavailable")}
             </p>
           )}
         </article>
         <article className="panel map-panel">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">Demo set</span>
-              <h3>Maps analyzed</h3>
+              <span className="eyebrow">{t("overview.demoSet")}</span>
+              <h3>{t("overview.mapsAnalyzed")}</h3>
             </div>
             <Layers3 />
           </div>
@@ -1579,24 +1822,28 @@ function Overview({
                 <div>
                   <strong>
                     {analyses[index]?.engineResult.demo.mapName ??
-                      "Unknown map"}
+                      t("overview.unknownMap")}
                   </strong>
                   <span>
                     {duration(value.durationSeconds)} ·{" "}
-                    {compact.format(value.observationCount)} observations
+                    {t("overview.observations", {
+                      count: compact.format(value.observationCount),
+                    })}
                   </span>
                 </div>
                 <b>
-                  {value.tickRate?.toFixed(0) ?? "N/A"}
-                  <small> tick</small>
+                  {value.tickRate?.toFixed(0) ?? t("common.notAvailable")}
+                  <small> {t("overview.tick")}</small>
                 </b>
                 {analyses[index]?.jobId && (
                   <a
                     className="analysis-link"
                     href={`/analysis/${encodeURIComponent(analyses[index].jobId)}/overview`}
-                    aria-label={`Open analysis for ${analyses[index].engineResult.demo.mapName}`}
+                    aria-label={t("overview.openAnalysis", {
+                      map: analyses[index].engineResult.demo.mapName,
+                    })}
                   >
-                    Open <ExternalLink />
+                    {t("overview.open")} <ExternalLink />
                   </a>
                 )}
               </div>
@@ -1607,8 +1854,8 @@ function Overview({
       <article className="panel leaderboard-panel awards-panel overview-awards">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">Competitive leaders</span>
-            <h3>Match awards</h3>
+            <span className="eyebrow">{t("overview.competitiveLeaders")}</span>
+            <h3>{t("overview.matchAwards")}</h3>
           </div>
           <Crosshair />
         </div>
@@ -1617,7 +1864,10 @@ function Overview({
             <article key={award.label}>
               <header>
                 <span>{award.label}</span>
-                <HeaderHelp label="About" description={award.description} />
+                <HeaderHelp
+                  label={t("overview.about")}
+                  description={award.description}
+                />
               </header>
               {award.leaders.length ? (
                 award.leaders.map(({ player, value }, index) => (
@@ -1636,11 +1886,11 @@ function Overview({
                 ))
               ) : (
                 <small>
-                  {award.label === "Most Tank damage dealt" && !award.observed
-                    ? "Reanalyze these demos to extract Tank damage"
+                  {award.id === "tankDamage" && !award.observed
+                    ? t("overview.reanalyzeTank")
                     : award.observed
-                      ? "No positive value in selected data"
-                      : "Unavailable in selected data"}
+                      ? t("overview.noPositive")
+                      : t("overview.unavailableSelected")}
                 </small>
               )}
             </article>
@@ -1652,6 +1902,7 @@ function Overview({
 }
 
 function VersusHalves({ stats }: { stats: DemoStats[] }) {
+  const { t, tx } = useI18n();
   const halves = stats.flatMap((demo, demoIndex) =>
     (demo.competitive?.halves ?? []).map((half) => ({ demo, demoIndex, half })),
   );
@@ -1666,21 +1917,23 @@ function VersusHalves({ stats }: { stats: DemoStats[] }) {
           <article className="panel half-card" key={`${demoIndex}-${half.id}`}>
             <div>
               <span className="eyebrow">
-                {half.id} half · neutral roster labels
+                {t("overview.halfLabel", { half: half.id })}
               </span>
               <b>
-                ticks {whole.format(half.tickRange.start)}–
-                {whole.format(half.tickRange.end)}
+                {tx("ticks {start}–{end}", "ticks {start}–{end}", {
+                  start: whole.format(half.tickRange.start),
+                  end: whole.format(half.tickRange.end),
+                })}
               </b>
             </div>
             <section>
-              <h3>Survivor side</h3>
+              <h3>{t("overview.survivorSide")}</h3>
               {half.survivorPlayerIds.map((id) => (
                 <span key={id}>{alias(id)}</span>
               ))}
             </section>
             <section>
-              <h3>Infected side</h3>
+              <h3>{t("overview.infectedSide")}</h3>
               {half.infectedPlayerIds.map((id) => (
                 <span key={id}>{alias(id)}</span>
               ))}
@@ -1697,6 +1950,7 @@ function ScoreProgression({
 }: {
   points: NonNullable<NonNullable<DemoStats["match"]>["scoreTimeline"]>;
 }) {
+  const { t } = useI18n();
   const width = 900;
   const height = 150;
   const maxTime = Math.max(1, ...points.map((point) => point.timeSeconds));
@@ -1719,25 +1973,22 @@ function ScoreProgression({
     <article className="panel score-progress">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Round progression</span>
-          <h3>Cumulative campaign score</h3>
+          <span className="eyebrow">{t("overview.roundProgression")}</span>
+          <h3>{t("overview.campaignScore")}</h3>
         </div>
         <span className="score-legend">
-          <i /> Team A <i /> Team B
+          <i /> {t("overview.teamA")} <i /> {t("overview.teamB")}
         </span>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label="Versus score over demo time"
+        aria-label={t("overview.scoreChart")}
       >
         <path className="score-a" d={path(0)} />
         <path className="score-b" d={path(1)} />
       </svg>
-      <small>
-        Tick-stamped cumulative game-rules values. Chapter score is already
-        included. Team indices are not inferred roster names.
-      </small>
+      <small>{t("overview.scoreChartHelp")}</small>
     </article>
   );
 }
@@ -1747,6 +1998,7 @@ function DistanceProgression({
 }: {
   points: NonNullable<NonNullable<DemoStats["match"]>["scoreTimeline"]>;
 }) {
+  const { t } = useI18n();
   const width = 900;
   const height = 150;
   const maxTime = Math.max(1, ...points.map((point) => point.timeSeconds));
@@ -1769,22 +2021,21 @@ function DistanceProgression({
     <article className="panel score-progress distance-progress">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Survivor progression</span>
-          <h3>Furthest engine-reported distance</h3>
+          <span className="eyebrow">{t("overview.survivorProgression")}</span>
+          <h3>{t("overview.distance")}</h3>
         </div>
-        <strong>{whole.format(maxDistance)} units</strong>
+        <strong>
+          {t("overview.units", { count: whole.format(maxDistance) })}
+        </strong>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label="Furthest Survivor distance over demo time"
+        aria-label={t("overview.distanceChart")}
       >
         <path d={path} />
       </svg>
-      <small>
-        Direct game-rules distance, not nav-flow percentage. Roster-to-score
-        team attribution remains unavailable.
-      </small>
+      <small>{t("overview.distanceHelp")}</small>
     </article>
   );
 }
@@ -1802,6 +2053,7 @@ function Players({
   analyses: JobAnalysis[];
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { t, tx } = useI18n();
   const [roleScope, setRoleScope] = useState<
     "overall" | "survivor" | "infected"
   >("overall");
@@ -1829,77 +2081,113 @@ function Players({
     roles: Array<typeof roleScope>;
     label: string;
     description: string;
+    source: SourceKind;
     value: (player: PlayerStats) => string | number;
   }> = [
     {
+      source: "event",
       roles: ["overall", "survivor"],
-      label: "SI kills",
-      description: "Special Infected you killed while playing Survivor.",
-      value: (player) => player.specialInfectedKills ?? "N/A",
-    },
-    {
-      roles: ["overall", "survivor"],
-      label: "All infected kills",
-      description:
-        "Total Common and Special Infected kills from the networked checkpoint counter. This is not a Common Infected total.",
-      value: (player) => player.checkpointInfectedKills ?? "N/A",
-    },
-    {
-      roles: ["overall", "survivor"],
-      label: "Surv deaths",
-      description:
-        "Deaths recorded while this player was on the Survivor side.",
-      value: (player) => player.survivorDeaths ?? "N/A",
-    },
-    {
-      roles: ["overall", "survivor"],
-      label: "Revives",
-      description:
-        "Incapacitated teammates this player helped back onto their feet.",
-      value: (player) => player.revives ?? "N/A",
-    },
-    {
-      roles: ["overall", "infected"],
-      label: "SI incaps",
-      description:
-        "Survivors this player incapacitated while controlling Special Infected.",
-      value: (player) => player.specialIncaps ?? "N/A",
-    },
-    {
-      roles: ["overall", "infected"],
-      label: "Pin time",
-      description:
-        "Observed time actively controlling a Survivor with a tongue, pounce, ride, carry, or pummel.",
+      label: tx("SI kills", "Bajas de IE"),
+      description: tx(
+        "Special Infected you killed while playing Survivor.",
+        "Infectados especiales que eliminaste mientras jugabas como superviviente.",
+      ),
       value: (player) =>
-        player.pinSeconds === undefined ? "N/A" : duration(player.pinSeconds),
+        player.specialInfectedKills ?? t("common.notAvailable"),
     },
     {
+      source: "counter",
+      roles: ["overall", "survivor"],
+      label: tx("All infected kills", "Bajas de todos los infectados"),
+      description: tx(
+        "Total Common and Special Infected kills from the networked checkpoint counter. This is not a Common Infected total.",
+        "Bajas totales de infectados comunes y especiales según el contador de checkpoint de red. No es un total exclusivo de infectados comunes.",
+      ),
+      value: (player) =>
+        player.checkpointInfectedKills ?? t("common.notAvailable"),
+    },
+    {
+      source: "event",
+      roles: ["overall", "survivor"],
+      label: tx("Surv deaths", "Muertes de superviviente"),
+      description: tx(
+        "Deaths recorded while this player was on the Survivor side.",
+        "Muertes registradas mientras este jugador estaba en el bando superviviente.",
+      ),
+      value: (player) => player.survivorDeaths ?? t("common.notAvailable"),
+    },
+    {
+      source: "counter",
+      roles: ["overall", "survivor"],
+      label: t("player.revives"),
+      description: tx(
+        "Incapacitated teammates this player helped back onto their feet.",
+        "Compañeros incapacitados a quienes este jugador ayudó a levantarse.",
+      ),
+      value: (player) => player.revives ?? t("common.notAvailable"),
+    },
+    {
+      source: "counter",
       roles: ["overall", "infected"],
-      label: "SI deaths",
-      description:
+      label: t("player.siIncaps"),
+      description: tx(
+        "Survivors this player incapacitated while controlling Special Infected.",
+        "Supervivientes que este jugador incapacitó mientras controlaba infectados especiales.",
+      ),
+      value: (player) => player.specialIncaps ?? t("common.notAvailable"),
+    },
+    {
+      source: "sampled",
+      roles: ["overall", "infected"],
+      label: t("player.pinTime"),
+      description: tx(
+        "Observed time actively controlling a Survivor with a tongue, pounce, ride, carry, or pummel.",
+        "Tiempo observado controlando activamente a un superviviente con lengua, abalanzamiento, montura, carga o golpeo.",
+      ),
+      value: (player) =>
+        player.pinSeconds === undefined
+          ? t("common.notAvailable")
+          : duration(player.pinSeconds),
+    },
+    {
+      source: "event",
+      roles: ["overall", "infected"],
+      label: t("player.siDeaths"),
+      description: tx(
         "Deaths recorded across this player's Special Infected lives.",
-      value: (player) => player.infectedDeaths ?? "N/A",
+        "Muertes registradas durante las vidas de infectado especial de este jugador.",
+      ),
+      value: (player) => player.infectedDeaths ?? t("common.notAvailable"),
     },
     {
+      source: "counter",
       roles: ["overall", "infected"],
-      label: "Best pounce",
-      description:
+      label: t("player.bestPounce"),
+      description: tx(
         "Highest networked Hunter pounce-damage value observed in the demo.",
-      value: (player) => player.highestPounceDamage ?? "N/A",
+        "Mayor valor de daño de abalanzamiento de Hunter observado en la demo.",
+      ),
+      value: (player) => player.highestPounceDamage ?? t("common.notAvailable"),
     },
     {
+      source: "derived",
       roles: ["overall"],
-      label: "Tracked",
-      description:
+      label: tx("Tracked", "Seguimiento"),
+      description: tx(
         "How long this player epoch was reconstructed from network snapshots.",
+        "Duración durante la cual se reconstruyó esta época del jugador a partir de capturas de red.",
+      ),
       value: (player) => duration(player.durationSeconds),
     },
     {
+      source: "derived",
       roles: ["overall"],
-      label: "Signals",
-      description:
+      label: tx("Signals", "Señales"),
+      description: tx(
         "Detector windows marked for human review. Signals are not cheating verdicts.",
-      value: (player) => player.evidenceWindows || "N/A",
+        "Ventanas del detector marcadas para revisión humana. Las señales no son veredictos de trampas.",
+      ),
+      value: (player) => player.evidenceWindows || t("common.notAvailable"),
     },
   ];
   const visibleColumns = statColumns.filter((column) =>
@@ -1909,18 +2197,27 @@ function Players({
     <div className="tab-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Player breakdown</span>
+          <span className="eyebrow">
+            {tx("Player breakdown", "Desglose de jugadores")}
+          </span>
           <h2>
-            {players.length} player{players.length === 1 ? "" : "s"}
+            {tx(
+              players.length === 1 ? "1 player" : "{count} players",
+              players.length === 1 ? "1 jugador" : "{count} jugadores",
+              { count: players.length },
+            )}
           </h2>
         </div>
         <span className="muted">
-          Embedded Steam identities when available, aliases otherwise
+          {tx(
+            "Embedded Steam identities when available, aliases otherwise",
+            "Identidades de Steam integradas cuando están disponibles; alias en caso contrario",
+          )}
         </span>
       </div>
       <div className="player-scope-bar">
         <div>
-          <span>Role</span>
+          <span>{tx("Role", "Rol")}</span>
           {(["overall", "survivor", "infected"] as const).map((role) => (
             <button
               type="button"
@@ -1929,19 +2226,23 @@ function Players({
               aria-pressed={roleScope === role}
               onClick={() => setRoleScope(role)}
             >
-              {role}
+              {role === "overall"
+                ? tx("overall", "general")
+                : role === "survivor"
+                  ? tx("survivor", "superviviente")
+                  : tx("infected", "infectado")}
             </button>
           ))}
         </div>
         <div>
-          <span>Map</span>
+          <span>{t("player.map")}</span>
           <button
             type="button"
             className={mapScope === "all" ? "active" : ""}
             aria-pressed={mapScope === "all"}
             onClick={() => setMapScope("all")}
           >
-            All maps
+            {tx("All maps", "Todos los mapas")}
           </button>
           {analyses.map((analysis) => (
             <button
@@ -1961,11 +2262,14 @@ function Players({
         <table>
           <thead>
             <tr>
-              <th>Player</th>
+              <th>{tx("Player", "Jugador")}</th>
               <th>
                 <HeaderHelp
-                  label="Rating"
-                  description="Experimental selected-game L4DStats Match Rating. Overall requires eligible Survivor and Infected role scores."
+                  label={tx("Rating", "Puntuación")}
+                  description={tx(
+                    "Experimental selected-game L4DStats Match Rating. Overall requires eligible Survivor and Infected role scores.",
+                    "Puntuación experimental L4DStats de la partida seleccionada. La puntuación general requiere resultados válidos de los roles de superviviente e infectado.",
+                  )}
                 />
               </th>
               {visibleColumns.map((column) => (
@@ -1973,6 +2277,7 @@ function Players({
                   <HeaderHelp
                     label={column.label}
                     description={column.description}
+                    source={column.source}
                   />
                 </th>
               ))}
@@ -1991,8 +2296,16 @@ function Players({
                         <strong>{player.alias}</strong>
                       )}
                       {player.identity?.inference === "unique-slot-v1" && (
-                        <small title="The entity slot exposed one unique human identity later in this demo.">
-                          identity inferred from unique demo slot
+                        <small
+                          title={tx(
+                            "The entity slot exposed one unique human identity later in this demo.",
+                            "La ranura de entidad mostró una única identidad humana más adelante en esta demo.",
+                          )}
+                        >
+                          {tx(
+                            "identity inferred from unique demo slot",
+                            "identidad inferida de una ranura única de la demo",
+                          )}
                         </small>
                       )}
                     </span>
@@ -2008,7 +2321,9 @@ function Players({
                           : roleScope === "infected"
                             ? rating?.infected.score
                             : rating?.rating;
-                      return value == null ? "N/A" : value.toFixed(2);
+                      return value == null
+                        ? t("common.notAvailable")
+                        : value.toFixed(2);
                     })()}
                   </strong>
                 </td>
@@ -2023,9 +2338,14 @@ function Players({
       <details className="advanced-player-data">
         <summary>
           <span>
-            <strong>Map and round detail</strong>
+            <strong>
+              {tx("Map and round detail", "Detalle de mapas y rondas")}
+            </strong>
             <small>
-              Rosters, per-half scoreboards, loadouts, ammo and health traces
+              {tx(
+                "Rosters, per-half scoreboards, loadouts, ammo and health traces",
+                "Plantillas, marcadores por mitad, equipamiento y trazas de munición y salud",
+              )}
             </small>
           </span>
           <ChevronDown />
@@ -2054,6 +2374,7 @@ function PlayerRatings({
   gameId: string | null;
   players: PlayerStats[];
 }) {
+  const { locale, t, tx } = useI18n();
   const ranked = [...ratings.players].sort(
     (left, right) =>
       (right.rating ?? Number.NEGATIVE_INFINITY) -
@@ -2062,21 +2383,33 @@ function PlayerRatings({
       left.playerAlias.localeCompare(right.playerAlias),
   );
   const score = (value: number | null) =>
-    value === null ? "N/A" : value.toFixed(2);
+    value === null ? t("common.notAvailable") : value.toFixed(2);
   return (
-    <section className="rating-section" aria-label="L4DStats player ratings">
+    <section
+      className="rating-section"
+      aria-label={tx(
+        "L4DStats player ratings",
+        "Puntuaciones de jugadores de L4DStats",
+      )}
+    >
       <div className="rating-intro">
         <div>
-          <span className="eyebrow">Experimental match model v0.2</span>
+          <span className="eyebrow">
+            {tx(
+              "Experimental match model v0.2",
+              "Modelo experimental de partida v0.2",
+            )}
+          </span>
           <h3>
-            L4DStats Rating <SourceBadge kind="derived" />
+            {tx("L4DStats Rating", "Puntuación L4DStats")}{" "}
+            <SourceBadge kind="derived" />
           </h3>
         </div>
         <p>
-          A 1.00-neutral, selected-game performance index. Survivor and Infected
-          contribution are rated separately, opportunity-normalized, shrunk
-          toward neutral for short samples, then combined 50/50 only when both
-          roles qualify. It is not career skill or win probability.
+          {tx(
+            "A 1.00-neutral, selected-game performance index. Survivor and Infected contribution are rated separately, opportunity-normalized, shrunk toward neutral for short samples, then combined 50/50 only when both roles qualify. It is not career skill or win probability.",
+            "Un índice de rendimiento de la partida seleccionada con 1,00 como valor neutral. Las contribuciones como superviviente e infectado se puntúan por separado, se normalizan por oportunidad, se acercan al valor neutral en muestras cortas y solo se combinan al 50 % cuando ambos roles cumplen los requisitos. No mide la habilidad histórica ni la probabilidad de victoria.",
+          )}
         </p>
       </div>
       <div className="rating-grid">
@@ -2096,8 +2429,14 @@ function PlayerRatings({
                   );
                 })()}
                 <small>
-                  {player.confidence} confidence · {pct(player.coverage)} model
-                  coverage
+                  {tx(
+                    "{confidence} confidence · {coverage} model coverage",
+                    "confianza {confidence} · {coverage} de cobertura del modelo",
+                    {
+                      confidence: player.confidence,
+                      coverage: pct(player.coverage),
+                    },
+                  )}
                 </small>
               </span>
               <b>{score(player.rating)}</b>
@@ -2107,14 +2446,22 @@ function PlayerRatings({
               {[player.survivor, player.infected].map((role) => (
                 <section key={role.role}>
                   <header>
-                    <span>{role.role}</span>
+                    <span>
+                      {role.role === "survivor"
+                        ? tx("survivor", "superviviente")
+                        : tx("infected", "infectado")}
+                    </span>
                     <b>{score(role.score)}</b>
-                    <small>{pct(role.coverage)} coverage</small>
+                    <small>
+                      {tx("{coverage} coverage", "{coverage} de cobertura", {
+                        coverage: pct(role.coverage),
+                      })}
+                    </small>
                   </header>
                   {role.pillars.map((pillar) => (
                     <div className="rating-pillar" key={pillar.name}>
                       <span>
-                        {pillar.name}
+                        {localizeRatingCopy(pillar.name, locale)}
                         <b>
                           {pillar.score.toFixed(2)} · {pct(pillar.coverage)}
                         </b>
@@ -2123,8 +2470,10 @@ function PlayerRatings({
                         {pillar.metrics.map((metric) => (
                           <li key={metric.key}>
                             <span>
-                              {metric.label}
-                              <small>{metric.source}</small>
+                              {localizeRatingCopy(metric.label, locale)}
+                              <small>
+                                {localizeRatingCopy(metric.source, locale)}
+                              </small>
                             </span>
                             <b>
                               {metric.contribution >= 0 ? "+" : ""}
@@ -2137,8 +2486,10 @@ function PlayerRatings({
                   ))}
                   {!role.eligible && (
                     <p>
-                      Role rating withheld: requires sufficient opportunity, at
-                      least two pillars and 70% planned coverage.
+                      {tx(
+                        "Role rating withheld: requires sufficient opportunity, at least two pillars and 70% planned coverage.",
+                        "Puntuación del rol retenida: requiere suficientes oportunidades, al menos dos pilares y un 70 % de cobertura prevista.",
+                      )}
                     </p>
                   )}
                 </section>
@@ -2149,19 +2500,22 @@ function PlayerRatings({
       </div>
       <details className="rating-method">
         <summary>
-          Formula, scientific status and limitations <ChevronDown />
+          {tx(
+            "Formula, scientific status and limitations",
+            "Fórmula, estado científico y limitaciones",
+          )}{" "}
+          <ChevronDown />
         </summary>
         <div>
           <p>
-            Every metric is expressed per relevant opportunity, compared with
-            observed peers, capped to limit outliers, and shrunk by exposure.
-            Missing telemetry is omitted and weights are renormalized visibly.
-            This experimental game-relative baseline will be replaced by a
-            frozen external cohort only after enough comparable games exist.
+            {tx(
+              "Every metric is expressed per relevant opportunity, compared with observed peers, capped to limit outliers, and shrunk by exposure. Missing telemetry is omitted and weights are renormalized visibly. This experimental game-relative baseline will be replaced by a frozen external cohort only after enough comparable games exist.",
+              "Cada métrica se expresa por oportunidad relevante, se compara con los jugadores observados, se limita para reducir valores atípicos y se ajusta según la exposición. La telemetría ausente se omite y los pesos se normalizan de nuevo de forma visible. Esta referencia experimental relativa a la partida se sustituirá por una cohorte externa congelada cuando existan suficientes partidas comparables.",
+            )}
           </p>
           <ul>
             {ratings.limitations.map((limitation) => (
-              <li key={limitation}>{limitation}</li>
+              <li key={limitation}>{localizeRatingCopy(limitation, locale)}</li>
             ))}
           </ul>
         </div>
@@ -2177,6 +2531,7 @@ function VersusRosters({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
+  const { tx } = useI18n();
   const demos = stats.flatMap((demo, index) =>
     demo.competitive?.rosters?.length
       ? [
@@ -2185,7 +2540,8 @@ function VersusRosters({
             index,
             rosters: demo.competitive.rosters,
             mapName:
-              analyses[index]?.engineResult.demo.mapName ?? `Map ${index + 1}`,
+              analyses[index]?.engineResult.demo.mapName ??
+              tx("Map {number}", "Mapa {number}", { number: index + 1 }),
           },
         ]
       : [],
@@ -2195,15 +2551,22 @@ function VersusRosters({
     <section className="roster-reconstruction">
       <div className="scoreboard-explainer">
         <div>
-          <span className="eyebrow">Neutral rosters</span>
+          <span className="eyebrow">
+            {tx("Neutral rosters", "Plantillas neutrales")}
+          </span>
           <h3>
-            Side-swap reconstruction <SourceBadge kind="derived" />
+            {tx(
+              "Side-swap reconstruction",
+              "Reconstrucción del cambio de bando",
+            )}{" "}
+            <SourceBadge kind="derived" />
           </h3>
         </div>
         <p>
-          Roster A starts from the earliest observed Survivor side and Roster B
-          from the opposing side. Membership is followed through the swap. These
-          neutral labels are not engine Team A or Team B score indices.
+          {tx(
+            "Roster A starts from the earliest observed Survivor side and Roster B from the opposing side. Membership is followed through the swap. These neutral labels are not engine Team A or Team B score indices.",
+            "La plantilla A parte del primer bando superviviente observado y la plantilla B del bando opuesto. La pertenencia se sigue durante el cambio. Estas etiquetas neutrales no son los índices de puntuación Equipo A o Equipo B del motor.",
+          )}
         </p>
       </div>
       <div className="roster-grid">
@@ -2214,8 +2577,12 @@ function VersusRosters({
               {rosters.map((roster) => (
                 <section key={roster.id}>
                   <h4>
-                    Roster {roster.id}
-                    <small>{roster.confidence}</small>
+                    {tx("Roster {id}", "Plantilla {id}", { id: roster.id })}
+                    <small>
+                      {roster.confidence === "high"
+                        ? tx("high", "alta")
+                        : tx("provisional", "provisional")}
+                    </small>
                   </h4>
                   <p>
                     {roster.playerIds
@@ -2224,7 +2591,8 @@ function VersusRosters({
                           demo.players.find((player) => player.id === id)
                             ?.alias ?? id.slice(0, 8),
                       )
-                      .join(" · ") || "Membership unavailable"}
+                      .join(" · ") ||
+                      tx("Membership unavailable", "Pertenencia no disponible")}
                   </p>
                   <span>
                     {roster.sides
@@ -2250,6 +2618,7 @@ function SurvivorLoadouts({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
+  const { tx } = useI18n();
   const maps = stats.flatMap((demo, demoIndex) => {
     const traces = demo.survivorLoadoutTraces ?? [];
     const ammoTraces = demo.survivorAmmoTraces ?? [];
@@ -2258,7 +2627,7 @@ function SurvivorLoadouts({
           {
             mapName:
               analyses[demoIndex]?.engineResult.demo.mapName ??
-              `Map ${demoIndex + 1}`,
+              tx("Map {number}", "Mapa {number}", { number: demoIndex + 1 }),
             traces,
             ammoTraces,
           },
@@ -2274,20 +2643,28 @@ function SurvivorLoadouts({
       | null
       | undefined,
   ) =>
-    value === undefined ? "Unavailable" : value === null ? "Empty" : value.name;
+    value === undefined
+      ? tx("Unavailable", "No disponible")
+      : value === null
+        ? tx("Empty", "Vacío")
+        : value.name;
   return (
     <section className="loadout-section">
       <div className="scoreboard-explainer">
         <div>
-          <span className="eyebrow">Survivor resources</span>
+          <span className="eyebrow">
+            {tx("Survivor resources", "Recursos de supervivientes")}
+          </span>
           <h3>
-            Networked loadouts <SourceBadge kind="sampled" />
+            {tx("Networked loadouts", "Equipamiento de red")}{" "}
+            <SourceBadge kind="sampled" />
           </h3>
         </div>
         <p>
-          Primary, first-aid and temporary-health slots come directly from the
-          player-resource entity. A change proves observed possession changed,
-          but does not prove who supplied an item or why it disappeared.
+          {tx(
+            "Primary, first-aid and temporary-health slots come directly from the player-resource entity. A change proves observed possession changed, but does not prove who supplied an item or why it disappeared.",
+            "Las ranuras de arma principal, primeros auxilios y salud temporal proceden directamente de la entidad de recursos del jugador. Un cambio demuestra que cambió la posesión observada, pero no quién proporcionó un objeto ni por qué desapareció.",
+          )}
         </p>
       </div>
       <div className="loadout-maps">
@@ -2295,10 +2672,20 @@ function SurvivorLoadouts({
           <article key={`${map.mapName}-${mapIndex}`}>
             <header>
               <div>
-                <span className="eyebrow">Map {mapIndex + 1}</span>
+                <span className="eyebrow">
+                  {tx("Map {number}", "Mapa {number}", {
+                    number: mapIndex + 1,
+                  })}
+                </span>
                 <h3>{map.mapName}</h3>
               </div>
-              <span>{map.traces.length} Survivor loadouts</span>
+              <span>
+                {tx(
+                  "{count} Survivor loadouts",
+                  "{count} equipamientos de superviviente",
+                  { count: map.traces.length },
+                )}
+              </span>
             </header>
             <div className="loadout-grid">
               {map.traces.map((trace) => {
@@ -2320,44 +2707,75 @@ function SurvivorLoadouts({
                     <div className="loadout-player">
                       <strong>{trace.playerAlias}</strong>
                       <small>
-                        {trace.points.length} observed state
-                        {trace.points.length === 1 ? "" : "s"}
+                        {tx(
+                          trace.points.length === 1
+                            ? "1 observed state"
+                            : "{count} observed states",
+                          trace.points.length === 1
+                            ? "1 estado observado"
+                            : "{count} estados observados",
+                          { count: trace.points.length },
+                        )}
                       </small>
                     </div>
                     <dl>
                       <div>
-                        <dt>Primary</dt>
+                        <dt>{tx("Primary", "Principal")}</dt>
                         <dd>{itemName(last?.primaryWeapon)}</dd>
                       </div>
                       <div>
-                        <dt>First aid</dt>
+                        <dt>{tx("First aid", "Primeros auxilios")}</dt>
                         <dd>{itemName(last?.firstAid)}</dd>
                       </div>
                       <div>
-                        <dt>Temp health</dt>
+                        <dt>{tx("Temp health", "Salud temporal")}</dt>
                         <dd>{itemName(last?.temporaryHealth)}</dd>
                       </div>
                     </dl>
                     <div className="loadout-coverage">
-                      <span>{pct(trace.coverage.primaryWeapon)} primary</span>
-                      <span>{pct(trace.coverage.firstAid)} aid</span>
-                      <span>{pct(trace.coverage.temporaryHealth)} temp</span>
+                      <span>
+                        {tx("{value} primary", "{value} principal", {
+                          value: pct(trace.coverage.primaryWeapon),
+                        })}
+                      </span>
+                      <span>
+                        {tx("{value} aid", "{value} auxilios", {
+                          value: pct(trace.coverage.firstAid),
+                        })}
+                      </span>
+                      <span>
+                        {tx("{value} temp", "{value} temporal", {
+                          value: pct(trace.coverage.temporaryHealth),
+                        })}
+                      </span>
                     </div>
                     {ammo && latestAmmo && (
                       <div className="ammo-state">
                         <div>
-                          <span>Sampled active ammo</span>
+                          <span>
+                            {tx(
+                              "Sampled active ammo",
+                              "Munición activa muestreada",
+                            )}
+                          </span>
                           <strong>
                             {latestAmmo.clip ?? "?"} /{" "}
                             {latestAmmo.reserve ?? "?"}
                           </strong>
-                          <small>{pct(ammo.coverage)} coverage</small>
+                          <small>
+                            {tx("{value} coverage", "{value} de cobertura", {
+                              value: pct(ammo.coverage),
+                            })}
+                          </small>
                         </div>
                         <svg
                           viewBox={`0 0 ${Math.max(1, ammoValues.length - 1)} 24`}
                           preserveAspectRatio="none"
                           role="img"
-                          aria-label="Sampled total clip and reserve ammo over time"
+                          aria-label={tx(
+                            "Sampled total clip and reserve ammo over time",
+                            "Munición total muestreada en cargador y reserva a lo largo del tiempo",
+                          )}
                         >
                           <polyline
                             points={ammoValues
@@ -2373,7 +2791,7 @@ function SurvivorLoadouts({
                     {trace.points.length > 1 && (
                       <details>
                         <summary>
-                          {itemName(first?.primaryWeapon)} to{" "}
+                          {itemName(first?.primaryWeapon)} {tx("to", "a")}{" "}
                           {itemName(last?.primaryWeapon)}
                           <ChevronDown />
                         </summary>
@@ -2399,9 +2817,10 @@ function SurvivorLoadouts({
         ))}
       </div>
       <p className="data-caveat">
-        Ammo is sampled network state. Drops can include firing, reloads, weapon
-        swaps or discarded weapons, so this view does not infer shots, hits or
-        accuracy.
+        {tx(
+          "Ammo is sampled network state. Drops can include firing, reloads, weapon swaps or discarded weapons, so this view does not infer shots, hits or accuracy.",
+          "La munición es un estado de red muestreado. Las disminuciones pueden deberse a disparos, recargas, cambios o armas descartadas; por eso esta vista no infiere disparos, impactos ni precisión.",
+        )}
       </p>
     </section>
   );
@@ -2416,6 +2835,7 @@ function SurvivorHealthTraces({
   analyses: JobAnalysis[];
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { tx } = useI18n();
   const demos = stats.flatMap((demo, index) =>
     demo.survivorHealthTraces?.length
       ? [
@@ -2424,7 +2844,8 @@ function SurvivorHealthTraces({
             duration: Math.max(1, demo.durationSeconds),
             traces: demo.survivorHealthTraces,
             mapName:
-              analyses[index]?.engineResult.demo.mapName ?? `Demo ${index + 1}`,
+              analyses[index]?.engineResult.demo.mapName ??
+              tx("Demo {number}", "Demo {number}", { number: index + 1 }),
             demoSha256: analyses[index]?.demoSha256,
           },
         ]
@@ -2457,38 +2878,58 @@ function SurvivorHealthTraces({
       })
       .join(" ");
   return (
-    <section className="health-traces" aria-label="Sampled Survivor health">
+    <section
+      className="health-traces"
+      aria-label={tx(
+        "Sampled Survivor health",
+        "Salud muestreada de supervivientes",
+      )}
+    >
       <div className="scoreboard-explainer">
         <div>
-          <span className="eyebrow">Survivor state</span>
+          <span className="eyebrow">
+            {tx("Survivor state", "Estado de supervivientes")}
+          </span>
           <h3>
-            Sampled health traces <SourceBadge kind="sampled" />
+            {tx("Sampled health traces", "Trazas de salud muestreadas")}{" "}
+            <SourceBadge kind="sampled" />
           </h3>
         </div>
         <p>
-          Green is permanent health. Blue is the raw networked temporary-health
-          buffer, not calculated effective health. Sampling can miss changes, so
-          these traces are lower-bound review evidence, not damage attribution.
+          {tx(
+            "Green is permanent health. Blue is the raw networked temporary-health buffer, not calculated effective health. Sampling can miss changes, so these traces are lower-bound review evidence, not damage attribution.",
+            "El verde representa salud permanente. El azul es el búfer bruto de salud temporal de red, no la salud efectiva calculada. El muestreo puede omitir cambios, así que estas trazas son evidencia mínima para revisión, no atribución de daño.",
+          )}
         </p>
       </div>
       {demos.map((demo) => (
         <article className="panel health-trace-card" key={demo.index}>
           <header>
             <div>
-              <span className="eyebrow">Map {demo.index + 1}</span>
+              <span className="eyebrow">
+                {tx("Map {number}", "Mapa {number}", {
+                  number: demo.index + 1,
+                })}
+              </span>
               <h3>{demo.mapName}</h3>
             </div>
             <span>
-              <i className="health-key permanent" /> permanent
-              <i className="health-key buffer" /> raw buffer
-              <i className="health-key incap" /> incap
+              <i className="health-key permanent" />{" "}
+              {tx("permanent", "permanente")}
+              <i className="health-key buffer" />{" "}
+              {tx("raw buffer", "búfer bruto")}
+              <i className="health-key incap" /> {tx("incap", "incapacitación")}
             </span>
           </header>
           <div className="health-trace-scroll">
             <svg
               viewBox={`0 0 ${width} ${demo.traces.length * rowHeight}`}
               role="img"
-              aria-label={`Sampled Survivor health on ${demo.mapName}`}
+              aria-label={tx(
+                "Sampled Survivor health on {map}",
+                "Salud muestreada de supervivientes en {map}",
+                { map: demo.mapName },
+              )}
             >
               {demo.traces.map((trace, row) => (
                 <g key={trace.playerId}>
@@ -2531,7 +2972,11 @@ function SurvivorHealthTraces({
                         className="health-incap"
                         role="button"
                         tabIndex={0}
-                        aria-label={`View ${trace.playerAlias} incap at tick ${point.tick} on timeline`}
+                        aria-label={tx(
+                          "View {player} incap at tick {tick} on timeline",
+                          "Ver la incapacitación de {player} en el tick {tick} en la cronología",
+                          { player: trace.playerAlias, tick: point.tick },
+                        )}
                         onClick={() => {
                           if (demo.demoSha256)
                             onOpenTimeline(demo.demoSha256, point.tick);
@@ -2547,15 +2992,28 @@ function SurvivorHealthTraces({
                         }}
                       >
                         <title>
-                          {trace.playerAlias}, incap at tick{" "}
-                          {whole.format(point.tick)}
+                          {tx(
+                            "{player}, incap at tick {tick}",
+                            "{player}, incapacitación en el tick {tick}",
+                            {
+                              player: trace.playerAlias,
+                              tick: whole.format(point.tick),
+                            },
+                          )}
                         </title>
                       </circle>
                     ))}
                   <title>
-                    {trace.playerAlias}: {pct(trace.healthCoverage)} health
-                    coverage, {pct(trace.bufferCoverage)} buffer coverage,{" "}
-                    {whole.format(trace.sourceSamples)} source samples
+                    {tx(
+                      "{player}: {health} health coverage, {buffer} buffer coverage, {samples} source samples",
+                      "{player}: {health} de cobertura de salud, {buffer} de cobertura de búfer, {samples} muestras de origen",
+                      {
+                        player: trace.playerAlias,
+                        health: pct(trace.healthCoverage),
+                        buffer: pct(trace.bufferCoverage),
+                        samples: whole.format(trace.sourceSamples),
+                      },
+                    )}
                   </title>
                 </g>
               ))}
@@ -2610,6 +3068,29 @@ function HalfScoreboards({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
+  const { tx } = useI18n();
+  const help = (
+    label: string,
+    labelEs: string,
+    description: string,
+    descriptionEs: string,
+  ) => {
+    const derived = new Set(["Tank share", "Controls", "Lives"]);
+    const sampled = new Set(["Pin time"]);
+    return (
+      <HeaderHelp
+        label={tx(label, labelEs)}
+        description={tx(description, descriptionEs)}
+        source={
+          derived.has(label)
+            ? "derived"
+            : sampled.has(label)
+              ? "sampled"
+              : "counter"
+        }
+      />
+    );
+  };
   const records = stats.flatMap((demo, demoIndex) =>
     (demo.competitive?.halves ?? []).map((half) => ({
       demo,
@@ -2617,20 +3098,32 @@ function HalfScoreboards({
       half,
       mapName:
         analyses[demoIndex]?.engineResult.demo.mapName ??
-        `Map ${demoIndex + 1}`,
+        tx("Map {number}", "Mapa {number}", { number: demoIndex + 1 }),
     })),
   );
   if (!records.length) return null;
   return (
-    <section className="half-scoreboards" aria-label="Per-half scoreboards">
+    <section
+      className="half-scoreboards"
+      aria-label={tx("Per-half scoreboards", "Marcadores por mitad")}
+    >
       <div className="scoreboard-explainer">
         <div>
-          <span className="eyebrow">Competitive split</span>
-          <h3>Reset-aware half scoreboards</h3>
+          <span className="eyebrow">
+            {tx("Competitive split", "División competitiva")}
+          </span>
+          <h3>
+            {tx(
+              "Reset-aware half scoreboards",
+              "Marcadores por mitad con reinicios",
+            )}
+          </h3>
         </div>
         <p>
-          Values are positive deltas from networked engine counters inside each
-          half. They do not carry across a side swap or counter reset.
+          {tx(
+            "Values are positive deltas from networked engine counters inside each half. They do not carry across a side swap or counter reset.",
+            "Los valores son incrementos positivos de los contadores de red del motor dentro de cada mitad. No se trasladan a través de un cambio de bando ni de un reinicio de contadores.",
+          )}
         </p>
       </div>
       {records.map(({ demo, demoIndex, half, mapName }) => {
@@ -2651,89 +3144,113 @@ function HalfScoreboards({
                 <span className="eyebrow">
                   {mapName} ·{" "}
                   {half.secondHalf === true
-                    ? "recorded second half"
+                    ? tx("recorded second half", "segunda mitad registrada")
                     : half.secondHalf === false
-                      ? "recorded first half"
-                      : "half unknown"}
+                      ? tx("recorded first half", "primera mitad registrada")
+                      : tx("half unknown", "mitad desconocida")}
                 </span>
                 <h3>
                   {half.id === "unknown"
-                    ? "Observed segment"
-                    : `${half.id[0]?.toUpperCase()}${half.id.slice(1)} half`}
+                    ? tx("Observed segment", "Segmento observado")
+                    : tx("{half} half", "mitad {half}", {
+                        half: `${half.id[0]?.toUpperCase()}${half.id.slice(1)}`,
+                      })}
                 </h3>
               </div>
               <span>
-                ticks {whole.format(half.tickRange.start)} to{" "}
-                {whole.format(half.tickRange.end)}
+                {tx("ticks {start} to {end}", "ticks {start} a {end}", {
+                  start: whole.format(half.tickRange.start),
+                  end: whole.format(half.tickRange.end),
+                })}
               </span>
             </header>
             {survivorRows.length > 0 && (
               <div className="side-scoreboard">
-                <h4>Survivor output</h4>
+                <h4>{tx("Survivor output", "Resultado de supervivientes")}</h4>
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>Player</th>
+                        <th>{tx("Player", "Jugador")}</th>
                         <th>
-                          <HeaderHelp
-                            label="Tank damage"
-                            description="Damage to Tank reported by the engine checkpoint counter during this half."
-                          />
+                          {help(
+                            "Tank damage",
+                            "Daño al Tank",
+                            "Damage to Tank reported by the engine checkpoint counter during this half.",
+                            "Daño al Tank indicado por el contador de checkpoint del motor durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Tank share"
-                            description="This player's share of the four-person Tank-damage total. Hidden when roster coverage is incomplete."
-                          />
+                          {help(
+                            "Tank share",
+                            "Proporción de Tank",
+                            "This player's share of the four-person Tank-damage total. Hidden when roster coverage is incomplete.",
+                            "Proporción de este jugador en el daño total al Tank de los cuatro integrantes. Se oculta cuando la cobertura de la plantilla está incompleta.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Witch damage"
-                            description="Damage to Witch reported by the engine checkpoint counter during this half."
-                          />
+                          {help(
+                            "Witch damage",
+                            "Daño a la Witch",
+                            "Damage to Witch reported by the engine checkpoint counter during this half.",
+                            "Daño a la Witch indicado por el contador de checkpoint del motor durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Damage taken"
-                            description="Damage received reported by the engine checkpoint counter. This is distinct from sampled health loss."
-                          />
+                          {help(
+                            "Damage taken",
+                            "Daño recibido",
+                            "Damage received reported by the engine checkpoint counter. This is distinct from sampled health loss.",
+                            "Daño recibido indicado por el contador de checkpoint del motor. Es distinto de la pérdida de salud muestreada.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Medkits"
-                            description="First-aid kits used during this half."
-                          />
+                          {help(
+                            "Medkits",
+                            "Botiquines",
+                            "First-aid kits used during this half.",
+                            "Botiquines utilizados durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Pills + adren"
-                            description="Pain pills and adrenaline used during this half."
-                          />
+                          {help(
+                            "Pills + adren",
+                            "Píldoras + adrenalina",
+                            "Pain pills and adrenaline used during this half.",
+                            "Píldoras analgésicas y adrenalina utilizadas durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Throws"
-                            description="Molotovs, pipe bombs, and Boomer bile jars used during this half."
-                          />
+                          {help(
+                            "Throws",
+                            "Arrojadizos",
+                            "Molotovs, pipe bombs, and Boomer bile jars used during this half.",
+                            "Cócteles molotov, bombas caseras y frascos de bilis utilizados durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Defibs"
-                            description="Defibrillators used according to the engine checkpoint counter."
-                          />
+                          {help(
+                            "Defibs",
+                            "Desfibriladores",
+                            "Defibrillators used according to the engine checkpoint counter.",
+                            "Desfibriladores utilizados según el contador de checkpoint del motor.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Aid shared"
-                            description="First-aid items shared according to the engine checkpoint counter."
-                          />
+                          {help(
+                            "Aid shared",
+                            "Ayuda compartida",
+                            "First-aid items shared according to the engine checkpoint counter.",
+                            "Objetos de primeros auxilios compartidos según el contador de checkpoint del motor.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Melee kills"
-                            description="Melee kills reported by the engine checkpoint counter."
-                          />
+                          {help(
+                            "Melee kills",
+                            "Bajas cuerpo a cuerpo",
+                            "Melee kills reported by the engine checkpoint counter.",
+                            "Bajas cuerpo a cuerpo indicadas por el contador de checkpoint del motor.",
+                          )}
                         </th>
                       </tr>
                     </thead>
@@ -2796,71 +3313,91 @@ function HalfScoreboards({
             )}
             {infectedRows.length > 0 && (
               <div className="side-scoreboard infected-board">
-                <h4>Infected output</h4>
+                <h4>{tx("Infected output", "Resultado de infectados")}</h4>
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>Player</th>
+                        <th>{tx("Player", "Jugador")}</th>
                         <th>
-                          <HeaderHelp
-                            label="Damage"
-                            description="Sum of positive class-specific infected damage-counter deltas during this half."
-                          />
+                          {help(
+                            "Damage",
+                            "Daño",
+                            "Sum of positive class-specific infected damage-counter deltas during this half.",
+                            "Suma de los incrementos positivos de los contadores de daño específicos de cada clase infectada durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Incaps"
-                            description="Survivor incapacitations reported by the infected checkpoint counter during this half."
-                          />
+                          {help(
+                            "Incaps",
+                            "Incapacitaciones",
+                            "Survivor incapacitations reported by the infected checkpoint counter during this half.",
+                            "Incapacitaciones de supervivientes indicadas por el contador de checkpoint infectado durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Controls"
-                            description="Observed pin controls across reconstructed Special Infected lives in this half."
-                          />
+                          {help(
+                            "Controls",
+                            "Controles",
+                            "Observed pin controls across reconstructed Special Infected lives in this half.",
+                            "Controles de inmovilización observados en las vidas reconstruidas de infectados especiales durante esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Lives"
-                            description="Reconstructed spawned Special Infected lives whose start falls inside this half."
-                          />
+                          {help(
+                            "Lives",
+                            "Vidas",
+                            "Reconstructed spawned Special Infected lives whose start falls inside this half.",
+                            "Vidas reconstruidas de infectados especiales cuyo inicio se encuentra dentro de esta mitad.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Pin time"
-                            description="Observed seconds spent actively controlling a Survivor across those lives."
-                          />
+                          {help(
+                            "Pin time",
+                            "Tiempo inmovilizando",
+                            "Observed seconds spent actively controlling a Survivor across those lives.",
+                            "Segundos observados controlando activamente a un superviviente durante esas vidas.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Tank actions"
-                            description="Registered Tank punches and rock throws. A registered throw does not prove a rock hit."
-                          />
+                          {help(
+                            "Tank actions",
+                            "Acciones de Tank",
+                            "Registered Tank punches and rock throws. A registered throw does not prove a rock hit.",
+                            "Puñetazos y lanzamientos de roca de Tank registrados. Un lanzamiento registrado no demuestra que la roca impactara.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Pulls"
-                            description="Smoker pull and hang actions reported by engine checkpoint counters."
-                          />
+                          {help(
+                            "Pulls",
+                            "Arrastres",
+                            "Smoker pull and hang actions reported by engine checkpoint counters.",
+                            "Acciones de arrastre y ahorcamiento de Smoker indicadas por los contadores de checkpoint del motor.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Booms"
-                            description="Boomer bomb and vomit actions reported by engine checkpoint counters."
-                          />
+                          {help(
+                            "Booms",
+                            "Vómitos",
+                            "Boomer bomb and vomit actions reported by engine checkpoint counters.",
+                            "Acciones de bomba y vómito de Boomer indicadas por los contadores de checkpoint del motor.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Charges"
-                            description="Charge victims reported by the engine checkpoint counter."
-                          />
+                          {help(
+                            "Charges",
+                            "Cargas",
+                            "Charge victims reported by the engine checkpoint counter.",
+                            "Víctimas de carga indicadas por el contador de checkpoint del motor.",
+                          )}
                         </th>
                         <th>
-                          <HeaderHelp
-                            label="Pushes"
-                            description="Survivor pushes received while infected, as reported by the engine checkpoint counter."
-                          />
+                          {help(
+                            "Pushes",
+                            "Empujones",
+                            "Survivor pushes received while infected, as reported by the engine checkpoint counter.",
+                            "Empujones recibidos de supervivientes mientras se jugaba como infectado, según el contador de checkpoint del motor.",
+                          )}
                         </th>
                       </tr>
                     </thead>
@@ -2881,7 +3418,11 @@ function HalfScoreboards({
                                   ...new Set(
                                     lives.map((life) => life.infectedClass),
                                   ),
-                                ].join(", ") || "No reconstructed life"}
+                                ].join(", ") ||
+                                  tx(
+                                    "No reconstructed life",
+                                    "Sin vida reconstruida",
+                                  )}
                               </small>
                             </td>
                             <td>
@@ -2947,8 +3488,10 @@ function HalfScoreboards({
             )}
             {!survivorRows.length && !infectedRows.length && (
               <p className="half-scoreboard-empty">
-                This older artifact has half boundaries but no per-half player
-                counters. Reanalyze the demo to populate this scoreboard.
+                {tx(
+                  "This older artifact has half boundaries but no per-half player counters. Reanalyze the demo to populate this scoreboard.",
+                  "Este artefacto antiguo contiene límites de mitad, pero no contadores de jugadores por mitad. Vuelve a analizar la demo para completar este marcador.",
+                )}
               </p>
             )}
           </article>
@@ -2961,9 +3504,11 @@ function HalfScoreboards({
 function HeaderHelp({
   label,
   description,
+  source,
 }: {
   label: string;
   description: string;
+  source?: SourceKind;
 }) {
   const tooltipId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -2999,41 +3544,6 @@ function HeaderHelp({
         : current,
     );
   }, [tooltipPosition]);
-  const source = (
-    {
-      "SI kills": "event",
-      "All infected kills": "counter",
-      "Surv deaths": "event",
-      Revives: "counter",
-      "SI incaps": "counter",
-      "Pin time": "sampled",
-      "SI deaths": "event",
-      "Best pounce": "counter",
-      Tracked: "derived",
-      Signals: "derived",
-      "SI damage": "counter",
-      "SI dmg share": "derived",
-      "Tank damage": "counter",
-      "Tank share": "derived",
-      "Witch damage": "counter",
-      "Damage taken": "counter",
-      Medkits: "counter",
-      "Pills + adren": "counter",
-      Throws: "counter",
-      Defibs: "counter",
-      "Aid shared": "counter",
-      "Melee kills": "counter",
-      Damage: "counter",
-      Incaps: "counter",
-      Controls: "derived",
-      Lives: "derived",
-      "Tank actions": "counter",
-      Pulls: "counter",
-      Booms: "counter",
-      Charges: "counter",
-      Pushes: "counter",
-    } as Record<string, SourceKind>
-  )[label];
   return (
     <span className="header-help">
       <span>
@@ -3078,21 +3588,48 @@ type SourceKind =
   | "unavailable";
 
 function SourceBadge({ kind, detail }: { kind: SourceKind; detail?: string }) {
+  const { tx } = useI18n();
   const descriptions: Record<SourceKind, string> = {
-    observed: "Direct network property or game-event evidence",
-    event: "Direct game-event payload",
-    counter: "Direct networked engine counter",
-    sampled: "Bounded network-state samples that can miss intermediate changes",
-    derived: "Deterministic computation from retained observations",
-    unavailable: "Not present or not validated in this demo",
+    observed: tx(
+      "Direct network property or game-event evidence",
+      "Evidencia directa de propiedad de red o evento del juego",
+    ),
+    event: tx(
+      "Direct game-event payload",
+      "Contenido directo de evento del juego",
+    ),
+    counter: tx(
+      "Direct networked engine counter",
+      "Contador de red directo del motor",
+    ),
+    sampled: tx(
+      "Bounded network-state samples that can miss intermediate changes",
+      "Muestras acotadas del estado de red que pueden omitir cambios intermedios",
+    ),
+    derived: tx(
+      "Deterministic computation from retained observations",
+      "Cálculo determinista a partir de observaciones conservadas",
+    ),
+    unavailable: tx(
+      "Not present or not validated in this demo",
+      "No presente o no validado en esta demo",
+    ),
+  };
+  const labels: Record<SourceKind, string> = {
+    observed: tx("observed", "observado"),
+    event: tx("event", "evento"),
+    counter: tx("counter", "contador"),
+    sampled: tx("sampled", "muestreado"),
+    derived: tx("derived", "derivado"),
+    unavailable: tx("unavailable", "no disponible"),
   };
   return (
     <span
       className={`source-badge ${kind}`}
       title={detail ?? descriptions[kind]}
-      aria-label={`${kind}: ${detail ?? descriptions[kind]}`}
+      aria-label={`${labels[kind]}: ${detail ?? descriptions[kind]}`}
     >
-      {kind}
+      {labels[kind]}
     </span>
   );
 }
@@ -3106,15 +3643,21 @@ function TickLink({
   demoSha256: string | undefined;
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { tx } = useI18n();
   if (!demoSha256) return null;
   return (
     <button
       type="button"
       className="tick-link"
       onClick={() => onOpenTimeline(demoSha256, tick)}
-      aria-label={`View tick ${tick} on timeline`}
+      aria-label={tx(
+        "View tick {tick} on timeline",
+        "Ver el tick {tick} en la cronología",
+        { tick },
+      )}
     >
-      tick {whole.format(tick)} <ExternalLink />
+      {tx("tick {tick}", "tick {tick}", { tick: whole.format(tick) })}{" "}
+      <ExternalLink />
     </button>
   );
 }
@@ -3128,6 +3671,7 @@ function Combat({
   analyses: JobAnalysis[];
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { t, tx } = useI18n();
   const [encounterDemoIndex, setEncounterDemoIndex] = useState(0);
   const [showAllHits, setShowAllHits] = useState(false);
   const total = (
@@ -3188,39 +3732,50 @@ function Combat({
     <div className="tab-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Combat scoreboard</span>
-          <h2>Who killed what, and how</h2>
+          <span className="eyebrow">
+            {tx("Combat scoreboard", "Marcador de combate")}
+          </span>
+          <h2>{tx("Who killed what, and how", "Quién eliminó qué y cómo")}</h2>
         </div>
       </div>
       <div className="metric-grid combat-metrics compact-mobile-metrics">
         <StatCard
           icon={Crosshair}
-          label="SI killed"
+          label={tx("SI killed", "IE eliminados")}
           value={whole.format(total("specialInfectedDeaths"))}
-          detail="player_death events"
+          detail={tx("player_death events", "eventos player_death")}
         />
         <StatCard
           icon={ShieldAlert}
-          label="Survivor deaths"
+          label={t("overview.survivorDeaths")}
           value={whole.format(total("survivorDeaths"))}
-          detail="both Versus halves"
+          detail={tx("both Versus halves", "ambas mitades de Versus")}
         />
         <StatCard
           icon={Activity}
-          label="Tanks killed"
+          label={tx("Tanks killed", "Tanks eliminados")}
           value={whole.format(total("tankDeaths"))}
-          detail="observed deaths"
+          detail={tx("observed deaths", "muertes observadas")}
         />
         <StatCard
           icon={ShieldAlert}
-          label="Witches killed"
+          label={tx("Witches killed", "Witches eliminadas")}
           value={whole.format(total("witchDeaths"))}
-          detail="observed deaths"
+          detail={tx("observed deaths", "muertes observadas")}
         />
       </div>
       <div className="combat-grid">
-        <Breakdown title="Special Infected deaths" rows={classes} />
-        <Breakdown title="Kill weapons" rows={weapons} />
+        <Breakdown
+          title={tx(
+            "Special Infected deaths",
+            "Muertes de infectados especiales",
+          )}
+          rows={classes}
+        />
+        <Breakdown
+          title={tx("Kill weapons", "Armas de eliminación")}
+          rows={weapons}
+        />
       </div>
       <SpatialCombat
         stats={stats}
@@ -3237,39 +3792,55 @@ function Combat({
           <div className="metric-grid competitive-metrics compact-mobile-metrics">
             <StatCard
               icon={Activity}
-              label="Inferred SI hits"
+              label={tx("Inferred SI hits", "Ataques de IE inferidos")}
               value={whole.format(allHits.length)}
-              detail="spawn-gap clusters, not intent"
+              detail={tx(
+                "spawn-gap clusters, not intent",
+                "grupos por intervalo de aparición, no intención",
+              )}
             />
             <StatCard
               icon={Activity}
-              label="SI lives"
+              label={tx("SI lives", "Vidas de IE")}
               value={whole.format(lives.length)}
-              detail={`${lives.reduce((sum, life) => sum + life.controls, 0)} controls`}
+              detail={tx("{count} controls", "{count} controles", {
+                count: lives.reduce((sum, life) => sum + life.controls, 0),
+              })}
             />
             <StatCard
               icon={ShieldAlert}
-              label="Narrow clears"
+              label={tx("Narrow clears", "Liberaciones ajustadas")}
               value={whole.format(
                 clears.reduce(
                   (sum, player) => sum + player.deathCorrelatedClears,
                   0,
                 ),
               )}
-              detail="death-correlated only"
+              detail={tx(
+                "death-correlated only",
+                "solo correlacionadas con muertes",
+              )}
             />
             <StatCard
               icon={Activity}
-              label="Tank controls"
+              label={tx("Tank controls", "Controles de Tank")}
               value={whole.format(allTanks.length)}
-              detail={`${allTanks.reduce((sum, { tank }) => sum + tank.punches, 0)} punches`}
+              detail={tx("{count} punches", "{count} puñetazos", {
+                count: allTanks.reduce(
+                  (sum, { tank }) => sum + tank.punches,
+                  0,
+                ),
+              })}
             />
           </div>
           <div className="competitive-grid">
             <article className="panel hit-board">
-              <span className="eyebrow">Infected coordination</span>
+              <span className="eyebrow">
+                {tx("Infected coordination", "Coordinación de infectados")}
+              </span>
               <h3>
-                Hit clusters <SourceBadge kind="derived" />
+                {tx("Hit clusters", "Grupos de ataques")}{" "}
+                <SourceBadge kind="derived" />
               </h3>
               {hits.map(({ hit, demoIndex, derivationVersion }, index) => (
                 <div
@@ -3277,8 +3848,10 @@ function Combat({
                   key={`${index}:${hit.id}`}
                 >
                   <time>
-                    ticks {whole.format(hit.tickRange.start)}–
-                    {whole.format(hit.tickRange.end)}
+                    {tx("ticks {start}–{end}", "ticks {start}–{end}", {
+                      start: whole.format(hit.tickRange.start),
+                      end: whole.format(hit.tickRange.end),
+                    })}
                   </time>
                   <strong className="hit-cluster-title">
                     <span>{hit.infectedClasses.join(" + ")}</span>
@@ -3296,30 +3869,57 @@ function Combat({
                                   ? "severe"
                                   : "critical"
                         }`}
-                        title="Maximum observed team permanent-health drawdown in the bounded hit window; damage source is not attributable"
+                        title={tx(
+                          "Maximum observed team permanent-health drawdown in the bounded hit window; damage source is not attributable",
+                          "Máxima reducción observada de salud permanente del equipo en la ventana acotada; la fuente del daño no es atribuible",
+                        )}
                       >
-                        -{whole.format(hit.observedSurvivorHealthLoss)} team HP
+                        -{whole.format(hit.observedSurvivorHealthLoss)}{" "}
+                        {tx("team HP", "PV del equipo")}
                       </b>
                     ) : derivationVersion >= 6 ? (
-                      <b className="hp-loss-pill hp-loss-low">HP unavailable</b>
+                      <b className="hp-loss-pill hp-loss-low">
+                        {tx("HP unavailable", "PV no disponibles")}
+                      </b>
                     ) : (
                       <b className="hp-loss-pill hp-loss-low">
-                        reanalyze for HP
+                        {tx(
+                          "reanalyze for HP",
+                          "volver a analizar para obtener PV",
+                        )}
                       </b>
                     )}
                   </strong>
                   <span className="hit-cluster-summary">
                     <span>
-                      {hit.controls} controls · {hit.peakSimultaneousPins}{" "}
-                      simultaneous · {hit.spawnSpreadSeconds.toFixed(1)}s spawn
-                      spread
+                      {tx(
+                        "{controls} controls · {pins} simultaneous · {spread}s spawn spread",
+                        "{controls} controles · {pins} simultáneos · {spread}s de dispersión de aparición",
+                        {
+                          controls: hit.controls,
+                          pins: hit.peakSimultaneousPins,
+                          spread: hit.spawnSpreadSeconds.toFixed(1),
+                        },
+                      )}
                     </span>
                     <small>
                       {derivationVersion >= 6 && hit.survivorHealthSamples >= 2
-                        ? `Maximum contiguous permanent-health drawdown per upright Survivor across ${whole.format(hit.survivorHealthSamples)} state samples in this bounded hit window. Healing is not counted twice and team loss is capped at 400 HP. The demo does not identify the damage source, so commons, friendly fire, falls, and other damage may contribute.`
+                        ? tx(
+                            "Maximum contiguous permanent-health drawdown per upright Survivor across {samples} state samples in this bounded hit window. Healing is not counted twice and team loss is capped at 400 HP. The demo does not identify the damage source, so commons, friendly fire, falls, and other damage may contribute.",
+                            "Máxima reducción continua de salud permanente por superviviente en pie a lo largo de {samples} muestras de estado en esta ventana acotada. La curación no se cuenta dos veces y la pérdida del equipo se limita a 400 PV. La demo no identifica la fuente del daño, por lo que pueden contribuir infectados comunes, fuego amigo, caídas y otros daños.",
+                            {
+                              samples: whole.format(hit.survivorHealthSamples),
+                            },
+                          )
                         : derivationVersion >= 6
-                          ? "No adjacent upright Survivor health samples cover this window."
-                          : "Legacy HP could double-count repeated loss or include invalid cluster windows and incap health. Reanalyze before using it."}
+                          ? tx(
+                              "No adjacent upright Survivor health samples cover this window.",
+                              "No hay muestras adyacentes de salud de supervivientes en pie que cubran esta ventana.",
+                            )
+                          : tx(
+                              "Legacy HP could double-count repeated loss or include invalid cluster windows and incap health. Reanalyze before using it.",
+                              "Los PV antiguos podrían contar dos veces pérdidas repetidas o incluir ventanas no válidas y salud de incapacitación. Vuelve a analizar antes de utilizarlos.",
+                            )}
                     </small>
                   </span>
                   <TickLink
@@ -3337,16 +3937,26 @@ function Combat({
                   onClick={() => setShowAllHits((value) => !value)}
                 >
                   {showAllHits
-                    ? "Show highest-impact clusters only"
-                    : `Show ${hits.length - 8} more clusters`}
+                    ? tx(
+                        "Show highest-impact clusters only",
+                        "Mostrar solo los grupos de mayor impacto",
+                      )
+                    : tx(
+                        "Show {count} more clusters",
+                        "Mostrar {count} grupos más",
+                        { count: hits.length - 8 },
+                      )}
                   <ChevronDown />
                 </button>
               )}
             </article>
             <article className="panel tank-board">
-              <span className="eyebrow">Tank encounters</span>
+              <span className="eyebrow">
+                {tx("Tank encounters", "Encuentros con Tank")}
+              </span>
               <h3>
-                Control and outcome <SourceBadge kind="derived" />
+                {tx("Control and outcome", "Control y resultado")}{" "}
+                <SourceBadge kind="derived" />
               </h3>
               {tanks.map(({ tank, demoIndex }, index) => (
                 <div key={`${index}:${tank.id}`}>
@@ -3354,22 +3964,46 @@ function Combat({
                     {tank.controllerAlias}
                     <small>
                       {analyses[demoIndex]?.engineResult.demo.mapName ??
-                        `Map ${demoIndex + 1}`}
+                        tx("Map {number}", "Mapa {number}", {
+                          number: demoIndex + 1,
+                        })}
                     </small>
                   </strong>
                   <span>
-                    {duration(tank.durationSeconds)} · {tank.punches} punches ·{" "}
-                    {tank.registeredRockThrows} throws · {tank.survivorIncaps}{" "}
-                    incaps · {tank.survivorDeaths} deaths
+                    {tx(
+                      "{duration} · {punches} punches · {throws} throws · {incaps} incaps · {deaths} deaths",
+                      "{duration} · {punches} puñetazos · {throws} lanzamientos · {incaps} incapacitados · {deaths} muertes",
+                      {
+                        duration: duration(tank.durationSeconds),
+                        punches: tank.punches,
+                        throws: tank.registeredRockThrows,
+                        incaps: tank.survivorIncaps,
+                        deaths: tank.survivorDeaths,
+                      },
+                    )}
                   </span>
                   <span>
                     {tank.damageDealt == null
-                      ? "Tank damage unavailable"
-                      : `${whole.format(tank.damageDealt)} damage dealt`}{" "}
+                      ? tx(
+                          "Tank damage unavailable",
+                          "Daño de Tank no disponible",
+                        )
+                      : tx(
+                          "{value} damage dealt",
+                          "{value} de daño infligido",
+                          {
+                            value: whole.format(tank.damageDealt),
+                          },
+                        )}{" "}
                     ·{" "}
                     {tank.damageTaken == null
-                      ? "damage taken unavailable"
-                      : `${whole.format(tank.damageTaken)} damage taken`}
+                      ? tx(
+                          "damage taken unavailable",
+                          "daño recibido no disponible",
+                        )
+                      : tx("{value} damage taken", "{value} de daño recibido", {
+                          value: whole.format(tank.damageTaken),
+                        })}
                   </span>
                   {(tank.damageBySurvivor?.length ?? 0) > 0 && (
                     <small>
@@ -3390,12 +4024,18 @@ function Combat({
                             tank.healthAtTake - tank.lowestObservedHealth,
                           ),
                         )}{" "}
-                        observed Tank HP lost, attacker unavailable
+                        {tx(
+                          "observed Tank HP lost, attacker unavailable",
+                          "PV de Tank perdidos observados; atacante no disponible",
+                        )}
                       </small>
                     )}
                   <b>
-                    {tank.healthAtTake ?? "N/A"} →{" "}
-                    {tank.healthAtEnd ?? tank.lowestObservedHealth ?? "N/A"} HP
+                    {tank.healthAtTake ?? t("common.notAvailable")} →{" "}
+                    {tank.healthAtEnd ??
+                      tank.lowestObservedHealth ??
+                      t("common.notAvailable")}{" "}
+                    {tx("HP", "PV")}
                   </b>
                   <TickLink
                     tick={tank.tickRange.start}
@@ -3412,58 +4052,70 @@ function Combat({
         <article className="panel witch-board">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">Witch encounters</span>
+              <span className="eyebrow">
+                {tx("Witch encounters", "Encuentros con Witch")}
+              </span>
               <h3>
-                Rage, fire, and observed outcome <SourceBadge kind="sampled" />
+                {tx(
+                  "Rage, fire, and observed outcome",
+                  "Furia, fuego y resultado observado",
+                )}{" "}
+                <SourceBadge kind="sampled" />
               </h3>
             </div>
             <AlertCircle />
           </div>
           <p className="muted">
-            Rage, burning state, and entity lifetime are direct network
-            observations. A death outcome is correlated by tick. Crown,
-            startler, target, world position, and attacker-attributed damage
-            remain unavailable.
+            {tx(
+              "Rage, burning state, and entity lifetime are direct network observations. A death outcome is correlated by tick. Crown, startler, target, world position, and attacker-attributed damage remain unavailable.",
+              "La furia, el estado en llamas y la vida de la entidad son observaciones directas de red. Un resultado de muerte se correlaciona por tick. Crown, quién la asustó, objetivo, posición y daño atribuido al atacante siguen sin estar disponibles.",
+            )}
           </p>
           <div className="witch-encounter-list">
             {witches.map(({ witch, demoIndex }, index) => (
               <div key={`${index}:${witch.id}`}>
                 <span>
-                  ticks {whole.format(witch.tickRange.start)} to{" "}
-                  {whole.format(witch.tickRange.end)}
+                  {tx("ticks {start} to {end}", "ticks {start} a {end}", {
+                    start: whole.format(witch.tickRange.start),
+                    end: whole.format(witch.tickRange.end),
+                  })}
                 </span>
                 <strong>
                   {witch.endReason === "death-correlated"
-                    ? "Death correlated"
-                    : "Outcome unresolved"}
+                    ? tx("Death correlated", "Muerte correlacionada")
+                    : tx("Outcome unresolved", "Resultado sin resolver")}
                 </strong>
                 <dl>
                   <div>
-                    <dt>Peak rage</dt>
+                    <dt>{tx("Peak rage", "Furia máxima")}</dt>
                     <dd>
                       {witch.peakRage === null
-                        ? "N/A"
+                        ? t("common.notAvailable")
                         : witch.peakRage.toFixed(2)}
                     </dd>
                   </div>
                   <div>
-                    <dt>Enraged</dt>
+                    <dt>{tx("Enraged", "Enfurecida")}</dt>
                     <dd>
                       {witch.enragedTick === null
-                        ? "not observed"
-                        : `tick ${whole.format(witch.enragedTick)}`}
+                        ? tx("not observed", "no observado")
+                        : tx("tick {tick}", "tick {tick}", {
+                            tick: whole.format(witch.enragedTick),
+                          })}
                     </dd>
                   </div>
                   <div>
-                    <dt>Burning</dt>
+                    <dt>{tx("Burning", "En llamas")}</dt>
                     <dd>
                       {witch.burningTick === null
-                        ? "not observed"
-                        : `tick ${whole.format(witch.burningTick)}`}
+                        ? tx("not observed", "no observado")
+                        : tx("tick {tick}", "tick {tick}", {
+                            tick: whole.format(witch.burningTick),
+                          })}
                     </dd>
                   </div>
                   <div>
-                    <dt>Samples</dt>
+                    <dt>{tx("Samples", "Muestras")}</dt>
                     <dd>{whole.format(witch.sampleCount)}</dd>
                   </div>
                 </dl>
@@ -3494,11 +4146,14 @@ function SpatialCombat({
   onSelectMap: (index: number) => void;
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { tx } = useI18n();
   const maps = stats.map((demo, index) => ({
     demo,
     analysis: analyses[index],
     key: analyses[index]?.demoSha256 ?? `map-${index}`,
-    name: analyses[index]?.engineResult.demo.mapName ?? `Map ${index + 1}`,
+    name:
+      analyses[index]?.engineResult.demo.mapName ??
+      tx("Map {number}", "Mapa {number}", { number: index + 1 }),
     positionedEvents: (demo.timeline ?? []).filter((event) => event.position)
       .length,
   }));
@@ -3506,20 +4161,35 @@ function SpatialCombat({
 
   if (!selected || maps.every((map) => map.positionedEvents === 0)) return null;
   return (
-    <section className="spatial-workspace" aria-label="Spatial combat map">
+    <section
+      className="spatial-workspace"
+      aria-label={tx("Spatial combat map", "Mapa de combate espacial")}
+    >
       <header>
         <div>
-          <span className="eyebrow">Spatial combat</span>
-          <h3>Where the fight happened</h3>
+          <span className="eyebrow">
+            {tx("Spatial combat", "Combate espacial")}
+          </span>
+          <h3>{tx("Where the fight happened", "Dónde ocurrió el combate")}</h3>
         </div>
         <span>
-          One map at a time · {selected.positionedEvents} positioned moment
-          {selected.positionedEvents === 1 ? "" : "s"}
+          {tx(
+            selected.positionedEvents === 1
+              ? "One map at a time · 1 positioned moment"
+              : "One map at a time · {count} positioned moments",
+            selected.positionedEvents === 1
+              ? "Un mapa cada vez · 1 momento posicionado"
+              : "Un mapa cada vez · {count} momentos posicionados",
+            { count: selected.positionedEvents },
+          )}
         </span>
       </header>
       <div
         className="spatial-map-selector"
-        aria-label="Spatial combat map selector"
+        aria-label={tx(
+          "Spatial combat map selector",
+          "Selector de mapa de combate espacial",
+        )}
       >
         {maps.map((map, index) => (
           <button
@@ -3527,12 +4197,22 @@ function SpatialCombat({
             key={map.key}
             className={map.key === selected.key ? "active" : ""}
             aria-pressed={map.key === selected.key}
-            aria-label={`Show spatial combat for ${map.name}`}
+            aria-label={tx(
+              "Show spatial combat for {map}",
+              "Mostrar el combate espacial de {map}",
+              { map: map.name },
+            )}
             onClick={() => onSelectMap(index)}
           >
-            <small>Map {index + 1}</small>
+            <small>
+              {tx("Map {number}", "Mapa {number}", { number: index + 1 })}
+            </small>
             <strong>{map.name}</strong>
-            <span>{map.positionedEvents} moments</span>
+            <span>
+              {tx("{count} moments", "{count} momentos", {
+                count: map.positionedEvents,
+              })}
+            </span>
           </button>
         ))}
       </div>
@@ -3564,6 +4244,7 @@ function DeathPositions({
   demoSha256: string | undefined;
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { tx } = useI18n();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [geometry, setGeometry] = useState<MapGeometry | null | undefined>();
   const [floorMode, setFloorMode] = useState<"events" | "all">("events");
@@ -4585,7 +5266,9 @@ function DeathPositions({
       context.stroke();
       context.font = "700 11px ui-monospace, monospace";
       context.fillText(
-        `${whole.format(scaleUnits)} SOURCE UNITS`,
+        tx("{units} SOURCE UNITS", "{units} UNIDADES SOURCE", {
+          units: whole.format(scaleUnits),
+        }),
         scaleX,
         scaleY - 9,
       );
@@ -4634,6 +5317,7 @@ function DeathPositions({
     infectedIconRevision,
     openingLandmarks,
     observedExtentLandmarks,
+    tx,
   ]);
   const exploreCluster = (
     cluster: (typeof canvasClusters.current)[number],
@@ -4675,16 +5359,34 @@ function DeathPositions({
         <div className="panel-heading">
           <div>
             <span className="eyebrow">
-              Spatial combat · actual BSP geometry
+              {tx(
+                "Spatial combat · actual BSP geometry",
+                "Combate espacial · geometría BSP real",
+              )}
             </span>
             <h3>
-              {positioned.length} positioned combat moments on {mapName}
+              {tx(
+                "{count} positioned combat moments on {map}",
+                "{count} momentos de combate posicionados en {map}",
+                { count: positioned.length, map: mapName ?? "" },
+              )}
             </h3>
           </div>
-          <span className="muted">Local official map · top-down</span>
+          <span className="muted">
+            {tx(
+              "Local official map · top-down",
+              "Mapa oficial local · vista cenital",
+            )}
+          </span>
         </div>
-        <div className="spatial-controls" aria-label="Spatial map controls">
-          <span className="spatial-mode-switch" aria-label="Display layer">
+        <div
+          className="spatial-controls"
+          aria-label={tx("Spatial map controls", "Controles del mapa espacial")}
+        >
+          <span
+            className="spatial-mode-switch"
+            aria-label={tx("Display layer", "Capa de visualización")}
+          >
             {(["events", "hybrid", "density"] as const).map((mode) => (
               <button
                 key={mode}
@@ -4692,13 +5394,17 @@ function DeathPositions({
                 aria-pressed={displayMode === mode}
                 onClick={() => setDisplayMode(mode)}
               >
-                {mode}
+                {mode === "events"
+                  ? tx("events", "eventos")
+                  : mode === "hybrid"
+                    ? tx("hybrid", "híbrido")
+                    : tx("density", "densidad")}
               </button>
             ))}
           </span>
           <span className="spatial-viewport-actions">
             <button
-              aria-label="Zoom out"
+              aria-label={tx("Zoom out", "Alejar")}
               onClick={() =>
                 scheduleViewport((current) => ({
                   ...current,
@@ -4709,13 +5415,13 @@ function DeathPositions({
               −
             </button>
             <button
-              aria-label="Fit map"
+              aria-label={tx("Fit map", "Ajustar mapa")}
               onClick={() => setViewportImmediately({ zoom: 1, x: 0, y: 0 })}
             >
-              Fit
+              {tx("Fit", "Ajustar")}
             </button>
             <button
-              aria-label="Zoom in"
+              aria-label={tx("Zoom in", "Acercar")}
               onClick={() =>
                 scheduleViewport((current) => ({
                   ...current,
@@ -4726,16 +5432,23 @@ function DeathPositions({
               +
             </button>
             <button
-              aria-label={expanded ? "Exit expanded map" : "Expand map"}
+              aria-label={
+                expanded
+                  ? tx("Exit expanded map", "Salir del mapa ampliado")
+                  : tx("Expand map", "Ampliar mapa")
+              }
               aria-pressed={expanded}
               onClick={() => setExpanded((current) => !current)}
             >
-              {expanded ? "Close" : "Expand"}
+              {expanded ? tx("Close", "Cerrar") : tx("Expand", "Ampliar")}
             </button>
           </span>
         </div>
-        <div className="spatial-presets" aria-label="Map review presets">
-          <span>Presets</span>
+        <div
+          className="spatial-presets"
+          aria-label={tx("Map review presets", "Ajustes predefinidos del mapa")}
+        >
+          <span>{tx("Presets", "Preajustes")}</span>
           <button
             type="button"
             className={
@@ -4747,7 +5460,7 @@ function DeathPositions({
               resetSpatialFilters();
             }}
           >
-            Review
+            {tx("Review", "Revisión")}
           </button>
           <button
             type="button"
@@ -4758,7 +5471,7 @@ function DeathPositions({
               setDisplayMode("events");
             }}
           >
-            Critical outcomes
+            {tx("Critical outcomes", "Resultados críticos")}
           </button>
           <button
             type="button"
@@ -4769,7 +5482,7 @@ function DeathPositions({
               setDisplayMode("events");
             }}
           >
-            Pins & clears
+            {tx("Pins & clears", "Inmovilizaciones y liberaciones")}
           </button>
           {competitive?.rosters?.length === 2 && (
             <button
@@ -4782,7 +5495,7 @@ function DeathPositions({
                 setCompareDensityMode("split");
               }}
             >
-              Team comparison
+              {tx("Team comparison", "Comparación de equipos")}
             </button>
           )}
         </div>
@@ -4792,7 +5505,7 @@ function DeathPositions({
           onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
         >
           <summary>
-            <span>Map filters</span>
+            <span>{tx("Map filters", "Filtros del mapa")}</span>
             <strong>
               {
                 [
@@ -4804,41 +5517,66 @@ function DeathPositions({
                   classScope,
                 ].filter((value) => value !== "all").length
               }{" "}
-              active
+              {tx("active", "activos")}
             </strong>
             <ChevronDown />
           </summary>
-          <div className="spatial-filter-bar" aria-label="Map filters">
+          <div
+            className="spatial-filter-bar"
+            aria-label={tx("Map filters", "Filtros del mapa")}
+          >
             <label>
-              <span>Moments</span>
+              <span>{tx("Moments", "Momentos")}</span>
               <select
                 value={eventScope}
                 onChange={(event) =>
                   setEventScope(event.target.value as typeof eventScope)
                 }
               >
-                <option value="all">All positioned events</option>
-                <option value="critical">Incaps, deaths & revives</option>
-                <option value="pins">Pins & clears</option>
-                <option value="boss">Tank & Witch</option>
+                <option value="all">
+                  {tx(
+                    "All positioned events",
+                    "Todos los eventos posicionados",
+                  )}
+                </option>
+                <option value="critical">
+                  {tx(
+                    "Incaps, deaths & revives",
+                    "Incapacitaciones, muertes y reanimaciones",
+                  )}
+                </option>
+                <option value="pins">
+                  {tx("Pins & clears", "Inmovilizaciones y liberaciones")}
+                </option>
+                <option value="boss">
+                  {tx("Tank & Witch", "Tank y Witch")}
+                </option>
               </select>
             </label>
             <label>
-              <span>Half</span>
+              <span>{tx("Half", "Mitad")}</span>
               <select
                 value={halfScope}
                 onChange={(event) =>
                   setHalfScope(event.target.value as typeof halfScope)
                 }
               >
-                <option value="all">Both halves</option>
-                <option value="first">First half</option>
-                <option value="second">Second half</option>
-                <option value="unknown">Unknown segment</option>
+                <option value="all">
+                  {tx("Both halves", "Ambas mitades")}
+                </option>
+                <option value="first">
+                  {tx("First half", "Primera mitad")}
+                </option>
+                <option value="second">
+                  {tx("Second half", "Segunda mitad")}
+                </option>
+                <option value="unknown">
+                  {tx("Unknown segment", "Segmento desconocido")}
+                </option>
               </select>
             </label>
             <label>
-              <span>Squad</span>
+              <span>{tx("Squad", "Plantilla")}</span>
               <select
                 value={rosterScope}
                 disabled={!competitive?.rosters?.length}
@@ -4846,13 +5584,13 @@ function DeathPositions({
                   setRosterScope(event.target.value as typeof rosterScope)
                 }
               >
-                <option value="all">Both teams</option>
-                <option value="A">Team A</option>
-                <option value="B">Team B</option>
+                <option value="all">{tx("Both teams", "Ambos equipos")}</option>
+                <option value="A">{tx("Team A", "Equipo A")}</option>
+                <option value="B">{tx("Team B", "Equipo B")}</option>
               </select>
             </label>
             <label>
-              <span>Role</span>
+              <span>{tx("Role", "Rol")}</span>
               <select
                 value={roleScope}
                 disabled={!competitive?.halves.length}
@@ -4860,18 +5598,22 @@ function DeathPositions({
                   setRoleScope(event.target.value as typeof roleScope)
                 }
               >
-                <option value="all">Both roles</option>
-                <option value="Survivor">Survivors</option>
-                <option value="Infected">Infected</option>
+                <option value="all">{tx("Both roles", "Ambos roles")}</option>
+                <option value="Survivor">
+                  {tx("Survivors", "Supervivientes")}
+                </option>
+                <option value="Infected">{tx("Infected", "Infectados")}</option>
               </select>
             </label>
             <label>
-              <span>Player</span>
+              <span>{tx("Player", "Jugador")}</span>
               <select
                 value={playerScope}
                 onChange={(event) => setPlayerScope(event.target.value)}
               >
-                <option value="all">All players</option>
+                <option value="all">
+                  {tx("All players", "Todos los jugadores")}
+                </option>
                 {players.map((player) => (
                   <option key={player.id} value={player.id}>
                     {player.alias}
@@ -4880,12 +5622,14 @@ function DeathPositions({
               </select>
             </label>
             <label>
-              <span>SI class</span>
+              <span>{tx("SI class", "Clase de IE")}</span>
               <select
                 value={classScope}
                 onChange={(event) => setClassScope(event.target.value)}
               >
-                <option value="all">All classes</option>
+                <option value="all">
+                  {tx("All classes", "Todas las clases")}
+                </option>
                 {infectedClasses.map((infectedClass) => (
                   <option key={infectedClass} value={infectedClass}>
                     {infectedClass}
@@ -4898,19 +5642,34 @@ function DeathPositions({
         {competitive?.rosters?.length === 2 && (
           <div className="spatial-compare-strip">
             <div>
-              <span>Versus comparison</span>
+              <span>{tx("Versus comparison", "Comparación Versus")}</span>
               <strong>
-                Team A × Team B · colors follow stable roster, not current role
+                {tx(
+                  "Team A × Team B · colors follow stable roster, not current role",
+                  "Equipo A × Equipo B · los colores siguen la plantilla estable, no el rol actual",
+                )}
               </strong>
               <small>
-                {rosterConfidence} roster inference · neutral labels · A{" "}
-                {comparisonCounts.A} · B {comparisonCounts.B} · unassigned{" "}
-                {comparisonCounts.unassigned}
+                {tx(
+                  "{confidence} roster inference · neutral labels · A {a} · B {b} · unassigned {unassigned}",
+                  "inferencia de plantilla {confidence} · etiquetas neutrales · A {a} · B {b} · sin asignar {unassigned}",
+                  {
+                    confidence: rosterConfidence,
+                    a: comparisonCounts.A,
+                    b: comparisonCounts.B,
+                    unassigned: comparisonCounts.unassigned,
+                  },
+                )}
               </small>
             </div>
             <div className="spatial-compare-actions">
               {compareTeams && (
-                <span aria-label="Team density comparison mode">
+                <span
+                  aria-label={tx(
+                    "Team density comparison mode",
+                    "Modo de comparación de densidad de equipos",
+                  )}
+                >
                   {(["difference", "overlay", "split"] as const).map((mode) => (
                     <button
                       key={mode}
@@ -4919,7 +5678,11 @@ function DeathPositions({
                       aria-pressed={compareDensityMode === mode}
                       onClick={() => setCompareDensityMode(mode)}
                     >
-                      {mode}
+                      {mode === "difference"
+                        ? tx("difference", "diferencia")
+                        : mode === "overlay"
+                          ? tx("overlay", "superposición")
+                          : tx("split", "dividido")}
                     </button>
                   ))}
                 </span>
@@ -4933,7 +5696,9 @@ function DeathPositions({
                   setRosterScope("all");
                 }}
               >
-                {compareTeams ? "Exit compare" : "Compare teams"}
+                {compareTeams
+                  ? tx("Exit compare", "Salir de comparación")
+                  : tx("Compare teams", "Comparar equipos")}
               </button>
             </div>
           </div>
@@ -4941,11 +5706,21 @@ function DeathPositions({
         {!positioned.length && (
           <div className="spatial-zero-state" role="status">
             <div>
-              <strong>No positioned moments match these filters</strong>
-              <span>The map and shared controls remain available.</span>
+              <strong>
+                {tx(
+                  "No positioned moments match these filters",
+                  "Ningún momento posicionado coincide con estos filtros",
+                )}
+              </strong>
+              <span>
+                {tx(
+                  "The map and shared controls remain available.",
+                  "El mapa y los controles compartidos siguen disponibles.",
+                )}
+              </span>
             </div>
             <button type="button" onClick={resetSpatialFilters}>
-              Clear filters
+              {tx("Clear filters", "Borrar filtros")}
             </button>
           </div>
         )}
@@ -4955,7 +5730,11 @@ function DeathPositions({
           <canvas
             ref={canvas}
             tabIndex={0}
-            aria-label={`Interactive top-down ${mapName} world geometry with ${positioned.length} positioned combat events, a Source-unit scale, and +Y orientation. Drag to pan, scroll to zoom, press Enter to explore the largest visible cluster, or comma and period to traverse visible clusters.`}
+            aria-label={tx(
+              "Interactive top-down {map} world geometry with {count} positioned combat events, a Source-unit scale, and +Y orientation. Drag to pan, scroll to zoom, press Enter to explore the largest visible cluster, or comma and period to traverse visible clusters.",
+              "Geometría interactiva cenital del mundo de {map} con {count} eventos de combate posicionados, escala en unidades Source y orientación +Y. Arrastra para desplazar, usa la rueda para ampliar, pulsa Intro para explorar el mayor grupo visible o coma y punto para recorrer los grupos visibles.",
+              { map: mapName ?? "", count: positioned.length },
+            )}
             onWheel={(wheelEvent) => {
               wheelEvent.preventDefault();
               wheelEvent.stopPropagation();
@@ -5215,19 +5994,33 @@ function DeathPositions({
           <div className="spatial-map-status" aria-live="polite">
             <span>{viewport.zoom.toFixed(2)}×</span>
             <span>
-              {positioned.length} positioned moments
+              {tx(
+                "{count} positioned moments",
+                "{count} momentos posicionados",
+                {
+                  count: positioned.length,
+                },
+              )}
               {positioned.length > 350 && viewport.zoom < 4
-                ? " · clustered"
+                ? tx(" · clustered", " · agrupados")
                 : ""}
             </span>
-            <span>Drag · scroll · pinch · [ ] select</span>
+            <span>
+              {tx(
+                "Drag · scroll · pinch · [ ] select",
+                "Arrastrar · rueda · pellizcar · [ ] seleccionar",
+              )}
+            </span>
           </div>
           {hoveredSpatialIndex !== null && positioned[hoveredSpatialIndex] && (
             <div className="spatial-hover-card" role="tooltip">
               <strong>{positioned[hoveredSpatialIndex].detail}</strong>
               <span>
                 {formatElapsedTime(positioned[hoveredSpatialIndex].timeSeconds)}{" "}
-                · tick {whole.format(positioned[hoveredSpatialIndex].tick)}
+                ·{" "}
+                {tx("tick {tick}", "tick {tick}", {
+                  tick: whole.format(positioned[hoveredSpatialIndex].tick),
+                })}
               </span>
             </div>
           )}
@@ -5239,24 +6032,37 @@ function DeathPositions({
           >
             <div>
               <span>
-                Explored cluster · ticks{" "}
-                {whole.format(selectedCluster.tickStart)}–
-                {whole.format(selectedCluster.tickEnd)}
+                {tx(
+                  "Explored cluster · ticks {start}–{end}",
+                  "Grupo explorado · ticks {start}–{end}",
+                  {
+                    start: whole.format(selectedCluster.tickStart),
+                    end: whole.format(selectedCluster.tickEnd),
+                  },
+                )}
               </span>
-              <strong>{selectedCluster.count} positioned moments</strong>
+              <strong>
+                {tx(
+                  "{count} positioned moments",
+                  "{count} momentos posicionados",
+                  {
+                    count: selectedCluster.count,
+                  },
+                )}
+              </strong>
               <small>{selectedCluster.composition}</small>
             </div>
             <button type="button" onClick={() => setSelectedCluster(null)}>
-              Dismiss
+              {tx("Dismiss", "Descartar")}
             </button>
           </article>
         )}
         <details className="spatial-advanced-controls">
-          <summary>Layers & height</summary>
+          <summary>{tx("Layers & height", "Capas y altura")}</summary>
           <div>
             {geometry.triangleZ && (
               <label>
-                <span>Height band</span>
+                <span>{tx("Height band", "Banda de altura")}</span>
                 <select
                   value={floorMode === "all" ? "all" : String(heightRadius)}
                   onChange={(event) => {
@@ -5267,15 +6073,31 @@ function DeathPositions({
                     }
                   }}
                 >
-                  <option value="128">Focused ±128u</option>
-                  <option value="256">Event level ±256u</option>
-                  <option value="512">Wide ±512u</option>
-                  <option value="all">All elevations</option>
+                  <option value="128">
+                    {tx("Focused ±128u", "Enfocada ±128u")}
+                  </option>
+                  <option value="256">
+                    {tx("Event level ±256u", "Nivel del evento ±256u")}
+                  </option>
+                  <option value="512">
+                    {tx("Wide ±512u", "Amplia ±512u")}
+                  </option>
+                  <option value="all">
+                    {tx("All elevations", "Todas las elevaciones")}
+                  </option>
                 </select>
               </label>
             )}
             <label>
-              <span>Smoothing · {densityRadius} world units</span>
+              <span>
+                {tx(
+                  "Smoothing · {radius} world units",
+                  "Suavizado · {radius} unidades del mundo",
+                  {
+                    radius: densityRadius,
+                  },
+                )}
+              </span>
               <input
                 type="range"
                 min="96"
@@ -5289,11 +6111,17 @@ function DeathPositions({
             </label>
             <label className="spatial-time-range">
               <span>
-                Tick range · {whole.format(tickRange[0])}–
-                {whole.format(tickRange[1])}
+                {tx(
+                  "Tick range · {start}–{end}",
+                  "Intervalo de ticks · {start}–{end}",
+                  {
+                    start: whole.format(tickRange[0]),
+                    end: whole.format(tickRange[1]),
+                  },
+                )}
               </span>
               <input
-                aria-label="Start tick"
+                aria-label={tx("Start tick", "Tick inicial")}
                 type="range"
                 min={tickMinimum}
                 max={tickMaximum}
@@ -5306,7 +6134,7 @@ function DeathPositions({
                 }
               />
               <input
-                aria-label="End tick"
+                aria-label={tx("End tick", "Tick final")}
                 type="range"
                 min={tickMinimum}
                 max={tickMaximum}
@@ -5325,8 +6153,10 @@ function DeathPositions({
           <article className="spatial-selection" aria-live="polite">
             <div>
               <span>
-                {formatElapsedTime(selectedSpatialEvent.timeSeconds)} · tick{" "}
-                {whole.format(selectedSpatialEvent.tick)}
+                {formatElapsedTime(selectedSpatialEvent.timeSeconds)} ·{" "}
+                {tx("tick {tick}", "tick {tick}", {
+                  tick: whole.format(selectedSpatialEvent.tick),
+                })}
               </span>
               <strong>{selectedSpatialEvent.detail}</strong>
               <small>
@@ -5344,7 +6174,7 @@ function DeathPositions({
                   onOpenTimeline(demoSha256, selectedSpatialEvent.tick)
                 }
               >
-                Open on timeline
+                {tx("Open on timeline", "Abrir en la cronología")}
               </button>
             )}
           </article>
@@ -5353,10 +6183,10 @@ function DeathPositions({
           {compareTeams ? (
             <>
               <span className="team-a">
-                <i /> Team A
+                <i /> {tx("Team A", "Equipo A")}
               </span>
               <span className="team-b">
-                <i /> Team B
+                <i /> {tx("Team B", "Equipo B")}
               </span>
               <span>
                 {positioned.filter((event) => rosterForEvent(event)?.id === "A")
@@ -5364,35 +6194,35 @@ function DeathPositions({
                 /{" "}
                 {positioned.filter((event) => rosterForEvent(event)?.id === "B")
                   .length || 0}{" "}
-                positioned moments
+                {tx("positioned moments", "momentos posicionados")}
               </span>
             </>
           ) : (
             <>
               <span className="support">
-                <i /> Attack/support
+                <i /> {tx("Attack/support", "Ataque/apoyo")}
               </span>
               <span className="critical">
-                <i /> Incap/death
+                <i /> {tx("Incap/death", "Incapacitación/muerte")}
               </span>
               <span className="pin">
-                <i /> Pin
+                <i /> {tx("Pin", "Inmovilización")}
               </span>
               <span className="tank">
-                <i /> Tank
+                <i /> {tx("Tank", "Tank")}
               </span>
               <span className="witch">
-                <i /> Witch
+                <i /> {tx("Witch", "Witch")}
               </span>
             </>
           )}
           {openingLandmarks.length > 0 && (
             <span className="opening">
-              <i /> Observed opening
+              <i /> {tx("Observed opening", "Inicio observado")}
             </span>
           )}
           <span className="extent">
-            <i /> First/last observed
+            <i /> {tx("First/last observed", "Primero/último observado")}
           </span>
         </div>
         {displayMode !== "events" && densityGrids && (
@@ -5402,44 +6232,86 @@ function DeathPositions({
             />
             <strong>
               {compareTeams && compareDensityMode === "difference"
-                ? "More Team A concentration ← normalized difference → More Team B concentration"
+                ? tx(
+                    "More Team A concentration ← normalized difference → More Team B concentration",
+                    "Mayor concentración del Equipo A ← diferencia normalizada → Mayor concentración del Equipo B",
+                  )
                 : compareTeams
-                  ? "Shared scale · Team A cyan · Team B magenta"
-                  : "Lower ← normalized share of positioned events → higher"}
+                  ? tx(
+                      "Shared scale · Team A cyan · Team B magenta",
+                      "Escala compartida · Equipo A cian · Equipo B magenta",
+                    )
+                  : tx(
+                      "Lower ← normalized share of positioned events → higher",
+                      "Menor ← proporción normalizada de eventos posicionados → mayor",
+                    )}
             </strong>
             <span>
-              Smoothing {densityRadius} world units · normalized within each
-              cohort · A n={densityGrids.A.sampleCount} · B n=
-              {densityGrids.B.sampleCount}
+              {tx(
+                "Smoothing {radius} world units · normalized within each cohort · A n={a} · B n={b}",
+                "Suavizado de {radius} unidades del mundo · normalizado dentro de cada cohorte · A n={a} · B n={b}",
+                {
+                  radius: densityRadius,
+                  a: densityGrids.A.sampleCount,
+                  b: densityGrids.B.sampleCount,
+                },
+              )}
               {compareTeams &&
               (densityGrids.A.sampleCount < 10 ||
                 densityGrids.B.sampleCount < 10)
-                ? " · sparse observations—patterns are unstable"
+                ? tx(
+                    " · sparse observations—patterns are unstable",
+                    " · observaciones escasas; los patrones son inestables",
+                  )
                 : ""}
             </span>
           </div>
         )}
         {openingLandmarks.length > 0 && (
           <div className="spatial-landmark-notice">
-            <strong>Observed Survivor opening area</strong>
+            <strong>
+              {tx(
+                "Observed Survivor opening area",
+                "Área inicial observada de supervivientes",
+              )}
+            </strong>
             <span>
-              First observed round opening · demo-derived, not an authored
-              saferoom ·{" "}
+              {tx(
+                "First observed round opening · demo-derived, not an authored saferoom",
+                "Primer inicio de ronda observado · derivado de la demo, no un refugio definido",
+              )}{" "}
+              ·{" "}
               {openingLandmarks
-                .map(
-                  ({ half, area }) =>
-                    `${half.id} ${area.samples.length}/${half.survivorPlayerIds.length} players · radius ${whole.format(area.planarRadiusUnits)}u · ticks ${whole.format(area.tickRange.start)}–${whole.format(area.tickRange.end)}`,
+                .map(({ half, area }) =>
+                  tx(
+                    "{half} {observed}/{total} players · radius {radius}u · ticks {start}–{end}",
+                    "{half} {observed}/{total} jugadores · radio {radius}u · ticks {start}–{end}",
+                    {
+                      half: half.id,
+                      observed: area.samples.length,
+                      total: half.survivorPlayerIds.length,
+                      radius: whole.format(area.planarRadiusUnits),
+                      start: whole.format(area.tickRange.start),
+                      end: whole.format(area.tickRange.end),
+                    },
+                  ),
                 )
                 .join(" · ")}
             </span>
           </div>
         )}
         <div className="spatial-landmark-notice extent-notice">
-          <strong>Observed progression anchors</strong>
+          <strong>
+            {tx(
+              "Observed progression anchors",
+              "Anclas de progresión observadas",
+            )}
+          </strong>
           <span>
-            First and last positioned event in each visible half · demo-derived
-            orientation aids, not authored saferoom boundaries or movement
-            routes
+            {tx(
+              "First and last positioned event in each visible half · demo-derived orientation aids, not authored saferoom boundaries or movement routes",
+              "Primer y último evento posicionado de cada mitad visible · ayudas de orientación derivadas de la demo, no límites de refugio ni rutas de movimiento definidos",
+            )}
           </span>
         </div>
         <SpatialEventLinks
@@ -5448,15 +6320,28 @@ function DeathPositions({
           onOpenTimeline={onOpenTimeline}
         />
         <small>
-          Density represents positioned timeline events, not player occupancy. ·{" "}
-          {whole.format(geometry.coverage.emittedTriangles)} world-brush
-          triangles · BSP {geometry.provenance.sourceBspSha256.slice(0, 12)} ·{" "}
-          {whole.format(geometry.coverage.emittedDisplacements)} displacements
-          reconstructed
-          {geometry.coverage.skippedDisplacements
-            ? ` · ${whole.format(geometry.coverage.skippedDisplacements)} displacements skipped`
-            : ""}
-          {" · static props unavailable"}
+          {tx(
+            "Density represents positioned timeline events, not player occupancy. · {triangles} world-brush triangles · BSP {bsp} · {displacements} displacements reconstructed{skipped} · static props unavailable",
+            "La densidad representa eventos posicionados de la cronología, no la ocupación de jugadores. · {triangles} triángulos de brushes del mundo · BSP {bsp} · {displacements} desplazamientos reconstruidos{skipped} · objetos estáticos no disponibles",
+            {
+              triangles: whole.format(geometry.coverage.emittedTriangles),
+              bsp: geometry.provenance.sourceBspSha256.slice(0, 12),
+              displacements: whole.format(
+                geometry.coverage.emittedDisplacements,
+              ),
+              skipped: geometry.coverage.skippedDisplacements
+                ? tx(
+                    " · {count} displacements skipped",
+                    " · {count} desplazamientos omitidos",
+                    {
+                      count: whole.format(
+                        geometry.coverage.skippedDisplacements,
+                      ),
+                    },
+                  )
+                : "",
+            },
+          )}
         </small>
       </article>
     );
@@ -5472,15 +6357,31 @@ function DeathPositions({
     <article className="panel death-map">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Spatial combat</span>
-          <h3>{positioned.length} positioned combat moments</h3>
+          <span className="eyebrow">
+            {tx("Spatial combat", "Combate espacial")}
+          </span>
+          <h3>
+            {tx(
+              "{count} positioned combat moments",
+              "{count} momentos de combate posicionados",
+              { count: positioned.length },
+            )}
+          </h3>
         </div>
-        <span className="muted">Normalized event coordinates</span>
+        <span className="muted">
+          {tx(
+            "Normalized event coordinates",
+            "Coordenadas normalizadas de eventos",
+          )}
+        </span>
       </div>
       <svg
         viewBox="0 0 900 300"
         role="img"
-        aria-label="Normalized combat-event positions"
+        aria-label={tx(
+          "Normalized combat-event positions",
+          "Posiciones normalizadas de eventos de combate",
+        )}
       >
         {positioned.map((event, index) => (
           <circle
@@ -5496,10 +6397,10 @@ function DeathPositions({
       </svg>
       <div className="death-map-key">
         <span>
-          <i /> Attacks and support
+          <i /> {tx("Attacks and support", "Ataques y apoyo")}
         </span>
         <span>
-          <i /> Incaps and deaths
+          <i /> {tx("Incaps and deaths", "Incapacitaciones y muertes")}
         </span>
       </div>
       <SpatialEventLinks
@@ -5508,8 +6409,10 @@ function DeathPositions({
         onOpenTimeline={onOpenTimeline}
       />
       <small>
-        This is not map geometry; it preserves relative positions from death
-        events. Install the matching local BSP artifact for real map geometry.
+        {tx(
+          "This is not map geometry; it preserves relative positions from death events. Install the matching local BSP artifact for real map geometry.",
+          "Esto no es geometría del mapa; conserva posiciones relativas de los eventos de muerte. Instala el artefacto BSP local correspondiente para obtener la geometría real del mapa.",
+        )}
       </small>
     </article>
   );
@@ -5524,6 +6427,7 @@ function SpatialEventLinks({
   demoSha256: string | undefined;
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const { tx } = useI18n();
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState(100);
   if (!demoSha256) return null;
@@ -5537,7 +6441,11 @@ function SpatialEventLinks({
       }}
     >
       <summary>
-        Inspect {whole.format(events.length)} positioned moments
+        {tx(
+          "Inspect {count} positioned moments",
+          "Inspeccionar {count} momentos posicionados",
+          { count: whole.format(events.length) },
+        )}
         <ChevronDown />
       </summary>
       {open && (
@@ -5552,7 +6460,11 @@ function SpatialEventLinks({
                 {event.infectedClass ?? event.type.replaceAll("_", " ")}
               </span>
               <strong>{event.detail}</strong>
-              <time>tick {whole.format(event.tick)}</time>
+              <time>
+                {tx("tick {tick}", "tick {tick}", {
+                  tick: whole.format(event.tick),
+                })}
+              </time>
             </button>
           ))}
           {limit < events.length && (
@@ -5561,7 +6473,9 @@ function SpatialEventLinks({
               className="spatial-event-more"
               onClick={() => setLimit((current) => current + 100)}
             >
-              Show next {whole.format(Math.min(100, events.length - limit))}
+              {tx("Show next {count}", "Mostrar los siguientes {count}", {
+                count: whole.format(Math.min(100, events.length - limit)),
+              })}
             </button>
           )}
         </div>
@@ -5577,10 +6491,11 @@ function Breakdown({
   title: string;
   rows: [string, number][];
 }) {
+  const { tx } = useI18n();
   const max = rows[0]?.[1] ?? 1;
   return (
     <article className="panel breakdown-panel">
-      <span className="eyebrow">Distribution</span>
+      <span className="eyebrow">{tx("Distribution", "Distribución")}</span>
       <h3>{title}</h3>
       {rows.length ? (
         rows.map(([name, count]) => (
@@ -5593,7 +6508,12 @@ function Breakdown({
           </div>
         ))
       ) : (
-        <p className="muted">This demo did not expose these events.</p>
+        <p className="muted">
+          {tx(
+            "This demo did not expose these events.",
+            "Esta demo no expuso estos eventos.",
+          )}
+        </p>
       )}
     </article>
   );
@@ -5606,6 +6526,7 @@ function Timeline({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
+  const { locale, tx } = useI18n();
   const initialTimelineParameters = new URLSearchParams(window.location.search);
   const initialFilter = initialTimelineParameters.get("storyFilter");
   const [filter, setFilter] = useState(
@@ -5684,7 +6605,9 @@ function Timeline({
   const demos = stats.map((demo, demoIndex) => ({
     demo,
     demoIndex,
-    mapName: analyses[demoIndex]?.engineResult.demo.mapName ?? "Unknown map",
+    mapName:
+      analyses[demoIndex]?.engineResult.demo.mapName ??
+      tx("Unknown map", "Mapa desconocido"),
     sha256: analyses[demoIndex]?.demoSha256 ?? "unknown",
     events: (demo.timeline ?? [])
       .map((event, eventIndex) => ({
@@ -5836,18 +6759,36 @@ function Timeline({
     };
   }, [fullscreen]);
   const lanes: Array<{
+    id: "round" | "si" | "bosses" | "pins" | "deaths" | "support";
     name: string;
     types: MatchTimelineEvent["type"][];
   }> = [
-    { name: "Round", types: ["round_start", "round_end", "team_change"] },
-    { name: "SI actions", types: ["spawn", "tank_control", "attack"] },
     {
-      name: "Bosses",
+      id: "round",
+      name: tx("Round", "Ronda"),
+      types: ["round_start", "round_end", "team_change"],
+    },
+    {
+      id: "si",
+      name: tx("SI actions", "Acciones de infectados especiales"),
+      types: ["spawn", "tank_control", "attack"],
+    },
+    {
+      id: "bosses",
+      name: tx("Bosses", "Jefes"),
       types: ["witch_spawn", "witch_enrage", "witch_burn", "witch_end"],
     },
-    { name: "Pins + clears", types: ["pin_start", "pin_end", "clear"] },
-    { name: "Deaths + incaps", types: ["death", "incap"] },
-    { name: "Support", types: ["revive"] },
+    {
+      id: "pins",
+      name: tx("Pins + clears", "Agarres y liberaciones"),
+      types: ["pin_start", "pin_end", "clear"],
+    },
+    {
+      id: "deaths",
+      name: tx("Deaths + incaps", "Muertes e incapacitados"),
+      types: ["death", "incap"],
+    },
+    { id: "support", name: tx("Support", "Apoyo"), types: ["revive"] },
   ];
   const hasInfectedIcon = (name?: string) =>
     [
@@ -6018,11 +6959,16 @@ function Timeline({
     );
     return {
       key: `${demo.sha256}:${observedRound}`,
-      label: observedRound >= 0 ? `Round ${observedRound + 1}` : "Unsegmented",
+      label:
+        observedRound >= 0
+          ? tx("Round {number}", "Ronda {number}", {
+              number: observedRound + 1,
+            })
+          : tx("Unsegmented", "Sin segmentar"),
       detail:
         observedRound >= 0
-          ? `${survivorRoster ? `Team ${survivorRoster.id} Survivors · ` : ""}Observed boundary · ${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
-          : "Boundary unavailable",
+          ? `${survivorRoster ? tx("Team {id} Survivors · ", "Supervivientes del equipo {id} · ", { id: survivorRoster.id }) : ""}${tx("Observed boundary", "Límite observado")} · ${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
+          : tx("Boundary unavailable", "Límite no disponible"),
     };
   };
   const storyRoundContext = (story: (typeof storyItems)[number]) => {
@@ -6031,15 +6977,116 @@ function Timeline({
     return roundContextForTick(demo, story.tick);
   };
   const storyEventLabel = (event: MatchTimelineEvent) => {
-    if (event.type === "tank_control") return "Tank entered play";
-    if (event.type === "witch_spawn") return "Witch observed";
-    if (event.type === "witch_enrage") return "Witch enraged";
-    if (event.type === "witch_burn") return "Witch burning";
-    if (event.type === "witch_end") return "Witch observation ended";
-    if (event.type === "round_start") return "Round started";
-    if (event.type === "round_end") return "Round ended";
-    if (event.type === "team_change") return "Side changed";
-    return event.type.replaceAll("_", " ");
+    if (event.type === "tank_control")
+      return tx("Tank entered play", "El Tank entró en juego");
+    if (event.type === "witch_spawn")
+      return tx("Witch observed", "Witch observada");
+    if (event.type === "witch_enrage")
+      return tx("Witch enraged", "Witch enfurecida");
+    if (event.type === "witch_burn")
+      return tx("Witch burning", "Witch en llamas");
+    if (event.type === "witch_end")
+      return tx(
+        "Witch observation ended",
+        "Terminó la observación de la Witch",
+      );
+    if (event.type === "round_start")
+      return tx("Round started", "Ronda iniciada");
+    if (event.type === "round_end") return tx("Round ended", "Ronda terminada");
+    if (event.type === "team_change")
+      return tx("Side changed", "Cambio de bando");
+    return tx(
+      event.type.replaceAll("_", " "),
+      (
+        {
+          attack: "ataque",
+          clear: "liberación",
+          death: "muerte",
+          incap: "incapacitación",
+          pin_start: "inicio del agarre",
+          pin_end: "fin del agarre",
+          revive: "reanimación",
+          spawn: "aparición",
+        } as Record<string, string>
+      )[event.type] ?? event.type.replaceAll("_", " "),
+    );
+  };
+  const timelineDetail = (event: MatchTimelineEvent) => {
+    if (locale === "en") return event.detail;
+    const actor = event.actor ?? tx("Environment", "Entorno");
+    const victim = event.victim ?? tx("a Survivor", "un superviviente");
+    const infected =
+      event.infectedClass ?? tx("Special Infected", "infectado especial");
+    if (event.type === "round_start")
+      return tx("Round started", "Ronda iniciada");
+    if (event.type === "round_end") return tx("Round ended", "Ronda terminada");
+    if (event.type === "team_change")
+      return tx("{player} changed team", "{player} cambió de equipo", {
+        player: event.subject ?? tx("Player", "Jugador"),
+      });
+    if (event.type === "tank_control")
+      return tx(
+        "{player} took Tank control",
+        "{player} tomó el control del Tank",
+        { player: actor },
+      );
+    if (event.type === "spawn")
+      return tx(
+        "{player} spawned as {class}",
+        "{player} apareció como {class}",
+        { player: actor, class: infected },
+      );
+    if (event.type === "incap")
+      return tx("{player} was incapacitated", "{player} quedó incapacitado", {
+        player: victim,
+      });
+    if (event.type === "revive")
+      return tx(
+        "{player} completed a revive",
+        "{player} completó una reanimación",
+        { player: actor },
+      );
+    if (event.type === "pin_start")
+      return tx(
+        "{actor} pinned {victim} as {class}",
+        "{actor} inmovilizó a {victim} como {class}",
+        { actor, victim, class: infected },
+      );
+    if (event.type === "pin_end")
+      return tx(
+        "{actor}'s pin on {victim} ended",
+        "Terminó el agarre de {actor} sobre {victim}",
+        { actor, victim },
+      );
+    if (event.type === "clear")
+      return tx(
+        "{actor} freed {victim} from {class}",
+        "{actor} liberó a {victim} de {class}",
+        { actor, victim, class: infected },
+      );
+    if (event.type === "death")
+      return event.victim
+        ? tx("{victim} died", "{victim} murió", { victim: event.victim })
+        : tx("{actor} killed {victim}", "{actor} mató a {victim}", {
+            actor,
+            victim: infected,
+          });
+    if (event.type === "witch_spawn")
+      return tx("Witch became observable", "La Witch se volvió observable");
+    if (event.type === "witch_enrage")
+      return tx("Witch became enraged", "La Witch se enfureció");
+    if (event.type === "witch_burn")
+      return tx("Witch began burning", "La Witch empezó a arder");
+    if (event.type === "witch_end")
+      return tx(
+        "Witch observation ended",
+        "Terminó la observación de la Witch",
+      );
+    if (event.type === "attack") {
+      const action = event.detail.split(":").slice(1).join(":").trim();
+      return tx("{actor}: {action}", "{actor}: {action}", { actor, action });
+    }
+    return storyEventLabel(event);
   };
   return (
     <div
@@ -6047,31 +7094,55 @@ function Timeline({
     >
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Match story</span>
-          <h2>{eventCount} tick-addressed moments</h2>
+          <span className="eyebrow">
+            {tx("Match story", "Historia de la partida")}
+          </span>
+          <h2>
+            {tx(
+              "{count} tick-addressed moments",
+              "{count} momentos ubicados por tick",
+              { count: eventCount },
+            )}
+          </h2>
         </div>
         <div className="timeline-heading-actions">
-          <span className="muted">One independent clock per demo</span>
+          <span className="muted">
+            {tx(
+              "One independent clock per demo",
+              "Un reloj independiente por demo",
+            )}
+          </span>
           <button
             type="button"
             className="timeline-fullscreen"
             onClick={() => setFullscreen((value) => !value)}
             aria-label={
               fullscreen
-                ? "Exit fullscreen timeline"
-                : "Open fullscreen timeline"
+                ? tx(
+                    "Exit fullscreen timeline",
+                    "Salir de la cronología a pantalla completa",
+                  )
+                : tx(
+                    "Open fullscreen timeline",
+                    "Abrir la cronología a pantalla completa",
+                  )
             }
           >
             {fullscreen ? <Minimize2 /> : <Maximize2 />}
-            {fullscreen ? "Exit" : "Fullscreen"}
+            {fullscreen
+              ? tx("Exit", "Salir")
+              : tx("Fullscreen", "Pantalla completa")}
           </button>
         </div>
       </div>
       <div
         className={`timeline-filters ${moreTimelineFilters || ["pins", "infected", "rounds", "support"].includes(filter) ? "show-secondary" : ""}`}
-        aria-label="Timeline filters"
+        aria-label={tx("Timeline filters", "Filtros de cronología")}
       >
-        <span className="timeline-map-filter" aria-label="Timeline map">
+        <span
+          className="timeline-map-filter"
+          aria-label={tx("Timeline map", "Mapa de la cronología")}
+        >
           {demos.map((demo) => (
             <button
               type="button"
@@ -6093,7 +7164,20 @@ function Timeline({
             type="button"
             className={`${filter === value ? "active" : ""} ${["pins", "infected", "rounds", "support"].includes(value) ? "timeline-filter-secondary" : ""}`}
             aria-pressed={filter === value}
-            aria-label={value}
+            aria-label={tx(
+              value,
+              (
+                {
+                  all: "todos",
+                  combat: "combate",
+                  pins: "agarres",
+                  infected: "infectados",
+                  bosses: "jefes",
+                  rounds: "rondas",
+                  support: "apoyo",
+                } as Record<string, string>
+              )[value] ?? value,
+            )}
             key={value}
             onClick={() => {
               setFilter(value);
@@ -6101,7 +7185,21 @@ function Timeline({
               setSelectedHit(null);
             }}
           >
-            {value} <span aria-hidden="true">{filterCounts[value]}</span>
+            {tx(
+              value,
+              (
+                {
+                  all: "todos",
+                  combat: "combate",
+                  pins: "agarres",
+                  infected: "infectados",
+                  bosses: "jefes",
+                  rounds: "rondas",
+                  support: "apoyo",
+                } as Record<string, string>
+              )[value] ?? value,
+            )}{" "}
+            <span aria-hidden="true">{filterCounts[value]}</span>
           </button>
         ))}
         <button
@@ -6110,12 +7208,14 @@ function Timeline({
           aria-expanded={moreTimelineFilters}
           onClick={() => setMoreTimelineFilters((current) => !current)}
         >
-          {moreTimelineFilters ? "Less" : "More"}
+          {moreTimelineFilters ? tx("Less", "Menos") : tx("More", "Más")}
         </button>
         <span
           className="timeline-zoom"
           aria-label={
-            timelineView === "hits" ? "Story density" : "Timeline zoom"
+            timelineView === "hits"
+              ? tx("Story density", "Densidad de la historia")
+              : tx("Timeline zoom", "Zoom de la cronología")
           }
         >
           {[1, 2, 4].map((value) => (
@@ -6127,15 +7227,15 @@ function Timeline({
             >
               {timelineView === "hits"
                 ? value === 1
-                  ? "compact"
+                  ? tx("compact", "compacto")
                   : value === 2
-                    ? "comfortable"
-                    : "spacious"
+                    ? tx("comfortable", "cómodo")
+                    : tx("spacious", "espacioso")
                 : value === 1
-                  ? "full match"
+                  ? tx("full match", "partida completa")
                   : value === 2
-                    ? "inspect"
-                    : "detail"}
+                    ? tx("inspect", "inspeccionar")
+                    : tx("detail", "detalle")}
             </button>
           ))}
         </span>
@@ -6143,7 +7243,10 @@ function Timeline({
       <div
         className="timeline-view-tabs"
         role="tablist"
-        aria-label="Match story view"
+        aria-label={tx(
+          "Match story view",
+          "Vista de la historia de la partida",
+        )}
       >
         <button
           id={storyTabId}
@@ -6162,7 +7265,7 @@ function Timeline({
             }
           }}
         >
-          Story
+          {tx("Story", "Historia")}
         </button>
         <button
           id={timelineTabId}
@@ -6181,7 +7284,7 @@ function Timeline({
             }
           }}
         >
-          Timeline
+          {tx("Timeline", "Cronología")}
         </button>
       </div>
       {timelineView === "hits" && (
@@ -6193,13 +7296,24 @@ function Timeline({
         >
           <header>
             <strong>
-              {storyItems.length} story moments · {visible.length} source events
+              {tx(
+                "{moments} story moments · {events} source events",
+                "{moments} momentos de la historia · {events} eventos de origen",
+                { moments: storyItems.length, events: visible.length },
+              )}
             </strong>
-            <span>Select a moment, then open Timeline for full evidence</span>
+            <span>
+              {tx(
+                "Select a moment, then open Timeline for full evidence",
+                "Selecciona un momento y abre Cronología para ver toda la evidencia",
+              )}
+            </span>
           </header>
           <p className="story-availability-note">
-            Saferoom departure/arrival, pills taken, and Witch crowns are not
-            available in retained demo telemetry; they are not inferred here.
+            {tx(
+              "Saferoom departure/arrival, pills taken, and Witch crowns are not available in retained demo telemetry; they are not inferred here.",
+              "La salida/llegada al refugio, las píldoras tomadas y las coronas a la Witch no están disponibles en la telemetría conservada; no se infieren aquí.",
+            )}
           </p>
           {storyItems.length ? (
             <div className="hit-roundup-scroll">
@@ -6253,7 +7367,7 @@ function Timeline({
                               {story.items[0]!.event.actor ??
                                 story.items[0]!.event.subject ??
                                 story.items[0]!.event.victim ??
-                                "Match"}
+                                tx("Match", "Partida")}
                             </strong>
                             <small>
                               {story.items[0]!.event.infectedClass ??
@@ -6261,7 +7375,11 @@ function Timeline({
                             </small>
                             <small className="story-event-mobile-meta">
                               {story.items.length > 1
-                                ? `${story.items.length} linked moments`
+                                ? tx(
+                                    "{count} linked moments",
+                                    "{count} momentos vinculados",
+                                    { count: story.items.length },
+                                  )
                                 : storyEventLabel(story.items[0]!.event)}{" "}
                               ·{" "}
                               {formatElapsedTime(
@@ -6273,7 +7391,11 @@ function Timeline({
                         <span className="story-event-core">
                           <small>
                             {story.items.length > 1
-                              ? `${story.items.length} linked moments`
+                              ? tx(
+                                  "{count} linked moments",
+                                  "{count} momentos vinculados",
+                                  { count: story.items.length },
+                                )
                               : storyEventLabel(story.items[0]!.event)}
                           </small>
                           <span>
@@ -6302,14 +7424,17 @@ function Timeline({
                         <span className="story-event-detail">
                           <strong>
                             {story.items
-                              .map(({ event }) => event.detail)
+                              .map(({ event }) => timelineDetail(event))
                               .join(" · ")}
                           </strong>
                           <small>
                             {story.items[0]!.event.weapon ??
                               (story.items.some(({ event }) => event.position)
-                                ? "position observed"
-                                : "position unavailable")}
+                                ? tx("position observed", "posición observada")
+                                : tx(
+                                    "position unavailable",
+                                    "posición no disponible",
+                                  ))}
                           </small>
                         </span>
                       </button>
@@ -6330,13 +7455,22 @@ function Timeline({
                       >
                         <span className="hit-summary-core">
                           <small>
-                            {hitRoundContext(story.summary).observedBoundary
-                              ? `Round ${hitRoundContext(story.summary).round}`
-                              : "Unsegmented"}{" "}
-                            · Hit{" "}
-                            {String(
-                              hitRoundContext(story.summary).hit,
-                            ).padStart(2, "0")}
+                            {tx(
+                              "{round} · Hit {hit}",
+                              "{round} · Ataque {hit}",
+                              {
+                                round: hitRoundContext(story.summary)
+                                  .observedBoundary
+                                  ? tx("Round {number}", "Ronda {number}", {
+                                      number: hitRoundContext(story.summary)
+                                        .round,
+                                    })
+                                  : tx("Unsegmented", "Sin segmentar"),
+                                hit: String(
+                                  hitRoundContext(story.summary).hit,
+                                ).padStart(2, "0"),
+                              },
+                            )}
                           </small>
                           <span>
                             <strong>
@@ -6344,7 +7478,12 @@ function Timeline({
                                 story.summary.hit.observedSurvivorHealthLoss,
                               )}
                             </strong>
-                            <small>observed HP loss</small>
+                            <small>
+                              {tx(
+                                "observed HP loss",
+                                "pérdida de PS observada",
+                              )}
+                            </small>
                           </span>
                           <small>
                             {formatTickTime(
@@ -6380,7 +7519,10 @@ function Timeline({
                                     {life.infectedClass} ·{" "}
                                     {damage !== undefined
                                       ? `${whole.format(damage)} dmg`
-                                      : "damage unavailable"}
+                                      : tx(
+                                          "damage unavailable",
+                                          "daño no disponible",
+                                        )}
                                   </small>
                                   <i>
                                     <i
@@ -6399,7 +7541,7 @@ function Timeline({
                             <strong>
                               {whole.format(story.summary.hit.controls)}
                             </strong>
-                            <small>controls</small>
+                            <small>{tx("controls", "controles")}</small>
                             <i>
                               <i
                                 style={{
@@ -6414,7 +7556,9 @@ function Timeline({
                                 story.summary.hit.peakSimultaneousPins,
                               )}
                             </strong>
-                            <small>peak pins</small>
+                            <small>
+                              {tx("peak pins", "máximo de agarres")}
+                            </small>
                             <i>
                               <i
                                 style={{
@@ -6425,9 +7569,16 @@ function Timeline({
                           </span>
                           <span>
                             <strong>
-                              {story.summary.hit.spawnSpreadSeconds.toFixed(1)}s
+                              {tx("{seconds}s", "{seconds}s", {
+                                seconds:
+                                  story.summary.hit.spawnSpreadSeconds.toFixed(
+                                    1,
+                                  ),
+                              })}
                             </strong>
-                            <small>spawn spread</small>
+                            <small>
+                              {tx("spawn spread", "dispersión de aparición")}
+                            </small>
                             <i>
                               <i
                                 style={{
@@ -6438,8 +7589,10 @@ function Timeline({
                           </span>
                         </span>
                         <span className="hit-summary-footnote">
-                          Survivor → SI damage unavailable · spawn-gap-v1
-                          grouping
+                          {tx(
+                            "Survivor → SI damage unavailable · spawn-gap-v1 grouping",
+                            "Daño de Superviviente → infectado especial no disponible · agrupación spawn-gap-v1",
+                          )}
                         </span>
                       </button>
                     )}
@@ -6452,14 +7605,23 @@ function Timeline({
                   className="story-show-more"
                   onClick={() => setStoryLimit((current) => current + 100)}
                 >
-                  Show next {Math.min(100, storyItems.length - storyLimit)} of{" "}
-                  {storyItems.length} moments
+                  {tx(
+                    "Show next {count} of {total} moments",
+                    "Mostrar los siguientes {count} de {total} momentos",
+                    {
+                      count: Math.min(100, storyItems.length - storyLimit),
+                      total: storyItems.length,
+                    },
+                  )}
                 </button>
               )}
             </div>
           ) : (
             <p className="muted">
-              No major story moments match the current map and category filters.
+              {tx(
+                "No major story moments match the current map and category filters.",
+                "Ningún momento importante coincide con los filtros actuales de mapa y categoría.",
+              )}
             </p>
           )}
           {selectedHitSummary && (
@@ -6469,7 +7631,10 @@ function Timeline({
             >
               <div>
                 <span>
-                  Hit {hitRoundContext(selectedHitSummary).hit} ·{" "}
+                  {tx("Hit {number}", "Ataque {number}", {
+                    number: hitRoundContext(selectedHitSummary).hit,
+                  })}{" "}
+                  ·{" "}
                   {formatTickTime(
                     selectedHitSummary.hit.tickRange.start,
                     selectedHitSummary.demo.demo.tickRate,
@@ -6484,8 +7649,14 @@ function Timeline({
                   {whole.format(
                     selectedHitSummary.hit.observedSurvivorHealthLoss,
                   )}{" "}
-                  observed HP loss · {selectedHitSummary.hit.controls} controls
-                  · peak {selectedHitSummary.hit.peakSimultaneousPins} pins
+                  {tx(
+                    "observed HP loss · {controls} controls · peak {pins} pins",
+                    "pérdida de PS observada · {controls} controles · máximo de {pins} agarres",
+                    {
+                      controls: selectedHitSummary.hit.controls,
+                      pins: selectedHitSummary.hit.peakSimultaneousPins,
+                    },
+                  )}
                 </strong>
                 <small>
                   {
@@ -6495,7 +7666,10 @@ function Timeline({
                         event.tick <= selectedHitSummary.hit.tickRange.end,
                     ).length
                   }{" "}
-                  constituent retained events · spawn-gap-v1 grouping
+                  {tx(
+                    "constituent retained events · spawn-gap-v1 grouping",
+                    "eventos constituyentes conservados · agrupación spawn-gap-v1",
+                  )}
                 </small>
               </div>
               <button
@@ -6505,7 +7679,7 @@ function Timeline({
                   setTimelineView("timeline");
                 }}
               >
-                Inspect hit range
+                {tx("Inspect hit range", "Inspeccionar intervalo del ataque")}
               </button>
             </article>
           )}
@@ -6516,13 +7690,16 @@ function Timeline({
                   {formatElapsedTime(active.event.timeSeconds)} ·{" "}
                   {active.event.type.replaceAll("_", " ")}
                 </span>
-                <strong>{active.event.detail}</strong>
+                <strong>{timelineDetail(active.event)}</strong>
                 <small>
-                  tick {whole.format(active.event.tick)} · {active.demo.mapName}
+                  {tx("tick {tick} · {map}", "tick {tick} · {map}", {
+                    tick: whole.format(active.event.tick),
+                    map: active.demo.mapName,
+                  })}
                 </small>
               </div>
               <button type="button" onClick={() => setTimelineView("timeline")}>
-                Inspect on Timeline
+                {tx("Inspect on Timeline", "Inspeccionar en la cronología")}
               </button>
             </article>
           )}
@@ -6538,7 +7715,10 @@ function Timeline({
           >
             <div
               className="timeline-presentation-switch"
-              aria-label="Timeline presentation"
+              aria-label={tx(
+                "Timeline presentation",
+                "Presentación de la cronología",
+              )}
             >
               <button
                 type="button"
@@ -6546,7 +7726,7 @@ function Timeline({
                 aria-pressed={timelinePresentation === "list"}
                 onClick={() => setTimelinePresentation("list")}
               >
-                Event list
+                {tx("Event list", "Lista de eventos")}
               </button>
               <button
                 type="button"
@@ -6554,13 +7734,15 @@ function Timeline({
                 aria-pressed={timelinePresentation === "chart"}
                 onClick={() => setTimelinePresentation("chart")}
               >
-                Lane chart
+                {tx("Lane chart", "Gráfico por carriles")}
               </button>
             </div>
             {timelinePresentation === "chart" && (
               <p className="timeline-hint">
-                Scroll through playback time and select a marker for full event
-                evidence. Rows expand when moments collide.
+                {tx(
+                  "Scroll through playback time and select a marker for full event evidence. Rows expand when moments collide.",
+                  "Desplázate por el tiempo de reproducción y selecciona un marcador para ver toda la evidencia del evento. Las filas se expanden cuando coinciden varios momentos.",
+                )}
               </p>
             )}
             {timelinePresentation === "list" && (
@@ -6597,9 +7779,11 @@ function Timeline({
                           <span className="mobile-timeline-glyph">•</span>
                         )}
                         <span>
-                          <strong>{item.event.detail}</strong>
+                          <strong>{timelineDetail(item.event)}</strong>
                           <small>
-                            {item.event.actor ?? item.event.subject ?? "Match"}
+                            {item.event.actor ??
+                              item.event.subject ??
+                              tx("Match", "Partida")}
                             {item.event.infectedClass
                               ? ` · ${item.event.infectedClass}`
                               : ` · ${item.event.type.replaceAll("_", " ")}`}
@@ -6618,9 +7802,17 @@ function Timeline({
                       setTimelineListLimit((current) => current + 100)
                     }
                   >
-                    Show next{" "}
-                    {Math.min(100, visible.length - timelineListLimit)} of{" "}
-                    {visible.length} events
+                    {tx(
+                      "Show next {count} of {total} events",
+                      "Mostrar los siguientes {count} de {total} eventos",
+                      {
+                        count: Math.min(
+                          100,
+                          visible.length - timelineListLimit,
+                        ),
+                        total: visible.length,
+                      },
+                    )}
                   </button>
                 )}
               </div>
@@ -6647,8 +7839,21 @@ function Timeline({
                     kind: "pin" as const,
                     start: item.event.tick,
                     end: end.event.tick,
-                    label: `${item.event.infectedClass ?? "SI"} pin`,
-                    detail: `${item.event.actor ?? "Special Infected"} controlled ${item.event.victim ?? "a Survivor"}`,
+                    label: tx("{class} pin", "agarre de {class}", {
+                      class: item.event.infectedClass ?? "SI",
+                    }),
+                    detail: tx(
+                      "{actor} controlled {victim}",
+                      "{actor} inmovilizó a {victim}",
+                      {
+                        actor:
+                          item.event.actor ??
+                          tx("Special Infected", "infectado especial"),
+                        victim:
+                          item.event.victim ??
+                          tx("a Survivor", "un superviviente"),
+                      },
+                    ),
                   };
                 });
                 const hitBands = (source.demo.competitive?.hits ?? []).map(
@@ -6657,8 +7862,18 @@ function Timeline({
                     kind: "hit" as const,
                     start: hit.tickRange.start,
                     end: hit.tickRange.end,
-                    label: `${hit.infectedClasses.join(" + ") || "SI"} hit`,
-                    detail: `${hit.playerIds.length} players, ${hit.controls} controls, peak ${hit.peakSimultaneousPins} simultaneous pins`,
+                    label: tx("{classes} hit", "ataque de {classes}", {
+                      classes: hit.infectedClasses.join(" + ") || "SI",
+                    }),
+                    detail: tx(
+                      "{players} players, {controls} controls, peak {pins} simultaneous pins",
+                      "{players} jugadores, {controls} controles, máximo de {pins} agarres simultáneos",
+                      {
+                        players: hit.playerIds.length,
+                        controls: hit.controls,
+                        pins: hit.peakSimultaneousPins,
+                      },
+                    ),
                   }),
                 );
                 const tankBands = (
@@ -6669,35 +7884,53 @@ function Timeline({
                   start: tank.tickRange.start,
                   end: tank.tickRange.end,
                   label: `Tank · ${tank.controllerAlias}`,
-                  detail: `${duration(tank.durationSeconds)}, ${tank.punches} punches, ${tank.registeredRockThrows} registered throws`,
+                  detail: tx(
+                    "{duration}, {punches} punches, {throws} registered throws",
+                    "{duration}, {punches} puñetazos, {throws} lanzamientos registrados",
+                    {
+                      duration: duration(tank.durationSeconds),
+                      punches: tank.punches,
+                      throws: tank.registeredRockThrows,
+                    },
+                  ),
                 }));
                 return (
                   <section className="match-timeline" key={source.demoIndex}>
                     <header className="timeline-demo-head">
                       <div>
                         <span className="eyebrow">
-                          Demo {source.demoIndex + 1}
+                          {tx("Demo {number}", "Demo {number}", {
+                            number: source.demoIndex + 1,
+                          })}
                         </span>
                         <h3>{source.mapName}</h3>
                       </div>
                       <span>
                         {source.sha256.slice(0, 12)} ·{" "}
-                        {whole.format(source.demo.playbackTicks)} ticks ·{" "}
+                        {tx("{ticks} ticks", "{ticks} ticks", {
+                          ticks: whole.format(source.demo.playbackTicks),
+                        })}{" "}
+                        ·{" "}
                         {source.demo.tickRate === null
-                          ? "time unavailable"
+                          ? tx("time unavailable", "tiempo no disponible")
                           : duration(source.demo.durationSeconds)}
                       </span>
                     </header>
                     <div className="timeline-scroll">
                       <span className="timeline-scroll-cue" aria-hidden="true">
-                        Scroll horizontally
+                        {tx(
+                          "Scroll horizontally",
+                          "Desplázate horizontalmente",
+                        )}
                       </span>
                       <div
                         className="timeline-canvas"
                         style={{ width: canvasWidth }}
                       >
                         <div className="timeline-axis">
-                          <strong>Playback time</strong>
+                          <strong>
+                            {tx("Playback time", "Tiempo de reproducción")}
+                          </strong>
                           <div>
                             {Array.from(
                               { length: guideCount + 1 },
@@ -6743,11 +7976,11 @@ function Timeline({
                               return { ...item, position, row };
                             });
                             const laneBands =
-                              lane.name === "SI actions"
+                              lane.id === "si"
                                 ? hitBands
-                                : lane.name === "Pins + clears"
+                                : lane.id === "pins"
                                   ? pinBands
-                                  : lane.name === "Bosses"
+                                  : lane.id === "bosses"
                                     ? tankBands
                                     : [];
                             const bandRows: number[] = [];
@@ -6789,7 +8022,11 @@ function Timeline({
                               >
                                 <strong>
                                   <span>{lane.name}</span>
-                                  <small>{laneEvents.length} events</small>
+                                  <small>
+                                    {tx("{count} events", "{count} eventos", {
+                                      count: laneEvents.length,
+                                    })}
+                                  </small>
                                 </strong>
                                 <div style={{ minHeight: laneHeight }}>
                                   <i />
@@ -6870,7 +8107,16 @@ function Timeline({
                                               ? "true"
                                               : undefined
                                           }
-                                          aria-label={`${source.mapName}, tick ${event.tick}, ${event.type.replaceAll("_", " ")}: ${event.detail}`}
+                                          aria-label={tx(
+                                            "{map}, tick {tick}, {type}: {detail}",
+                                            "{map}, tick {tick}, {type}: {detail}",
+                                            {
+                                              map: source.mapName,
+                                              tick: event.tick,
+                                              type: storyEventLabel(event),
+                                              detail: timelineDetail(event),
+                                            },
+                                          )}
                                         >
                                           <b>
                                             {infectedMarker &&
@@ -6881,7 +8127,7 @@ function Timeline({
                                                 }
                                               />
                                             ) : (
-                                              event.type.replaceAll("_", " ")
+                                              storyEventLabel(event)
                                             )}
                                           </b>
                                           {(event.actor || event.subject) && (
@@ -6908,24 +8154,37 @@ function Timeline({
                 <div>
                   <time>
                     {active.demo.demo.tickRate === null
-                      ? "Time N/A"
+                      ? tx("Time N/A", "Tiempo no disponible")
                       : formatElapsedTime(active.event.timeSeconds)}
                   </time>
-                  <span>tick {whole.format(active.event.tick)}</span>
+                  <span>
+                    {tx("tick {tick}", "tick {tick}", {
+                      tick: whole.format(active.event.tick),
+                    })}
+                  </span>
                 </div>
                 <div>
                   <span className="eyebrow">
-                    {active.demo.mapName} ·{" "}
-                    {active.event.type.replaceAll("_", " ")}
+                    {active.demo.mapName} · {storyEventLabel(active.event)}
                   </span>
-                  <h3>{active.event.detail}</h3>
+                  <h3>{timelineDetail(active.event)}</h3>
                   <p>
                     {[
                       active.event.infectedClass,
                       active.event.weapon,
-                      active.event.headshot ? "headshot" : undefined,
+                      active.event.headshot
+                        ? tx("headshot", "disparo a la cabeza")
+                        : undefined,
                       active.event.position
-                        ? `position ${Math.round(active.event.position.x)}, ${Math.round(active.event.position.y)}, ${Math.round(active.event.position.z)}`
+                        ? tx(
+                            "position {x}, {y}, {z}",
+                            "posición {x}, {y}, {z}",
+                            {
+                              x: Math.round(active.event.position.x),
+                              y: Math.round(active.event.position.y),
+                              z: Math.round(active.event.position.z),
+                            },
+                          )
                         : undefined,
                     ]
                       .filter(Boolean)
@@ -6948,17 +8207,26 @@ function Timeline({
                     style={{ left: hovered.x, top: hovered.y }}
                   >
                     <em>
-                      {item.demo.mapName} · tick {whole.format(item.event.tick)}{" "}
+                      {item.demo.mapName} ·{" "}
+                      {tx("tick {tick}", "tick {tick}", {
+                        tick: whole.format(item.event.tick),
+                      })}{" "}
                       ·{" "}
                       {item.demo.demo.tickRate === null
-                        ? "time unavailable"
+                        ? tx("time unavailable", "tiempo no disponible")
                         : formatElapsedTime(item.event.timeSeconds)}
                     </em>
                     <strong>
-                      {item.event.actor ?? item.event.subject ?? "Match"}
-                      {item.event.victim ? ` to ${item.event.victim}` : ""}
+                      {item.event.actor ??
+                        item.event.subject ??
+                        tx("Match", "Partida")}
+                      {item.event.victim
+                        ? tx(" to {victim}", " a {victim}", {
+                            victim: item.event.victim,
+                          })
+                        : ""}
                     </strong>
-                    <small>{item.event.detail}</small>
+                    <small>{timelineDetail(item.event)}</small>
                   </div>,
                   document.body,
                 );
@@ -6966,8 +8234,14 @@ function Timeline({
           </div>
         ) : (
           <Empty
-            title="No detailed timeline available"
-            text="This analysis predates detailed event retention or the demo did not expose supported match events."
+            title={tx(
+              "No detailed timeline available",
+              "No hay una cronología detallada disponible",
+            )}
+            text={tx(
+              "This analysis predates detailed event retention or the demo did not expose supported match events.",
+              "Este análisis es anterior a la conservación detallada de eventos o la demo no expuso eventos compatibles de la partida.",
+            )}
           />
         ))}
     </div>
@@ -6983,6 +8257,7 @@ function Signals({
   stats: DemoStats[];
   onOpenTimeline: (jobId: string, demoSha256: string, tick: number) => void;
 }) {
+  const { locale, tx } = useI18n();
   const [mapFilter, setMapFilter] = useState("all");
   const [playerFilter, setPlayerFilter] = useState("all");
   const [familyFilter, setFamilyFilter] = useState("all");
@@ -7003,10 +8278,15 @@ function Signals({
         })
         .map((evidence) => ({
           ...evidence,
-          player: item.presentation?.alias ?? "Unlinked player",
+          player:
+            item.presentation?.alias ??
+            tx("Unlinked player", "Jugador no vinculado"),
           identityNote: item.presentation?.alias
             ? null
-            : "This detector case did not retain a reliable player identity.",
+            : tx(
+                "This detector case did not retain a reliable player identity.",
+                "Este caso del detector no conservó una identidad de jugador fiable.",
+              ),
           mapName: analysis.engineResult.demo.mapName,
           jobId: analysis.jobId,
           demoSha256: analysis.demoSha256,
@@ -7028,50 +8308,61 @@ function Signals({
     <div className="tab-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Interesting moments</span>
+          <span className="eyebrow">
+            {tx("Interesting moments", "Momentos interesantes")}
+          </span>
           <h2>
-            {evidence.length} review signal{evidence.length === 1 ? "" : "s"}
+            {tx("{count} review signals", "{count} señales para revisar", {
+              count: evidence.length,
+            })}
           </h2>
         </div>
         <span className="safety-note">
-          <ShieldAlert /> Signals are not verdicts
+          <ShieldAlert />{" "}
+          {tx("Signals are not verdicts", "Las señales no son veredictos")}
         </span>
       </div>
       <article className="signal-explainer panel">
         <ShieldAlert />
         <div>
-          <h3>What is a review signal?</h3>
+          <h3>
+            {tx("What is a review signal?", "¿Qué es una señal para revisar?")}
+          </h3>
           <p>
-            A detector found a short, inspectable pattern worth human review. It
-            is not a cheating probability or verdict. Telemetry completeness
-            describes how much of the detector's required input was retained for
-            that moment. Counterevidence and limitations explain why an innocent
-            play may look similar.
+            {tx(
+              "A detector found a short, inspectable pattern worth human review. It is not a cheating probability or verdict. Telemetry completeness describes how much of the detector's required input was retained for that moment. Counterevidence and limitations explain why an innocent play may look similar.",
+              "Un detector encontró un patrón breve e inspeccionable que merece revisión humana. No es una probabilidad de trampas ni un veredicto. La integridad de la telemetría indica cuántos datos necesarios conservó el detector para ese momento. La contraevidencia y las limitaciones explican por qué una jugada inocente puede parecer similar.",
+            )}
           </p>
         </div>
       </article>
-      <div className="signal-summary" aria-label="Signal summary">
+      <div
+        className="signal-summary"
+        aria-label={tx("Signal summary", "Resumen de señales")}
+      >
         <span>
-          <b>{allEvidence.length}</b> windows
+          <b>{allEvidence.length}</b> {tx("windows", "ventanas")}
         </span>
         <span>
-          <b>{players.length}</b> players
+          <b>{players.length}</b> {tx("players", "jugadores")}
         </span>
         <span>
-          <b>{families.length}</b> detector families
+          <b>{families.length}</b>{" "}
+          {tx("detector families", "familias de detectores")}
         </span>
         <span>
-          <b>{new Set(allEvidence.map((item) => item.demoSha256)).size}</b> maps
+          <b>{new Set(allEvidence.map((item) => item.demoSha256)).size}</b>{" "}
+          {tx("maps", "mapas")}
         </span>
       </div>
       <div className="signal-filters">
         <label>
-          Map
+          {tx("Map", "Mapa")}
           <select
             value={mapFilter}
             onChange={(event) => setMapFilter(event.target.value)}
           >
-            <option value="all">All maps</option>
+            <option value="all">{tx("All maps", "Todos los mapas")}</option>
             {analyses.map((analysis) => (
               <option key={analysis.demoSha256} value={analysis.demoSha256}>
                 {analysis.engineResult.demo.mapName}
@@ -7080,24 +8371,28 @@ function Signals({
           </select>
         </label>
         <label>
-          Player
+          {tx("Player", "Jugador")}
           <select
             value={playerFilter}
             onChange={(event) => setPlayerFilter(event.target.value)}
           >
-            <option value="all">All players</option>
+            <option value="all">
+              {tx("All players", "Todos los jugadores")}
+            </option>
             {players.map((player) => (
               <option key={player}>{player}</option>
             ))}
           </select>
         </label>
         <label>
-          Detector
+          {tx("Detector", "Detector")}
           <select
             value={familyFilter}
             onChange={(event) => setFamilyFilter(event.target.value)}
           >
-            <option value="all">All families</option>
+            <option value="all">
+              {tx("All families", "Todas las familias")}
+            </option>
             {families.map((family) => (
               <option key={family}>{family}</option>
             ))}
@@ -7116,8 +8411,8 @@ function Signals({
               </div>
               <div>
                 <span>
-                  {item.player} · {item.mapName} · {item.family} · tick{" "}
-                  {whole.format(item.tick)}
+                  {item.player} · {item.mapName} · {item.family} ·{" "}
+                  {tx("tick", "tick")} {whole.format(item.tick)}
                 </span>
                 {item.identityNote && (
                   <small className="signal-identity-note">
@@ -7125,17 +8420,29 @@ function Signals({
                   </small>
                 )}
                 <h3>
-                  {item.title}{" "}
+                  {localizeDetectorCopy(item.title, locale)}{" "}
                   <SourceBadge
                     kind="derived"
-                    detail="Detector output derived from the retained evidence window"
+                    detail={tx(
+                      "Detector output derived from the retained evidence window",
+                      "Resultado del detector derivado de la ventana de evidencia conservada",
+                    )}
                   />
                 </h3>
-                <p>{item.explanation}</p>
+                <p>{localizeDetectorCopy(item.explanation, locale)}</p>
                 <p className="signal-counterevidence">
-                  <strong>Strongest counterevidence:</strong>{" "}
-                  {item.counterevidence[0] ??
-                    "No detector-specific counterevidence was retained."}
+                  <strong>
+                    {tx(
+                      "Strongest counterevidence:",
+                      "Contraevidencia más sólida:",
+                    )}
+                  </strong>{" "}
+                  {item.counterevidence[0]
+                    ? localizeDetectorCopy(item.counterevidence[0], locale)
+                    : tx(
+                        "No detector-specific counterevidence was retained.",
+                        "No se conservó contraevidencia específica del detector.",
+                      )}
                 </p>
                 <button
                   className="signal-timeline-link"
@@ -7143,82 +8450,146 @@ function Signals({
                     onOpenTimeline(item.jobId, item.demoSha256, item.tick)
                   }
                 >
-                  View tick {whole.format(item.tick)} on timeline
+                  {tx(
+                    "View tick {tick} on timeline",
+                    "Ver el tick {tick} en la cronología",
+                    {
+                      tick: whole.format(item.tick),
+                    },
+                  )}
                 </button>
                 <dl className="signal-facts">
                   <div>
-                    <dt>Window</dt>
+                    <dt>{tx("Window", "Ventana")}</dt>
                     <dd>
-                      {duration(item.window.contextSeconds)} · ticks{" "}
-                      {whole.format(item.tickRange.start)}–
-                      {whole.format(item.tickRange.end)}
+                      {duration(item.window.contextSeconds)} ·{" "}
+                      {tx("ticks {start}–{end}", "ticks {start}–{end}", {
+                        start: whole.format(item.tickRange.start),
+                        end: whole.format(item.tickRange.end),
+                      })}
                     </dd>
                   </div>
                   <div>
-                    <dt>Evidence available</dt>
+                    <dt>{tx("Evidence available", "Evidencia disponible")}</dt>
                     <dd>
-                      {item.quality.basis.join(", ") || "No stated basis"}
+                      {item.quality.basis.length
+                        ? item.quality.basis
+                            .map((value) => localizeDetectorCopy(value, locale))
+                            .join(", ")
+                        : tx("No stated basis", "Sin base declarada")}
                     </dd>
                   </div>
                   <div>
-                    <dt>Model contribution</dt>
+                    <dt>
+                      {tx("Model contribution", "Contribución al modelo")}
+                    </dt>
                     <dd>
                       {item.contribution === null
-                        ? "Descriptive only, no numeric contribution"
-                        : `${item.contribution.toFixed(3)} review-model input, not cheating probability`}
+                        ? tx(
+                            "Descriptive only, no numeric contribution",
+                            "Solo descriptivo, sin contribución numérica",
+                          )
+                        : tx(
+                            "{value} review-model input, not cheating probability",
+                            "{value} de entrada al modelo de revisión; no es una probabilidad de trampas",
+                            { value: item.contribution.toFixed(3) },
+                          )}
                     </dd>
                   </div>
                 </dl>
                 <details>
-                  <summary>Why this might be innocent</summary>
+                  <summary>
+                    {tx(
+                      "Why this might be innocent",
+                      "Por qué podría ser inocente",
+                    )}
+                  </summary>
                   <p>
-                    {item.counterevidence.join(" ") ||
-                      "No specific counterevidence was supplied."}
+                    {item.counterevidence
+                      .map((value) => localizeDetectorCopy(value, locale))
+                      .join(" ") ||
+                      tx(
+                        "No specific counterevidence was supplied.",
+                        "No se aportó contraevidencia específica.",
+                      )}
                   </p>
                 </details>
                 <details>
-                  <summary>Detector limitations</summary>
+                  <summary>
+                    {tx("Detector limitations", "Limitaciones del detector")}
+                  </summary>
                   <p>
-                    {item.limitations.join(" ") ||
-                      "No additional limitations were recorded for this window."}
+                    {item.limitations
+                      .map((value) => localizeDetectorCopy(value, locale))
+                      .join(" ") ||
+                      tx(
+                        "No additional limitations were recorded for this window.",
+                        "No se registraron limitaciones adicionales para esta ventana.",
+                      )}
                   </p>
                 </details>
                 <details>
-                  <summary>Detector lineage and configuration</summary>
+                  <summary>
+                    {tx(
+                      "Detector lineage and configuration",
+                      "Linaje y configuración del detector",
+                    )}
+                  </summary>
                   <dl className="signal-lineage">
                     <div>
-                      <dt>Parser</dt>
-                      <dd>{item.versions?.parser ?? "Not retained"}</dd>
-                    </div>
-                    <div>
-                      <dt>Schema</dt>
-                      <dd>{item.versions?.schema ?? "Not retained"}</dd>
-                    </div>
-                    <div>
-                      <dt>Detectors</dt>
+                      <dt>{tx("Parser", "Analizador")}</dt>
                       <dd>
-                        {item.versions?.detectors.join(", ") ?? "Not retained"}
+                        {item.versions?.parser ??
+                          tx("Not retained", "No conservado")}
                       </dd>
                     </div>
                     <div>
-                      <dt>Model</dt>
-                      <dd>{item.versions?.model ?? "Not retained"}</dd>
+                      <dt>{tx("Schema", "Esquema")}</dt>
+                      <dd>
+                        {item.versions?.schema ??
+                          tx("Not retained", "No conservado")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{tx("Detectors", "Detectores")}</dt>
+                      <dd>
+                        {item.versions?.detectors.join(", ") ??
+                          tx("Not retained", "No conservado")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{tx("Model", "Modelo")}</dt>
+                      <dd>
+                        {item.versions?.model ??
+                          tx("Not retained", "No conservado")}
+                      </dd>
                     </div>
                   </dl>
                   {item.config !== undefined && (
                     <pre>{JSON.stringify(item.config, null, 2)}</pre>
                   )}
                   {item.caseLimitations.length > 0 && (
-                    <p>{item.caseLimitations.join(" ")}</p>
+                    <p>
+                      {item.caseLimitations
+                        .map((value) => localizeDetectorCopy(value, locale))
+                        .join(" ")}
+                    </p>
                   )}
                 </details>
               </div>
               <div className="quality-score">
                 <strong>{Math.round(item.quality.value * 100)}%</strong>
-                <span>telemetry completeness</span>
+                <span>
+                  {tx("telemetry completeness", "integridad de la telemetría")}
+                </span>
                 <small>
-                  {item.quality.basis.length} retained input
-                  {item.quality.basis.length === 1 ? "" : "s"}
+                  {tx(
+                    "{count} retained inputs",
+                    "{count} entradas conservadas",
+                    {
+                      count: item.quality.basis.length,
+                    },
+                  )}
                 </small>
               </div>
             </article>
@@ -7228,13 +8599,22 @@ function Signals({
         <Empty
           title={
             allEvidence.length
-              ? "No signals match these filters"
-              : "Nothing unusual surfaced"
+              ? tx(
+                  "No signals match these filters",
+                  "Ninguna señal coincide con estos filtros",
+                )
+              : tx("Nothing unusual surfaced", "No apareció nada inusual")
           }
           text={
             allEvidence.length
-              ? "Change the map, player, or detector filter to see retained windows."
-              : "No detector window met its prerequisites. That is a result, not a guarantee."
+              ? tx(
+                  "Change the map, player, or detector filter to see retained windows.",
+                  "Cambia el filtro de mapa, jugador o detector para ver las ventanas conservadas.",
+                )
+              : tx(
+                  "No detector window met its prerequisites. That is a result, not a guarantee.",
+                  "Ninguna ventana del detector cumplió sus requisitos previos. Es un resultado, no una garantía.",
+                )
           }
         />
       )}
@@ -7249,6 +8629,7 @@ function Quality({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
+  const { tx } = useI18n();
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const fields = [
     "position",
@@ -7273,29 +8654,42 @@ function Quality({
     <div className="tab-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Data coverage</span>
-          <h2>What could be reconstructed, and what could not</h2>
+          <span className="eyebrow">
+            {tx("Data coverage", "Cobertura de datos")}
+          </span>
+          <h2>
+            {tx(
+              "What could be reconstructed, and what could not",
+              "Qué se pudo reconstruir y qué no",
+            )}
+          </h2>
         </div>
       </div>
       <p className="coverage-intro">
-        SourceTV demos do not contain every action a player performed. These
-        percentages show how often each network field was available across
-        sampled player states. They measure evidence coverage, not match quality
-        or player skill.
+        {tx(
+          "SourceTV demos do not contain every action a player performed. These percentages show how often each network field was available across sampled player states. They measure evidence coverage, not match quality or player skill.",
+          "Las demos de SourceTV no contienen todas las acciones realizadas por un jugador. Estos porcentajes muestran con qué frecuencia estuvo disponible cada campo de red en los estados de jugador muestreados. Miden la cobertura de evidencia, no la calidad de la partida ni la habilidad del jugador.",
+        )}
       </p>
       <div className="quality-grid">
         <article className="panel rings">
-          <Ring value={averages.position} label="Position" />
-          <Ring value={averages.eyeAngles} label="View angles" />
-          <Ring value={averages.weapon} label="Weapons" />
-          <Ring value={averages.team} label="Teams" />
-          <Ring value={averages.playerClass} label="Player class" />
+          <Ring value={averages.position} label={tx("Position", "Posición")} />
+          <Ring
+            value={averages.eyeAngles}
+            label={tx("View angles", "Ángulos de visión")}
+          />
+          <Ring value={averages.weapon} label={tx("Weapons", "Armas")} />
+          <Ring value={averages.team} label={tx("Teams", "Equipos")} />
+          <Ring
+            value={averages.playerClass}
+            label={tx("Player class", "Clase del jugador")}
+          />
         </article>
         <article className="panel provenance">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">Provenance</span>
-              <h3>Reproducible inputs</h3>
+              <span className="eyebrow">{tx("Provenance", "Procedencia")}</span>
+              <h3>{tx("Reproducible inputs", "Entradas reproducibles")}</h3>
             </div>
             <Layers3 />
           </div>
@@ -7309,7 +8703,11 @@ function Quality({
               <button
                 type="button"
                 className="copy-hash"
-                aria-label={`Copy SHA-256 for ${analysis.engineResult.demo.mapName}`}
+                aria-label={tx(
+                  "Copy SHA-256 for {map}",
+                  "Copiar SHA-256 de {map}",
+                  { map: analysis.engineResult.demo.mapName },
+                )}
                 onClick={() => {
                   void navigator.clipboard
                     .writeText(analysis.demoSha256)
@@ -7317,10 +8715,12 @@ function Quality({
                 }}
               >
                 {copiedHash === analysis.demoSha256 ? <Check /> : <Copy />}
-                {copiedHash === analysis.demoSha256 ? "Copied" : "Copy"}
+                {copiedHash === analysis.demoSha256
+                  ? tx("Copied", "Copiado")
+                  : tx("Copy", "Copiar")}
               </button>
               <span className="verified">
-                <Check /> verified
+                <Check /> {tx("verified", "verificado")}
               </span>
             </div>
           ))}
@@ -7329,8 +8729,15 @@ function Quality({
       <article className="panel coverage-by-map">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">Per-map evidence</span>
-            <h3>Coverage denominators and decode status</h3>
+            <span className="eyebrow">
+              {tx("Per-map evidence", "Evidencia por mapa")}
+            </span>
+            <h3>
+              {tx(
+                "Coverage denominators and decode status",
+                "Denominadores de cobertura y estado de decodificación",
+              )}
+            </h3>
           </div>
           <SourceBadge kind="observed" />
         </div>
@@ -7338,12 +8745,12 @@ function Quality({
           <table>
             <thead>
               <tr>
-                <th>Map</th>
-                <th>Samples</th>
+                <th>{tx("Map", "Mapa")}</th>
+                <th>{tx("Samples", "Muestras")}</th>
                 {fields.map((field) => (
                   <th key={field}>{counterLabel(field)}</th>
                 ))}
-                <th>Decode issues</th>
+                <th>{tx("Decode issues", "Problemas de decodificación")}</th>
               </tr>
             </thead>
             <tbody>
@@ -7351,7 +8758,9 @@ function Quality({
                 <tr key={analyses[index]?.demoSha256 ?? index}>
                   <td>
                     {analyses[index]?.engineResult.demo.mapName ??
-                      `Map ${index + 1}`}
+                      tx("Map {number}", "Mapa {number}", {
+                        number: index + 1,
+                      })}
                   </td>
                   <td>{whole.format(demo.observationCount)}</td>
                   {fields.map((field) => (
@@ -7364,113 +8773,176 @@ function Quality({
           </table>
         </div>
         <small>
-          Aggregate rings are weighted by these player-state sample counts, not
-          by a mean of map percentages.
+          {tx(
+            "Aggregate rings are weighted by these player-state sample counts, not by a mean of map percentages.",
+            "Los anillos agregados se ponderan por estos recuentos de muestras de estado del jugador, no por una media de los porcentajes de los mapas.",
+          )}
         </small>
       </article>
       <article className="panel coverage-semantics">
         <div>
           <SourceBadge kind="observed" />
-          <strong>Carried directly by a network property or game event</strong>
+          <strong>
+            {tx(
+              "Carried directly by a network property or game event",
+              "Proporcionado directamente por una propiedad de red o evento del juego",
+            )}
+          </strong>
           <p>
-            Examples include player position, team, health, and death events.
+            {tx(
+              "Examples include player position, team, health, and death events.",
+              "Algunos ejemplos son la posición, el equipo, la salud y los eventos de muerte del jugador.",
+            )}
           </p>
         </div>
         <div>
           <SourceBadge kind="derived" />
-          <strong>Computed from bounded observed samples</strong>
+          <strong>
+            {tx(
+              "Computed from bounded observed samples",
+              "Calculado a partir de muestras observadas y acotadas",
+            )}
+          </strong>
           <p>
-            Examples include pin duration, SI lives, hit clusters, and narrow
-            clears.
+            {tx(
+              "Examples include pin duration, SI lives, hit clusters, and narrow clears.",
+              "Algunos ejemplos son la duración de los agarres, las vidas de infectados especiales, los grupos de ataques y las liberaciones estrictamente definidas.",
+            )}
           </p>
         </div>
         <div>
           <SourceBadge kind="unavailable" />
-          <strong>Not present or not validated in this SourceTV demo</strong>
+          <strong>
+            {tx(
+              "Not present or not validated in this SourceTV demo",
+              "No presente o no validado en esta demo de SourceTV",
+            )}
+          </strong>
           <p>
-            Never silently replaced with zero. Accuracy, exact damage
-            attribution, and player input remain unavailable.
+            {tx(
+              "Never silently replaced with zero. Accuracy, exact damage attribution, and player input remain unavailable.",
+              "Nunca se sustituye silenciosamente por cero. La precisión, la atribución exacta del daño y las entradas del jugador siguen sin estar disponibles.",
+            )}
           </p>
         </div>
       </article>
       <article className="panel capability-matrix">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">Capability boundary</span>
-            <h3>What this report can and cannot prove</h3>
+            <span className="eyebrow">
+              {tx("Capability boundary", "Límite de capacidades")}
+            </span>
+            <h3>
+              {tx(
+                "What this report can and cannot prove",
+                "Qué puede y qué no puede demostrar este informe",
+              )}
+            </h3>
           </div>
           <ShieldAlert />
         </div>
         <div>
           <section>
             <h4>
-              Supported evidence <SourceBadge kind="observed" />
+              {tx("Supported evidence", "Evidencia compatible")}{" "}
+              <SourceBadge kind="observed" />
             </h4>
             <dl>
               <div>
-                <dt>Identity and participation</dt>
+                <dt>
+                  {tx(
+                    "Identity and participation",
+                    "Identidad y participación",
+                  )}
+                </dt>
                 <dd>
-                  Userinfo names, SteamID64, connection epochs, team, and
-                  observed class.
+                  {tx(
+                    "Userinfo names, SteamID64, connection epochs, team, and observed class.",
+                    "Nombres de userinfo, SteamID64, épocas de conexión, equipo y clase observada.",
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>Versus structure</dt>
+                <dt>{tx("Versus structure", "Estructura de Versus")}</dt>
                 <dd>
-                  Scores, Survivor distance, side state, reset-aware halves, SI
-                  lives, hits, Tank, and Witch sequences.
+                  {tx(
+                    "Scores, Survivor distance, side state, reset-aware halves, SI lives, hits, Tank, and Witch sequences.",
+                    "Puntuaciones, distancia de los supervivientes, estado del bando, mitades sensibles a reinicios, vidas y ataques de infectados especiales y secuencias de Tank y Witch.",
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>Combat story</dt>
+                <dt>{tx("Combat story", "Historia del combate")}</dt>
                 <dd>
-                  Death attribution, checkpoint counters, pins, incaps, revives,
-                  narrow clears, ticks, and available positions.
+                  {tx(
+                    "Death attribution, checkpoint counters, pins, incaps, revives, narrow clears, ticks, and available positions.",
+                    "Atribución de muertes, contadores de checkpoint, agarres, incapacitados, reanimaciones, liberaciones estrictamente definidas, ticks y posiciones disponibles.",
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>Review lineage</dt>
+                <dt>{tx("Review lineage", "Linaje de revisión")}</dt>
                 <dd>
-                  Demo hashes, parser versions, coverage, detector limitations,
-                  counterevidence, and exact timeline windows.
+                  {tx(
+                    "Demo hashes, parser versions, coverage, detector limitations, counterevidence, and exact timeline windows.",
+                    "Hashes de demos, versiones del analizador, cobertura, limitaciones del detector, contraevidencia y ventanas exactas de la cronología.",
+                  )}
                 </dd>
               </div>
             </dl>
           </section>
           <section>
             <h4>
-              Not provable here <SourceBadge kind="unavailable" />
+              {tx("Not provable here", "No demostrable aquí")}{" "}
+              <SourceBadge kind="unavailable" />
             </h4>
             <dl>
               <div>
-                <dt>Accuracy and exact damage</dt>
+                <dt>
+                  {tx("Accuracy and exact damage", "Precisión y daño exacto")}
+                </dt>
                 <dd>
-                  Shots, hits, misses, hit groups, attacker damage, assists,
-                  friendly fire, and exact damage taken need omitted hurt and
-                  weapon events.
+                  {tx(
+                    "Shots, hits, misses, hit groups, attacker damage, assists, friendly fire, and exact damage taken need omitted hurt and weapon events.",
+                    "Los disparos, impactos, fallos, grupos de impacto, daño del atacante, asistencias, fuego amigo y daño exacto recibido necesitan eventos de daño y armas que fueron omitidos.",
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>Competitive skill events</dt>
+                <dt>
+                  {tx(
+                    "Competitive skill events",
+                    "Eventos de habilidad competitiva",
+                  )}
+                </dt>
                 <dd>
-                  Skeets, deadstops, levels, crowns, general saves, shove
-                  clears, rock hits, and hittable damage need richer live-server
-                  telemetry.
+                  {tx(
+                    "Skeets, deadstops, levels, crowns, general saves, shove clears, rock hits, and hittable damage need richer live-server telemetry.",
+                    "Los skeets, deadstops, levels, coronas, salvamentos generales, liberaciones con empujón, impactos de roca y daño con objetos golpeables necesitan telemetría más completa del servidor en vivo.",
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>Intent and private input</dt>
+                <dt>
+                  {tx(
+                    "Intent and private input",
+                    "Intención y entradas privadas",
+                  )}
+                </dt>
                 <dd>
-                  Voice, communications, player commands, recoil input, and
-                  intent are not present in SourceTV.
+                  {tx(
+                    "Voice, communications, player commands, recoil input, and intent are not present in SourceTV.",
+                    "La voz, las comunicaciones, los comandos del jugador, las entradas de retroceso y la intención no están presentes en SourceTV.",
+                  )}
                 </dd>
               </div>
               <div>
-                <dt>Cheating verdict</dt>
+                <dt>{tx("Cheating verdict", "Veredicto sobre trampas")}</dt>
                 <dd>
-                  Signals identify inspectable moments. No calibrated,
-                  representative labelled dataset supports a definitive
-                  probability or verdict.
+                  {tx(
+                    "Signals identify inspectable moments. No calibrated, representative labelled dataset supports a definitive probability or verdict.",
+                    "Las señales identifican momentos inspeccionables. Ningún conjunto de datos etiquetado, representativo y calibrado permite una probabilidad o veredicto definitivo.",
+                  )}
                 </dd>
               </div>
             </dl>

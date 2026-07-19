@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b && vite build && node scripts/check-asset-budget.mjs",
-    "check": "tsc -b --pretty false",
+    "check": "tsc -b --pretty false && pnpm check:i18n",
+    "check:i18n": "node scripts/check-i18n-copy.mjs",
     "dev": "vite",
     "start": "node server.mjs",
     "test:e2e": "playwright test",
     "test:e2e:real": "playwright test --config playwright.real.config.ts",
+    "test:e2e:production": "playwright test --config playwright.production.config.ts",
     "test:budget": "node scripts/check-asset-budget.mjs",
     "test": "vitest run src --passWithNoTests && node scripts/test-production-server.mjs"
   },

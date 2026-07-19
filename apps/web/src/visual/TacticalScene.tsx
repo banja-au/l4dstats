@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { useI18n } from "../i18n";
 
 type TacticalSceneProps = {
   className?: string;
@@ -9,9 +10,10 @@ type TacticalSceneProps = {
 /** Abstract tactical reconstruction, intentionally not a real L4D2 map. */
 export function TacticalScene({
   className,
-  label = "Abstract tactical reconstruction",
+  label,
   active = true,
 }: TacticalSceneProps) {
+  const { tx } = useI18n();
   const titleId = useId();
   const clipId = useId();
   const hatchId = useId();
@@ -23,7 +25,13 @@ export function TacticalScene({
       role="img"
       aria-labelledby={titleId}
     >
-      <title id={titleId}>{label}</title>
+      <title id={titleId}>
+        {label ??
+          tx(
+            "Abstract tactical reconstruction",
+            "Reconstrucción táctica abstracta",
+          )}
+      </title>
       <defs>
         <clipPath id={clipId}>
           <rect x="1" y="1" width="418" height="258" rx="18" />
@@ -82,10 +90,10 @@ export function TacticalScene({
         </g>
         <g className="ww-tactical__coordinates">
           <text x="18" y="25">
-            FLOOR 02 / RECONSTRUCTION
+            {tx("FLOOR 02 / RECONSTRUCTION", "PISO 02 / RECONSTRUCCIÓN")}
           </text>
           <text x="320" y="240">
-            TICK 148,220
+            {tx("TICK 148,220", "TICK 148.220")}
           </text>
         </g>
       </g>
