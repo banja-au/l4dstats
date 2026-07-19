@@ -237,6 +237,7 @@ async function queueHandler(
   for (const message of batch.messages) {
     const owner = crypto.randomUUID();
     const repo = repository(environment);
+    let claimed: Awaited<ReturnType<HostedJobRepository["claim"]>> = undefined;
     try {
       await repo.migrate();
       const job = await repo.claim({
@@ -252,6 +253,7 @@ async function queueHandler(
         }
         throw new Error("job is not currently claimable");
       }
+      claimed = job;
       const source = await environment.TEMPORARY_DEMOS.get(job.source.key);
       if (!source || source.size !== job.source.bytes)
         throw new Error("temporary source object is unavailable or incomplete");
@@ -270,7 +272,9 @@ async function queueHandler(
         }),
       );
       if (!response.ok)
-        throw new Error(`container returned ${response.status}`);
+        throw new Error(
+          `container returned ${response.status}: ${(await response.text()).slice(0, 2_000)}`,
+        );
       const resultBytes = new Uint8Array(await response.arrayBuffer());
       if (
         resultBytes.byteLength < 2 ||
@@ -313,8 +317,40 @@ async function queueHandler(
         throw new Error("source demo deletion was not confirmed");
       await repo.finish({ id: job.id, owner, state: "succeeded" });
       message.ack();
-    } catch {
-      message.retry({ delaySeconds: 600 });
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message.slice(0, 2_000)
+          : "unknown error";
+      console.error(
+        JSON.stringify({
+          event: "hosted.analysis.failed",
+          jobId: message.body.jobId,
+          detail,
+        }),
+      );
+      const job = claimed ?? (await repo.getJob(message.body.jobId));
+      if (job?.state === "running" && job.attempt >= 3) {
+        await environment.TEMPORARY_DEMOS.delete(job.source.key).catch(
+          () => undefined,
+        );
+        await repo.finish({
+          id: job.id,
+          owner,
+          state: "failed",
+          message: "Analysis failed after three bounded attempts",
+        });
+        message.ack();
+      } else if (job?.state === "running") {
+        await repo.retry({
+          id: job.id,
+          owner,
+          message: "Analysis attempt failed; retrying",
+        });
+        message.retry({ delaySeconds: 30 });
+      } else {
+        message.retry({ delaySeconds: 30 });
+      }
     }
   }
 }

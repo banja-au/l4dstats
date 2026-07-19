@@ -108,6 +108,35 @@ describe("HostedJobRepository", () => {
       close();
     }
   });
+
+  it("releases a failed attempt for an immediate bounded retry", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const job = await repo.enqueue(source, "upload:retry");
+      await repo.claim({ id: job.id, owner: "worker-a", leaseMs: 60_000 });
+      await expect(
+        repo.retry({
+          id: job.id,
+          owner: "worker-a",
+          message: "Analysis attempt failed; retrying",
+        }),
+      ).resolves.toMatchObject({
+        state: "queued",
+        attempt: 1,
+        leaseOwner: null,
+        message: "Analysis attempt failed; retrying",
+      });
+      await expect(
+        repo.claim({ id: job.id, owner: "worker-b", leaseMs: 60_000 }),
+      ).resolves.toMatchObject({
+        state: "running",
+        attempt: 2,
+        leaseOwner: "worker-b",
+      });
+    } finally {
+      close();
+    }
+  });
 });
 
 class MemoryR2 implements R2BucketLike {

@@ -293,6 +293,27 @@ export class HostedJobRepository {
     if (result.rowsAffected !== 1) throw new Error("hosted job lease was lost");
   }
 
+  public async retry(input: {
+    id: string;
+    owner: string;
+    message: string;
+    at?: Date;
+  }): Promise<HostedJob> {
+    const timestamp = iso(input.at);
+    const result = await this.client.execute(
+      `UPDATE hosted_jobs
+       SET state='queued',message=?,lease_owner=NULL,lease_expires_at=NULL,
+           updated_at=?
+       WHERE id=? AND state='running' AND lease_owner=?`,
+      [input.message, timestamp, input.id, input.owner],
+    );
+    if (result.rowsAffected !== 1) throw new Error("hosted job lease was lost");
+    await this.audit("job.retrying", input.id, {
+      message: input.message,
+    });
+    return (await this.getJob(input.id))!;
+  }
+
   public async progress(input: {
     id: string;
     owner: string;
