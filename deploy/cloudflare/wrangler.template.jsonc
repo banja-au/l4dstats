@@ -5,7 +5,10 @@
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "vars": { "L4DSTATS_ENVIRONMENT": "__ENV__" },
+  "vars": {
+    "L4DSTATS_ENVIRONMENT": "__ENV__",
+    "POSTHOG_HOST": "https://us.i.posthog.com",
+  },
   "assets": {
     "directory": "../../apps/web/dist",
     "binding": "ASSETS",

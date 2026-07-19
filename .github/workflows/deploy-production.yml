@@ -99,6 +99,9 @@ jobs:
       - name: Install pinned dependencies
         run: pnpm install --frozen-lockfile
       - name: Build web and hosted dispatcher
+        env:
+          VITE_POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
         run: pnpm turbo run build --filter=@l4dstats/web --filter=@l4dstats/edge
       - name: Validate deployment configuration
         run: |
@@ -111,13 +114,16 @@ jobs:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
           L4DSTATS_PSEUDONYM_KEY: ${{ secrets.L4DSTATS_PSEUDONYM_KEY }}
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
         run: |
           test -n "$TURSO_DATABASE_URL"
           test -n "$TURSO_AUTH_TOKEN"
           test -n "$L4DSTATS_PSEUDONYM_KEY"
+          test -n "$POSTHOG_PROJECT_TOKEN"
           printf '%s' "$TURSO_DATABASE_URL" | pnpm dlx wrangler@4 secret put TURSO_DATABASE_URL --config deploy/cloudflare/wrangler.production.jsonc
           printf '%s' "$TURSO_AUTH_TOKEN" | pnpm dlx wrangler@4 secret put TURSO_AUTH_TOKEN --config deploy/cloudflare/wrangler.production.jsonc
           printf '%s' "$L4DSTATS_PSEUDONYM_KEY" | pnpm dlx wrangler@4 secret put L4DSTATS_PSEUDONYM_KEY --config deploy/cloudflare/wrangler.production.jsonc
+          printf '%s' "$POSTHOG_PROJECT_TOKEN" | pnpm dlx wrangler@4 secret put POSTHOG_PROJECT_TOKEN --config deploy/cloudflare/wrangler.production.jsonc
       - name: Deploy Worker, static assets, Queue bindings, and Container
         run: pnpm dlx wrangler@4 deploy --config deploy/cloudflare/wrangler.production.jsonc
       - name: Attach production hostname

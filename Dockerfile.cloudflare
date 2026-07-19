@@ -29,8 +29,11 @@ COPY --from=native-build /native/demo-source1-node.node /workspace/crates/demo-s
 
 RUN L4DSTATS_EXPECT_NATIVE_BUILD_SHA256="$(cat /workspace/native/build-sha256)" node crates/demo-source1-node/test/lineage.test.mjs \
   && pnpm install --frozen-lockfile \
-  && pnpm exec turbo run build \
-  && pnpm prune --prod
+  && pnpm exec turbo run build
+
+# Keep pnpm's workspace links in the runtime image. `pnpm prune` is not
+# recursive in a workspace and removes links such as @l4dstats/acquisition,
+# leaving the compiled worker unable to start.
 
 FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
 

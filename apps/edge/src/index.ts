@@ -63,6 +63,46 @@ export interface EdgeEnvironment {
   TURSO_AUTH_TOKEN: string;
   L4DSTATS_PSEUDONYM_KEY: string;
   L4DSTATS_ENVIRONMENT: string;
+  POSTHOG_PROJECT_TOKEN?: string;
+  POSTHOG_HOST?: string;
+}
+
+type OperationalEvent = "hosted_analysis_failed" | "hosted_analysis_succeeded";
+
+function failureCategory(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("container")) return "container";
+  if (message.includes("source object")) return "source_object";
+  if (message.includes("artifact")) return "derived_artifact";
+  if (message.includes("claim")) return "job_claim";
+  return "unknown";
+}
+
+async function captureOperationalEvent(
+  environment: EdgeEnvironment,
+  event: OperationalEvent,
+  properties: Record<string, boolean | number | string>,
+): Promise<void> {
+  if (!environment.POSTHOG_PROJECT_TOKEN) return;
+  const host = environment.POSTHOG_HOST ?? "https://us.i.posthog.com";
+  try {
+    await fetch(`${host.replace(/\/$/, "")}/capture/`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        api_key: environment.POSTHOG_PROJECT_TOKEN,
+        event,
+        properties: {
+          distinct_id: "l4dstats-edge-production",
+          environment: environment.L4DSTATS_ENVIRONMENT,
+          ...properties,
+        },
+      }),
+      signal: AbortSignal.timeout(2_000),
+    });
+  } catch {
+    // Observability is best-effort and must never affect analysis delivery.
+  }
 }
 
 function json(status: number, value: unknown): Response {
@@ -316,6 +356,11 @@ async function queueHandler(
       if (await environment.TEMPORARY_DEMOS.head(job.source.key))
         throw new Error("source demo deletion was not confirmed");
       await repo.finish({ id: job.id, owner, state: "succeeded" });
+      await captureOperationalEvent(environment, "hosted_analysis_succeeded", {
+        attempt: job.attempt,
+        resultSizeBand:
+          resultBytes.byteLength < 1024 * 1024 ? "under_1mb" : "1mb_or_more",
+      });
       message.ack();
     } catch (error) {
       const detail =
@@ -330,6 +375,11 @@ async function queueHandler(
         }),
       );
       const job = claimed ?? (await repo.getJob(message.body.jobId));
+      await captureOperationalEvent(environment, "hosted_analysis_failed", {
+        attempt: job?.attempt ?? 0,
+        category: failureCategory(error),
+        terminal: job?.state === "running" && job.attempt >= 3,
+      });
       if (job?.state === "running" && job.attempt >= 3) {
         await environment.TEMPORARY_DEMOS.delete(job.source.key).catch(
           () => undefined,
