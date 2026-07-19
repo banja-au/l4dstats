@@ -52,6 +52,7 @@ import { PlayerLookup } from "./PlayerLookup";
 import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
 import { INFECTED_CLASSES, InfectedIcon } from "./visual";
 import { useI18n } from "./i18n";
+import { captureAnalyticsEvent } from "./analytics";
 
 type UploadItem = {
   key: string;
@@ -102,6 +103,32 @@ const DEMO_FILE_SUFFIXES = [
 const isDemoUploadFilename = (value: string) => {
   const lower = value.toLowerCase();
   return DEMO_FILE_SUFFIXES.some((suffix) => lower.endsWith(suffix));
+};
+const uploadFormat = (value: string) => {
+  const lower = value.toLowerCase();
+  if (lower.endsWith(".zip")) return "zip";
+  if (lower.endsWith(".gz")) return "gzip";
+  if (lower.endsWith(".xz")) return "xz";
+  if (lower.endsWith(".bz2")) return "bzip2";
+  if (lower.endsWith(".zst")) return "zstd";
+  return "raw";
+};
+const byteSizeBand = (bytes: number) =>
+  bytes < 1024 * 1024
+    ? "under_1mb"
+    : bytes < 10 * 1024 * 1024
+      ? "1_to_10mb"
+      : bytes < 50 * 1024 * 1024
+        ? "10_to_50mb"
+        : "50mb_or_more";
+const errorCategory = (error: unknown) => {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("size") || message.includes("limit")) return "limit";
+  if (message.includes("compress") || message.includes("archive"))
+    return "compression";
+  if (message.includes("network") || message.includes("fetch"))
+    return "network";
+  return "other";
 };
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const activeNumberLocale = () =>
@@ -288,6 +315,9 @@ function BanjaAttribution({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={t("brand.banjaTab")}
+        onClick={() =>
+          captureAnalyticsEvent("outbound_link_clicked", { target: "banja" })
+        }
       >
         <span>{t("brand.by")}</span> {t("brand.banjaName")}
       </a>
@@ -296,6 +326,9 @@ function BanjaAttribution({
         href="mailto:labs@banja.au"
         aria-label={t("brand.banjaEmail")}
         title={t("brand.banjaAddress")}
+        onClick={() =>
+          captureAnalyticsEvent("outbound_link_clicked", { target: "email" })
+        }
       >
         <Mail aria-hidden="true" />
       </a>
@@ -304,6 +337,11 @@ function BanjaAttribution({
         href="https://developers.l4dstats.gg/"
         aria-label={t("brand.developers")}
         title={t("brand.developers")}
+        onClick={() =>
+          captureAnalyticsEvent("outbound_link_clicked", {
+            target: "developers",
+          })
+        }
       >
         <Braces aria-hidden="true" />
       </a>
@@ -381,7 +419,16 @@ function App() {
       current.map((item) => (item.key === key ? { ...item, ...patch } : item)),
     );
 
-  async function watchJob(key: string, id: string, updateUrl: boolean) {
+  async function watchJob(
+    key: string,
+    id: string,
+    updateUrl: boolean,
+    analytics?: {
+      format: string;
+      operation: "upload" | "reanalyze";
+      startedAt: number;
+    },
+  ) {
     for (;;) {
       const job = await workbenchApi.job(id);
       update(key, {
@@ -400,6 +447,17 @@ function App() {
         job.state === "failed" ||
         job.state === "cancelled"
       ) {
+        if (analytics)
+          captureAnalyticsEvent("analysis_finished", {
+            attempt: job.attempt ?? 0,
+            duration_seconds: Math.max(
+              0,
+              Math.round((performance.now() - analytics.startedAt) / 1000),
+            ),
+            format: analytics.format,
+            operation: analytics.operation,
+            outcome: job.state,
+          });
         if (job.state === "succeeded" && job.analysis && updateUrl)
           window.history.replaceState(
             {},
@@ -415,6 +473,12 @@ function App() {
   }
 
   async function process(item: UploadItem, updateUrl: boolean) {
+    const startedAt = performance.now();
+    const format = uploadFormat(item.file.name);
+    captureAnalyticsEvent("demo_upload_started", {
+      format,
+      size_band: byteSizeBand(item.file.size),
+    });
     try {
       if (!item.source) throw new Error(t("upload.unavailable"));
       const uploaded = await workbenchApi.uploadDemo(item.source);
@@ -424,8 +488,23 @@ function App() {
         message: t("upload.queued"),
         job: uploaded.job,
       });
-      await watchJob(item.key, uploaded.job.id, updateUrl);
+      captureAnalyticsEvent("demo_upload_accepted", {
+        duplicate: uploaded.duplicate ?? false,
+        format,
+        initial_state: uploaded.job.state,
+        size_band: byteSizeBand(item.file.size),
+      });
+      await watchJob(item.key, uploaded.job.id, updateUrl, {
+        format,
+        operation: "upload",
+        startedAt,
+      });
     } catch (error) {
+      captureAnalyticsEvent("demo_upload_failed", {
+        category: errorCategory(error),
+        format,
+        size_band: byteSizeBand(item.file.size),
+      });
       update(item.key, {
         state: "failed",
         message: error instanceof Error ? error.message : t("upload.failed"),
@@ -452,7 +531,11 @@ function App() {
             ),
             job,
           });
-          await watchJob(item.key, job.id, false);
+          await watchJob(item.key, job.id, false, {
+            format: uploadFormat(item.file.name),
+            operation: "reanalyze",
+            startedAt: performance.now(),
+          });
         }),
       );
     } catch (error) {
@@ -467,6 +550,10 @@ function App() {
   function addFiles(files: File[]) {
     const demos = files.filter((file) => isDemoUploadFilename(file.name));
     if (!demos.length) {
+      captureAnalyticsEvent("upload_selection_rejected", {
+        category: "unsupported_format",
+        selected_count: files.length,
+      });
       setUploadError(
         tx(
           "Choose one or more supported demo or compressed-demo files.",
@@ -476,6 +563,10 @@ function App() {
       return;
     }
     if (items.length + demos.length > MAX_DEMOS) {
+      captureAnalyticsEvent("upload_selection_rejected", {
+        category: "batch_limit",
+        selected_count: demos.length,
+      });
       setUploadError(
         tx(
           "You can analyze up to {maximum} demos at once.",
@@ -485,6 +576,15 @@ function App() {
       );
       return;
     }
+    captureAnalyticsEvent("upload_batch_selected", {
+      demo_count: demos.length,
+      formats: [...new Set(demos.map((file) => uploadFormat(file.name)))]
+        .sort()
+        .join(","),
+      total_size_band: byteSizeBand(
+        demos.reduce((sum, file) => sum + file.size, 0),
+      ),
+    });
     setUploadError("");
     const next = demos.map((source) => ({
       key: `${source.name}:${source.size}:${source.lastModified}:${crypto.randomUUID()}`,
@@ -513,6 +613,11 @@ function App() {
           );
       void workbenchApi.game(id).then(
         (game) => {
+          captureAnalyticsEvent("game_viewed", {
+            confidence: game.confidence,
+            demo_count: game.analyses.length,
+            entry: playerMatch ? "player_profile" : "direct_route",
+          });
           setSelectedGame(game.id);
           setGameConfidence(game.confidence);
           setItems(
@@ -531,6 +636,9 @@ function App() {
           setRouteLoading(false);
         },
         (error) => {
+          captureAnalyticsEvent("game_load_failed", {
+            category: errorCategory(error),
+          });
           setItems([
             {
               key: `game:${id}:error`,
@@ -784,6 +892,11 @@ function App() {
       ? analyses[0]?.jobId
       : undefined;
   const selectTab = (next: Tab) => {
+    if (next !== tab)
+      captureAnalyticsEvent("results_tab_selected", {
+        route: selectedGame ? "game" : "analysis",
+        tab: next,
+      });
     setTab(next);
     if (selectedGame)
       window.history.replaceState(
@@ -902,9 +1015,14 @@ function App() {
               <button
                 className="landing-tool-switch"
                 type="button"
-                onClick={() =>
-                  setLandingTool(landingTool === "upload" ? "player" : "upload")
-                }
+                onClick={() => {
+                  captureAnalyticsEvent("landing_tool_switched", {
+                    destination: landingTool === "upload" ? "player" : "upload",
+                  });
+                  setLandingTool(
+                    landingTool === "upload" ? "player" : "upload",
+                  );
+                }}
               >
                 {t(
                   landingTool === "upload"
@@ -912,7 +1030,10 @@ function App() {
                     : "playerSearch.switchBack",
                 )}
               </button>
-              <a href="/game/0b1b114c-ece0-415e-91ae-7844c8b990fb/overview">
+              <a
+                href="/game/0b1b114c-ece0-415e-91ae-7844c8b990fb/overview"
+                onClick={() => captureAnalyticsEvent("example_game_opened")}
+              >
                 {t("results.exampleGame")}
               </a>
             </div>

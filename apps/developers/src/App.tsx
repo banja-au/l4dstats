@@ -1,5 +1,6 @@
 import { BookOpen, Copy, KeyRound, LogOut } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
+import { captureDeveloperEvent } from "./analytics";
 
 type Account = {
   id: string;
@@ -64,6 +65,7 @@ export function App() {
     event.preventDefault();
     setError("");
     const data = new FormData(event.currentTarget);
+    captureDeveloperEvent("developer_auth_started", { mode });
     try {
       await api(`/auth/${mode}`, {
         method: "POST",
@@ -73,7 +75,15 @@ export function App() {
         }),
       });
       await refresh();
+      captureDeveloperEvent("developer_auth_finished", {
+        mode,
+        outcome: "succeeded",
+      });
     } catch (cause) {
+      captureDeveloperEvent("developer_auth_finished", {
+        mode,
+        outcome: "failed",
+      });
       setError(
         cause instanceof Error ? cause.message : "Authentication failed",
       );
@@ -89,7 +99,9 @@ export function App() {
       });
       setRevealedKey(result.key);
       await refresh();
+      captureDeveloperEvent("developer_api_key_created");
     } catch (cause) {
+      captureDeveloperEvent("developer_api_key_create_failed");
       setError(cause instanceof Error ? cause.message : "Could not create key");
     }
   }
@@ -99,7 +111,9 @@ export function App() {
     try {
       await api(`/keys/${id}`, { method: "DELETE" });
       await refresh();
+      captureDeveloperEvent("developer_api_key_revoked");
     } catch (cause) {
+      captureDeveloperEvent("developer_api_key_revoke_failed");
       setError(cause instanceof Error ? cause.message : "Could not revoke key");
     }
   }
@@ -195,6 +209,7 @@ export function App() {
                 className="pill"
                 onClick={async () => {
                   await api("/auth/logout", { method: "POST", body: "{}" });
+                  captureDeveloperEvent("developer_signed_out");
                   setAccount(null);
                 }}
               >
@@ -311,7 +326,11 @@ export function App() {
           <p className="eyebrow">API REFERENCE</p>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
             <h2 className="text-4xl font-black tracking-tight">Endpoints</h2>
-            <a className="pill" href="/openapi.json">
+            <a
+              className="pill"
+              href="/openapi.json"
+              onClick={() => captureDeveloperEvent("openapi_opened")}
+            >
               <BookOpen size={16} /> OpenAPI JSON
             </a>
           </div>

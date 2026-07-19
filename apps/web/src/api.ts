@@ -26,6 +26,7 @@ export interface ApiJob {
   id: string;
   state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   progress: number;
+  attempt?: number;
   message: string | null;
   source: { kind: "local" | "remote"; sha256?: string; bytes?: number };
   analysis?: JobAnalysis;
@@ -582,6 +583,7 @@ export const workbenchApi = {
   async uploadDemo(file: File): Promise<{
     job: ApiJob;
     upload: { filename: string; bytes: number; sha256: string };
+    duplicate?: boolean;
   }> {
     const response = await fetch(
       `/api/uploads?filename=${encodeURIComponent(file.name)}`,
@@ -600,6 +602,7 @@ export const workbenchApi = {
     return response.json() as Promise<{
       job: ApiJob;
       upload: { filename: string; bytes: number; sha256: string };
+      duplicate?: boolean;
     }>;
   },
   async cases(): Promise<ApiCase[]> {

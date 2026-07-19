@@ -3,6 +3,7 @@ import { ArrowRight, Search, UserRoundSearch } from "lucide-react";
 import { type ApiPlayerHistory, workbenchApi } from "./api";
 import { gameCampaignName } from "./campaign-metadata";
 import { useI18n } from "./i18n";
+import { captureAnalyticsEvent } from "./analytics";
 
 function campaignForMaps(mapNames: string[]): string | null {
   return gameCampaignName(
@@ -24,16 +25,54 @@ export function PlayerLookup() {
   async function lookup(value: string) {
     const normalized = value.trim();
     if (!normalized) return;
+    const startedAt = performance.now();
+    const queryType = normalized.includes("/id/")
+      ? "vanity_url"
+      : normalized.includes("/profiles/")
+        ? "profile_url"
+        : /^\d+$/.test(normalized)
+          ? "steam_id"
+          : "other";
+    captureAnalyticsEvent("player_search_started", { query_type: queryType });
     setLoading(true);
     setError("");
     setHistory(null);
     try {
       const result = await workbenchApi.playerHistory(normalized);
+      captureAnalyticsEvent("player_search_finished", {
+        demo_count: result.games.reduce(
+          (sum, game) => sum + game.demos.length,
+          0,
+        ),
+        duration_seconds: Math.max(
+          0,
+          Math.round((performance.now() - startedAt) / 1000),
+        ),
+        game_count: result.games.length,
+        outcome: "succeeded",
+        query_type: queryType,
+      });
       setHistory(result);
       const parameters = new URLSearchParams(window.location.search);
       parameters.set("player", result.steamId64);
       window.history.replaceState({}, "", `/?${parameters.toString()}`);
     } catch (lookupError) {
+      const message =
+        lookupError instanceof Error ? lookupError.message.toLowerCase() : "";
+      captureAnalyticsEvent("player_search_finished", {
+        category:
+          message.includes("not found") || message.includes("no retained")
+            ? "not_found"
+            : message.includes("configured") || message.includes("unavailable")
+              ? "unavailable"
+              : "other",
+        duration_seconds: Math.max(
+          0,
+          Math.round((performance.now() - startedAt) / 1000),
+        ),
+        outcome: "failed",
+        query_type: queryType,
+      });
       setError(
         lookupError instanceof Error
           ? lookupError.message

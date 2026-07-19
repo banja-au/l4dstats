@@ -81,6 +81,10 @@ interface AssetsBinding {
   fetch(request: Request): Promise<Response>;
 }
 
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 export interface EdgeEnvironment {
   ASSETS: AssetsBinding;
   TEMPORARY_DEMOS: R2BucketBinding;
@@ -96,7 +100,49 @@ export interface EdgeEnvironment {
   STEAM_WEB_API_KEY?: string;
 }
 
-type OperationalEvent = "hosted_analysis_failed" | "hosted_analysis_succeeded";
+type OperationalEvent =
+  | "developer_api_request"
+  | "developer_console_action"
+  | "hosted_analysis_failed"
+  | "hosted_analysis_succeeded"
+  | "hosted_upload_accepted";
+
+function sourceFormat(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".zip")) return "zip";
+  if (lower.endsWith(".gz")) return "gzip";
+  if (lower.endsWith(".xz")) return "xz";
+  if (lower.endsWith(".bz2")) return "bzip2";
+  if (lower.endsWith(".zst")) return "zstd";
+  return "raw";
+}
+
+function sizeBand(bytes: number): string {
+  if (bytes < 1024 * 1024) return "under_1mb";
+  if (bytes < 10 * 1024 * 1024) return "1_to_10mb";
+  if (bytes < 50 * 1024 * 1024) return "10_to_50mb";
+  return "50mb_or_more";
+}
+
+function developerPath(pathname: string): string {
+  if (pathname === "/v1/batches") return "/v1/batches";
+  if (pathname.startsWith("/v1/uploads/")) return "/v1/uploads/:id";
+  if (pathname.startsWith("/v1/jobs/")) return "/v1/jobs/:id";
+  return "other";
+}
+
+function consoleAction(method: string, pathname: string): string {
+  if (pathname.endsWith("/auth/register")) return "register";
+  if (pathname.endsWith("/auth/login")) return "login";
+  if (pathname.endsWith("/auth/logout")) return "logout";
+  if (pathname === "/developer-api/keys" && method === "POST")
+    return "key_create";
+  if (pathname.startsWith("/developer-api/keys/") && method === "DELETE")
+    return "key_revoke";
+  if (pathname === "/developer-api/account" && method === "DELETE")
+    return "account_delete";
+  return "other";
+}
 
 function failureCategory(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
@@ -132,6 +178,7 @@ async function captureOperationalEvent(
         event,
         properties: {
           distinct_id: "l4dstats-edge-production",
+          $process_person_profile: false,
           environment: environment.L4DSTATS_ENVIRONMENT,
           ...properties,
         },
@@ -141,6 +188,17 @@ async function captureOperationalEvent(
   } catch {
     // Observability is best-effort and must never affect analysis delivery.
   }
+}
+
+function scheduleOperationalEvent(
+  context: ExecutionContext | undefined,
+  environment: EdgeEnvironment,
+  event: OperationalEvent,
+  properties: Record<string, boolean | number | string>,
+): void {
+  const promise = captureOperationalEvent(environment, event, properties);
+  if (context) context.waitUntil(promise);
+  else void promise;
 }
 
 function json(status: number, value: unknown): Response {
@@ -240,6 +298,7 @@ async function upload(
   request: Request,
   environment: EdgeEnvironment,
   uploadId: string,
+  context?: ExecutionContext,
 ): Promise<Response> {
   if (!UPLOAD_ID.test(uploadId))
     return json(400, { error: "invalid upload ID" });
@@ -283,6 +342,12 @@ async function upload(
   const job = await repo.enqueue(source, `upload:${sha256}`);
   if (job.source.key !== key) {
     await environment.TEMPORARY_DEMOS.delete(key);
+    scheduleOperationalEvent(context, environment, "hosted_upload_accepted", {
+      duplicate: true,
+      format: sourceFormat(filename),
+      sizeBand: sizeBand(contentLength),
+      state: job.state,
+    });
     return json(job.state === "succeeded" ? 200 : 202, {
       job,
       duplicate: true,
@@ -295,6 +360,12 @@ async function upload(
     await environment.TEMPORARY_DEMOS.delete(key).catch(() => undefined);
     throw error;
   }
+  scheduleOperationalEvent(context, environment, "hosted_upload_accepted", {
+    duplicate: false,
+    format: sourceFormat(filename),
+    sizeBand: sizeBand(contentLength),
+    state: job.state,
+  });
   return json(202, {
     job,
     upload: { filename, bytes: contentLength, sha256 },
@@ -305,6 +376,7 @@ async function upload(
 async function compatibleUpload(
   request: Request,
   environment: EdgeEnvironment,
+  context?: ExecutionContext,
 ): Promise<Response> {
   const length = Number(request.headers.get("content-length"));
   if (!Number.isSafeInteger(length) || length < 1 || length > MAX_UPLOAD_BYTES)
@@ -321,16 +393,31 @@ async function compatibleUpload(
     },
     body: bytes,
   });
-  return upload(forwarded, environment, crypto.randomUUID());
+  return upload(forwarded, environment, crypto.randomUUID(), context);
 }
 
 export async function fetchHandler(
   request: Request,
   environment: EdgeEnvironment,
+  context?: ExecutionContext,
 ): Promise<Response> {
+  const capture = (
+    event: OperationalEvent,
+    properties: Record<string, boolean | number | string>,
+  ): void => {
+    scheduleOperationalEvent(context, environment, event, properties);
+  };
   const url = new URL(request.url);
   const developerConsole = await handleDeveloperConsole(request, environment);
-  if (developerConsole) return developerConsole;
+  if (developerConsole) {
+    if (request.method !== "GET")
+      capture("developer_console_action", {
+        action: consoleAction(request.method, url.pathname),
+        status: developerConsole.status,
+        succeeded: developerConsole.ok,
+      });
+    return developerConsole;
+  }
   if (request.method === "GET" && url.pathname === "/openapi.json")
     return Response.json(openApiDocument(url.origin), {
       headers: secureHeaders({
@@ -342,7 +429,12 @@ export async function fetchHandler(
     request,
     environment,
     async (uploadRequest, uploadId) => {
-      const response = await upload(uploadRequest, environment, uploadId);
+      const response = await upload(
+        uploadRequest,
+        environment,
+        uploadId,
+        context,
+      );
       const value = (await response
         .clone()
         .json()
@@ -357,9 +449,18 @@ export async function fetchHandler(
       fetchHandler(
         new Request(`${url.origin}/api/jobs/${encodeURIComponent(jobId)}`),
         environment,
+        context,
       ),
   );
-  if (publicDeveloperApi) return publicDeveloperApi;
+  if (publicDeveloperApi) {
+    capture("developer_api_request", {
+      method: request.method,
+      path: developerPath(url.pathname),
+      status: publicDeveloperApi.status,
+      succeeded: publicDeveloperApi.ok,
+    });
+    return publicDeveloperApi;
+  }
   if (request.method === "GET" && url.pathname === "/health")
     return json(200, {
       status: "ok",
@@ -426,7 +527,7 @@ export async function fetchHandler(
     return new Response(asset.body, { status: 200, headers });
   }
   if (request.method === "POST" && url.pathname === "/api/uploads")
-    return compatibleUpload(request, environment);
+    return compatibleUpload(request, environment, context);
   if (
     request.method === "PUT" &&
     parts[0] === "api" &&
@@ -434,7 +535,7 @@ export async function fetchHandler(
     parts[2] &&
     parts.length === 3
   )
-    return upload(request, environment, parts[2]);
+    return upload(request, environment, parts[2], context);
   if (
     request.method === "GET" &&
     parts[0] === "api" &&
@@ -653,6 +754,11 @@ async function queueHandler(
       await repo.finish({ id: job.id, owner, state: "succeeded" });
       await captureOperationalEvent(environment, "hosted_analysis_succeeded", {
         attempt: job.attempt,
+        durationSeconds: Math.max(
+          0,
+          Math.round((Date.now() - Date.parse(job.createdAt)) / 1000),
+        ),
+        format: sourceFormat(job.source.filename),
         resultSizeBand:
           resultBytes.byteLength < 1024 * 1024 ? "under_1mb" : "1mb_or_more",
       });
@@ -673,6 +779,13 @@ async function queueHandler(
       await captureOperationalEvent(environment, "hosted_analysis_failed", {
         attempt: job?.attempt ?? 0,
         category: failureCategory(error),
+        durationSeconds: job
+          ? Math.max(
+              0,
+              Math.round((Date.now() - Date.parse(job.createdAt)) / 1000),
+            )
+          : 0,
+        format: job ? sourceFormat(job.source.filename) : "unknown",
         terminal: job?.state === "running" && job.attempt >= 3,
       });
       if (job?.state === "running" && isTransientContainerCapacity(error)) {
@@ -716,6 +829,10 @@ async function digest(bytes: Uint8Array): Promise<string> {
 }
 
 export default {
-  fetch: fetchHandler,
+  fetch: (
+    request: Request,
+    environment: EdgeEnvironment,
+    context: ExecutionContext,
+  ) => fetchHandler(request, environment, context),
   queue: queueHandler,
 };
