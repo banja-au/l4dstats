@@ -170,6 +170,27 @@ describe("HostedJobRepository", () => {
       close();
     }
   });
+
+  it("defers transient infrastructure capacity without consuming an attempt", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const job = await repo.enqueue(source, "upload:capacity");
+      await repo.claim({ id: job.id, owner: "worker-a", leaseMs: 60_000 });
+      await expect(
+        repo.defer({
+          id: job.id,
+          owner: "worker-a",
+          message: "Hosted analysis capacity is busy; retrying",
+        }),
+      ).resolves.toMatchObject({
+        state: "queued",
+        attempt: 0,
+        leaseOwner: null,
+      });
+    } finally {
+      close();
+    }
+  });
 });
 
 class MemoryR2 implements R2BucketLike {

@@ -78,6 +78,15 @@ function failureCategory(error: unknown): string {
   return "unknown";
 }
 
+function isTransientContainerCapacity(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return (
+    message.includes(
+      "Maximum number of running container instances exceeded",
+    ) || message.includes("internal error connecting to port")
+  );
+}
+
 async function captureOperationalEvent(
   environment: EdgeEnvironment,
   event: OperationalEvent,
@@ -380,7 +389,14 @@ async function queueHandler(
         category: failureCategory(error),
         terminal: job?.state === "running" && job.attempt >= 3,
       });
-      if (job?.state === "running" && job.attempt >= 3) {
+      if (job?.state === "running" && isTransientContainerCapacity(error)) {
+        await repo.defer({
+          id: job.id,
+          owner,
+          message: "Hosted analysis capacity is busy; retrying",
+        });
+        message.retry({ delaySeconds: 30 });
+      } else if (job?.state === "running" && job.attempt >= 3) {
         await environment.TEMPORARY_DEMOS.delete(job.source.key).catch(
           () => undefined,
         );
