@@ -148,6 +148,18 @@ still-open licensed game-playback validation boundary.
   recompute player, combat, timeline and coverage views without relabelling
   whole-demo totals as half totals. A late first observation can still make
   any delta a lower bound.
+- Observed opening area: each newly derived competitive half records either a
+  bounded `survivor-opening-area-v1` result or an explicit unavailable reason.
+  The derivation requires an observed `round_start`, a positive tick duration,
+  and at least two resolved Survivors with finite observed positions during the
+  inclusive eight-second post-start window. It retains the earliest eligible
+  upright observation per player, the player/tick/position samples, centroid,
+  XYZ bounds, maximum planar radius, and limitations. Missing team, position,
+  or tick duration is never substituted with zero. The result describes the
+  first observed round opening only: it is demo-derived, is not an authored
+  saferoom/checkpoint, does not prove players remained in the area, and may be
+  unavailable for late recordings or sparse telemetry. Older artifacts omit
+  this append-compatible field.
 - Indexed match-state arrays preserve an absent network send property as
   `null`; numeric zero is reserved for an observed engine value. Consumers
   must not reconstruct or chart a score boundary whose required team index is

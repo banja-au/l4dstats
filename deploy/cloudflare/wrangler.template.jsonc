@@ -1,0 +1,61 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "witchwatch-ENVIRONMENT",
+  "main": "HOSTED_DISPATCHER_ENTRYPOINT",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "r2_buckets": [
+    {
+      "binding": "TEMPORARY_DEMOS",
+      "bucket_name": "witchwatch-ENVIRONMENT-temporary"
+    },
+    {
+      "binding": "DERIVED_ARTIFACTS",
+      "bucket_name": "witchwatch-ENVIRONMENT-artifacts"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "ANALYSIS_QUEUE",
+        "queue": "witchwatch-ENVIRONMENT-analysis"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "witchwatch-ENVIRONMENT-analysis",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "witchwatch-ENVIRONMENT-analysis-dlq"
+      }
+    ]
+  },
+  "containers": [
+    {
+      "class_name": "AnalysisContainer",
+      "image": "./container/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "standard-2",
+      "name": "witchwatch-ENVIRONMENT-analysis",
+      "ssh": {
+        "enabled": false
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "AnalysisContainer",
+        "name": "ANALYSIS_CONTAINER"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["AnalysisContainer"],
+      "tag": "v1"
+    }
+  ]
+}

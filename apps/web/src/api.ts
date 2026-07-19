@@ -283,6 +283,36 @@ export interface WitchEncounter {
   endReason: "death-correlated" | "despawn-or-demo-end";
 }
 
+export type ObservedOpeningArea =
+  | {
+      availability: "derived";
+      derivation: "survivor-opening-area-v1";
+      anchor: { kind: "round-start"; tick: number };
+      tickRange: { start: number; end: number };
+      samples: Array<{
+        playerId: string;
+        tick: number;
+        position: { x: number; y: number; z: number };
+      }>;
+      center: { x: number; y: number; z: number };
+      bounds: {
+        min: { x: number; y: number; z: number };
+        max: { x: number; y: number; z: number };
+      };
+      planarRadiusUnits: number;
+      limitations: string[];
+    }
+  | {
+      availability: "unavailable";
+      derivation: "survivor-opening-area-v1";
+      reason:
+        | "round-start-unobserved"
+        | "tick-rate-unavailable"
+        | "insufficient-survivor-positions";
+      anchor?: { kind: "round-start"; tick: number };
+      observedPlayerIds: string[];
+    };
+
 export interface CompetitiveStats {
   derivationVersion: 1 | 2 | 3 | 4 | 5 | 6;
   rosters?: Array<{
@@ -301,6 +331,7 @@ export interface CompetitiveStats {
     tickRange: { start: number; end: number };
     survivorPlayerIds: string[];
     infectedPlayerIds: string[];
+    observedOpeningArea?: ObservedOpeningArea;
     players: Array<{
       playerId: string;
       side: "Survivor" | "Infected";

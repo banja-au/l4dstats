@@ -312,6 +312,40 @@ export interface SurvivorAmmoTrace {
   }>;
 }
 
+export type ObservedOpeningArea =
+  | {
+      availability: "derived";
+      derivation: "survivor-opening-area-v1";
+      anchor: { kind: "round-start"; tick: number };
+      tickRange: { start: number; end: number };
+      samples: Array<{
+        playerId: string;
+        tick: number;
+        position: { x: number; y: number; z: number };
+      }>;
+      center: { x: number; y: number; z: number };
+      bounds: {
+        min: { x: number; y: number; z: number };
+        max: { x: number; y: number; z: number };
+      };
+      planarRadiusUnits: number;
+      limitations: Array<
+        | "demo-derived-not-map-authored"
+        | "first-observed-position-per-player"
+        | "life-state-partially-unavailable"
+      >;
+    }
+  | {
+      availability: "unavailable";
+      derivation: "survivor-opening-area-v1";
+      reason:
+        | "round-start-unobserved"
+        | "tick-rate-unavailable"
+        | "insufficient-survivor-positions";
+      anchor?: { kind: "round-start"; tick: number };
+      observedPlayerIds: string[];
+    };
+
 export interface CompetitiveStats {
   derivationVersion: 1 | 2 | 3 | 4 | 5 | 6;
   rosters: Array<{
@@ -330,6 +364,7 @@ export interface CompetitiveStats {
     tickRange: { start: number; end: number };
     survivorPlayerIds: string[];
     infectedPlayerIds: string[];
+    observedOpeningArea?: ObservedOpeningArea;
     players: Array<{
       playerId: string;
       side: "Survivor" | "Infected";
@@ -1994,6 +2029,133 @@ export function maximumObservedHealthDrawdown(
   return maximumDrawdown;
 }
 
+const OPENING_AREA_WINDOW_SECONDS = 8;
+
+export function deriveObservedOpeningAreaV1(input: {
+  projected: readonly ProjectedPlayerObservation[];
+  timeline: readonly DemoStats["timeline"][number][];
+  halfTickRange: { start: number; end: number };
+  survivorPlayerIds: readonly string[];
+  tickIntervalSeconds: number | undefined;
+}): ObservedOpeningArea {
+  const derivation = "survivor-opening-area-v1" as const;
+  const roundStart = input.timeline.find(
+    (event) =>
+      event.type === "round_start" &&
+      event.tick >= input.halfTickRange.start &&
+      event.tick <= input.halfTickRange.end,
+  );
+  if (!roundStart)
+    return {
+      availability: "unavailable",
+      derivation,
+      reason: "round-start-unobserved",
+      observedPlayerIds: [],
+    };
+  const anchor = { kind: "round-start" as const, tick: roundStart.tick };
+  if (!input.tickIntervalSeconds || input.tickIntervalSeconds <= 0)
+    return {
+      availability: "unavailable",
+      derivation,
+      reason: "tick-rate-unavailable",
+      anchor,
+      observedPlayerIds: [],
+    };
+  const end = Math.min(
+    input.halfTickRange.end,
+    roundStart.tick +
+      Math.floor(OPENING_AREA_WINDOW_SECONDS / input.tickIntervalSeconds),
+  );
+  let lifeStatePartiallyUnavailable = false;
+  const samples = [...input.survivorPlayerIds].sort().flatMap((playerId) => {
+    const row = input.projected
+      .filter((candidate) => {
+        const observation = candidate.observation;
+        if (observation.playerEpochId !== playerId) return false;
+        const position = observation.position.value;
+        const lifeState = candidate.l4d2.lifeState;
+        return (
+          observation.tick >= roundStart.tick &&
+          observation.tick <= end &&
+          observation.team.value === 2 &&
+          position !== undefined &&
+          Number.isFinite(position.x) &&
+          Number.isFinite(position.y) &&
+          Number.isFinite(position.z) &&
+          candidate.l4d2.incapacitated !== true &&
+          (lifeState === undefined || lifeState === 0)
+        );
+      })
+      .sort((left, right) => left.observation.tick - right.observation.tick)[0];
+    if (row?.l4d2.lifeState === undefined) lifeStatePartiallyUnavailable = true;
+    const position = row?.observation.position.value;
+    return row && position
+      ? [
+          {
+            playerId,
+            tick: row.observation.tick,
+            position: { ...position },
+          },
+        ]
+      : [];
+  });
+  if (samples.length < 2)
+    return {
+      availability: "unavailable",
+      derivation,
+      reason: "insufficient-survivor-positions",
+      anchor,
+      observedPlayerIds: samples.map((sample) => sample.playerId),
+    };
+  const center = samples.reduce(
+    (sum, sample) => ({
+      x: sum.x + sample.position.x / samples.length,
+      y: sum.y + sample.position.y / samples.length,
+      z: sum.z + sample.position.z / samples.length,
+    }),
+    { x: 0, y: 0, z: 0 },
+  );
+  const axes = ["x", "y", "z"] as const;
+  const bounds = {
+    min: Object.fromEntries(
+      axes.map((axis) => [
+        axis,
+        Math.min(...samples.map((sample) => sample.position[axis])),
+      ]),
+    ) as { x: number; y: number; z: number },
+    max: Object.fromEntries(
+      axes.map((axis) => [
+        axis,
+        Math.max(...samples.map((sample) => sample.position[axis])),
+      ]),
+    ) as { x: number; y: number; z: number },
+  };
+  return {
+    availability: "derived",
+    derivation,
+    anchor,
+    tickRange: {
+      start: Math.min(...samples.map((sample) => sample.tick)),
+      end: Math.max(...samples.map((sample) => sample.tick)),
+    },
+    samples,
+    center,
+    bounds,
+    planarRadiusUnits: Math.max(
+      ...samples.map((sample) =>
+        Math.hypot(sample.position.x - center.x, sample.position.y - center.y),
+      ),
+    ),
+    limitations: [
+      "demo-derived-not-map-authored",
+      "first-observed-position-per-player",
+      ...(lifeStatePartiallyUnavailable
+        ? (["life-state-partially-unavailable"] as const)
+        : []),
+    ],
+  };
+}
+
 export function deriveCompetitiveStats(input: {
   projected: readonly ProjectedPlayerObservation[];
   matchStates: readonly L4d2MatchState[];
@@ -2087,6 +2249,13 @@ export function deriveCompetitiveStats(input: {
       tickRange: { start: half.start, end: half.end },
       survivorPlayerIds,
       infectedPlayerIds,
+      observedOpeningArea: deriveObservedOpeningAreaV1({
+        projected: input.projected,
+        timeline: input.timeline,
+        halfTickRange: { start: half.start, end: half.end },
+        survivorPlayerIds,
+        tickIntervalSeconds: input.tickIntervalSeconds,
+      }),
       players: [
         ...survivorPlayerIds.map((playerId) =>
           playerHalf(playerId, "Survivor"),

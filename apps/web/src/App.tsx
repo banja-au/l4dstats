@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Activity,
@@ -33,10 +33,21 @@ import { aggregateGamePlayers } from "./game-aggregation";
 import { halfScopeKey, scopeDemoStats } from "./demo-scope";
 import { rateGamePlayers } from "./player-rating";
 import { gameCampaignName, orderGameAnalyses } from "./campaign-metadata";
+import {
+  buildScreenPointIndex,
+  spatialSubjectPlayerId,
+  type ScreenPointIndex,
+} from "./spatial-map";
+import { formatElapsedTime, formatTickTime } from "./time-format";
+import { numberHitsByObservedRounds } from "./story-timeline";
+import {
+  buildNormalizedDensityGrid,
+  densityDifference,
+} from "./spatial-density";
 import { reconstructVersusScores } from "./score-reconstruction";
 import { PlayerProfile } from "./PlayerProfile";
 import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
-import { InfectedIcon } from "./visual";
+import { INFECTED_CLASSES, InfectedIcon } from "./visual";
 
 type UploadItem = {
   key: string;
@@ -3476,6 +3487,8 @@ function SpatialCombat({
       <DeathPositions
         key={selected.key}
         events={selected.demo.timeline ?? []}
+        competitive={selected.demo.competitive}
+        players={selected.demo.players}
         mapName={selected.name}
         demoSha256={selected.analysis?.demoSha256}
         onOpenTimeline={onOpenTimeline}
@@ -3486,11 +3499,15 @@ function SpatialCombat({
 
 function DeathPositions({
   events,
+  competitive,
+  players,
   mapName,
   demoSha256,
   onOpenTimeline,
 }: {
   events: MatchTimelineEvent[];
+  competitive: CompetitiveStats | undefined;
+  players: PlayerStats[];
   mapName: string | undefined;
   demoSha256: string | undefined;
   onOpenTimeline: (demoSha256: string, tick: number) => void;
@@ -3498,23 +3515,421 @@ function DeathPositions({
   const canvas = useRef<HTMLCanvasElement>(null);
   const [geometry, setGeometry] = useState<MapGeometry | null | undefined>();
   const [floorMode, setFloorMode] = useState<"events" | "all">("events");
-  const [spatialZoom, setSpatialZoom] = useState(1);
+  const [heightRadius, setHeightRadius] = useState(256);
+  const [viewport, setViewport] = useState({ zoom: 1, x: 0, y: 0 });
+  const viewportValue = useRef(viewport);
+  const viewportFrame = useRef<number | null>(null);
+  const viewportUiTimer = useRef<number | null>(null);
+  const drawSpatial = useRef<(() => void) | null>(null);
+  const scheduleViewport = (
+    update:
+      | { zoom: number; x: number; y: number }
+      | ((current: { zoom: number; x: number; y: number }) => {
+          zoom: number;
+          x: number;
+          y: number;
+        }),
+  ) => {
+    viewportValue.current =
+      typeof update === "function" ? update(viewportValue.current) : update;
+    if (viewportFrame.current !== null) return;
+    viewportFrame.current = requestAnimationFrame(() => {
+      viewportFrame.current = null;
+      drawSpatial.current?.();
+      if (viewportUiTimer.current === null) {
+        viewportUiTimer.current = window.setTimeout(() => {
+          viewportUiTimer.current = null;
+          setViewport({ ...viewportValue.current });
+        }, 120);
+      }
+    });
+  };
+  const setViewportImmediately = (next: {
+    zoom: number;
+    x: number;
+    y: number;
+  }) => {
+    if (viewportFrame.current !== null)
+      cancelAnimationFrame(viewportFrame.current);
+    viewportFrame.current = null;
+    viewportValue.current = next;
+    setViewport(next);
+    drawSpatial.current?.();
+  };
+  useEffect(
+    () => () => {
+      if (viewportFrame.current !== null)
+        cancelAnimationFrame(viewportFrame.current);
+      if (viewportUiTimer.current !== null)
+        window.clearTimeout(viewportUiTimer.current);
+    },
+    [],
+  );
+  const [displayMode, setDisplayMode] = useState<
+    "events" | "density" | "hybrid"
+  >("hybrid");
+  const [eventScope, setEventScope] = useState<
+    "all" | "critical" | "pins" | "boss"
+  >("all");
+  const [halfScope, setHalfScope] = useState<
+    "all" | "first" | "second" | "unknown"
+  >("all");
+  const [rosterScope, setRosterScope] = useState<"all" | "A" | "B">("all");
+  const [roleScope, setRoleScope] = useState<"all" | "Survivor" | "Infected">(
+    "all",
+  );
+  const [playerScope, setPlayerScope] = useState("all");
+  const [classScope, setClassScope] = useState("all");
+  const [compareTeams, setCompareTeams] = useState(false);
+  const [compareDensityMode, setCompareDensityMode] = useState<
+    "difference" | "overlay"
+  >("difference");
+  const [expanded, setExpanded] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(() => window.innerWidth > 700);
+  const [densityRadius, setDensityRadius] = useState(256);
+  const infectedIconImages = useRef(new Map<string, HTMLImageElement>());
+  const [infectedIconRevision, setInfectedIconRevision] = useState(0);
+  const positionedTickBounds = events.reduce<[number, number]>(
+    (bounds, event) =>
+      event.position
+        ? [Math.min(bounds[0], event.tick), Math.max(bounds[1], event.tick)]
+        : bounds,
+    [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+  );
+  const tickMinimum = Number.isFinite(positionedTickBounds[0])
+    ? positionedTickBounds[0]
+    : 0;
+  const tickMaximum = Number.isFinite(positionedTickBounds[1])
+    ? positionedTickBounds[1]
+    : 1;
+  const [tickRange, setTickRange] = useState<[number, number]>([
+    tickMinimum,
+    tickMaximum,
+  ]);
   const [selectedSpatialIndex, setSelectedSpatialIndex] = useState<
     number | null
   >(null);
+  const [hoveredSpatialIndex, setHoveredSpatialIndex] = useState<number | null>(
+    null,
+  );
+  const drag = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    moved: boolean;
+  } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{
+    distance: number;
+    midpointX: number;
+    midpointY: number;
+    viewport: { zoom: number; x: number; y: number };
+  } | null>(null);
   const canvasPoints = useRef<Array<{ x: number; y: number; index: number }>>(
     [],
   );
-  const positioned = events.filter((event) => event.position);
+  const canvasPointIndex = useRef<ScreenPointIndex | null>(null);
+  const spatialRenderCount = useRef(0);
+  const eventHalf = (event: MatchTimelineEvent) =>
+    competitive?.halves.find(
+      (half) =>
+        event.tick >= half.tickRange.start && event.tick <= half.tickRange.end,
+    );
+  const participantId = spatialSubjectPlayerId;
+  const rosterForEvent = (event: MatchTimelineEvent) => {
+    const playerId = participantId(event);
+    return competitive?.rosters?.find((roster) =>
+      playerId ? roster.playerIds.includes(playerId) : false,
+    );
+  };
+  const infectedClasses = [
+    ...new Set(
+      events.flatMap((event) =>
+        event.infectedClass ? [event.infectedClass] : [],
+      ),
+    ),
+  ].sort();
+  const positioned = useMemo(
+    () =>
+      events.filter((event) => {
+        if (!event.position) return false;
+        if (event.tick < tickRange[0] || event.tick > tickRange[1])
+          return false;
+        if (
+          eventScope === "critical" &&
+          event.type !== "incap" &&
+          event.type !== "death" &&
+          event.type !== "revive"
+        )
+          return false;
+        if (
+          eventScope === "pins" &&
+          event.type !== "pin_start" &&
+          event.type !== "pin_end" &&
+          event.type !== "clear"
+        )
+          return false;
+        if (
+          eventScope === "boss" &&
+          event.infectedClass !== "Tank" &&
+          event.infectedClass !== "Witch" &&
+          !event.type.startsWith("witch_") &&
+          event.type !== "tank_control"
+        )
+          return false;
+        const half = eventHalf(event);
+        if (halfScope !== "all" && half?.id !== halfScope) return false;
+        const playerId = participantId(event);
+        if (playerScope !== "all" && playerId !== playerScope) return false;
+        if (classScope !== "all" && event.infectedClass !== classScope)
+          return false;
+        if (rosterScope !== "all") {
+          const roster = competitive?.rosters?.find(
+            (candidate) => candidate.id === rosterScope,
+          );
+          if (!playerId || !roster?.playerIds.includes(playerId)) return false;
+        }
+        if (roleScope !== "all") {
+          if (!playerId || !half) return false;
+          const ids =
+            roleScope === "Survivor"
+              ? half.survivorPlayerIds
+              : half.infectedPlayerIds;
+          if (!ids.includes(playerId)) return false;
+        }
+        return true;
+      }),
+    [
+      events,
+      tickRange,
+      eventScope,
+      halfScope,
+      playerScope,
+      classScope,
+      rosterScope,
+      roleScope,
+      competitive,
+    ],
+  );
   const selectedSpatialEvent =
     selectedSpatialIndex === null
       ? undefined
       : positioned[selectedSpatialIndex];
+  const comparisonCounts = positioned.reduce(
+    (counts, event) => {
+      const roster = rosterForEvent(event)?.id;
+      if (roster === "A") counts.A += 1;
+      else if (roster === "B") counts.B += 1;
+      else counts.unassigned += 1;
+      return counts;
+    },
+    { A: 0, B: 0, unassigned: 0 },
+  );
+  const rosterConfidence = competitive?.rosters?.some(
+    (roster) => roster.confidence === "provisional",
+  )
+    ? "provisional"
+    : "high";
+  const openingLandmarks = useMemo(
+    () =>
+      (competitive?.halves ?? []).flatMap((half) => {
+        const area = half.observedOpeningArea;
+        if (
+          !area ||
+          area.availability !== "derived" ||
+          (halfScope !== "all" && half.id !== halfScope)
+        )
+          return [];
+        return [{ half, area }];
+      }),
+    [competitive, halfScope],
+  );
+  const densityGrids = useMemo(() => {
+    if (!geometry) return null;
+    const width = Math.max(1, geometry.bounds.max.x - geometry.bounds.min.x);
+    const height = Math.max(1, geometry.bounds.max.y - geometry.bounds.min.y);
+    const columns = 72;
+    const rows = Math.min(
+      128,
+      Math.max(24, Math.round(columns * (height / width))),
+    );
+    const bounds = {
+      min: { x: geometry.bounds.min.x, y: geometry.bounds.min.y },
+      max: { x: geometry.bounds.max.x, y: geometry.bounds.max.y },
+    };
+    const grid = (points: Array<{ x: number; y: number }>) =>
+      buildNormalizedDensityGrid(points, bounds, columns, rows, densityRadius);
+    const all = grid(
+      positioned.map((event) => ({
+        x: event.position!.x,
+        y: event.position!.y,
+      })),
+    );
+    const team = (id: "A" | "B") =>
+      grid(
+        positioned.flatMap((event) =>
+          rosterForEvent(event)?.id === id
+            ? [{ x: event.position!.x, y: event.position!.y }]
+            : [],
+        ),
+      );
+    const A = team("A");
+    const B = team("B");
+    return { bounds, all, A, B, difference: densityDifference(A, B) };
+  }, [geometry, positioned, competitive, densityRadius]);
+  const densityRaster = useMemo(() => {
+    if (!densityGrids || typeof document === "undefined") return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = densityGrids.all.columns;
+    canvas.height = densityGrids.all.rows;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    const pixels = context.createImageData(canvas.width, canvas.height);
+    let differenceMaximum = 0;
+    for (const value of densityGrids.difference)
+      differenceMaximum = Math.max(differenceMaximum, Math.abs(value));
+    const sharedMaximum = Math.max(
+      densityGrids.A.maximum,
+      densityGrids.B.maximum,
+    );
+    for (let index = 0; index < densityGrids.all.values.length; index += 1) {
+      const column = index % canvas.width;
+      const row = Math.floor(index / canvas.width);
+      const pixel = ((canvas.height - 1 - row) * canvas.width + column) * 4;
+      let red = 255,
+        green = 150,
+        blue = 56,
+        alpha =
+          densityGrids.all.maximum > 0
+            ? (densityGrids.all.values[index] ?? 0) / densityGrids.all.maximum
+            : 0;
+      if (compareTeams && compareDensityMode === "difference") {
+        const difference = densityGrids.difference[index] ?? 0;
+        const strength =
+          differenceMaximum > 0 ? Math.abs(difference) / differenceMaximum : 0;
+        [red, green, blue] = difference >= 0 ? [52, 210, 255] : [255, 151, 61];
+        alpha = strength;
+      } else if (compareTeams) {
+        const a =
+          sharedMaximum > 0
+            ? (densityGrids.A.values[index] ?? 0) / sharedMaximum
+            : 0;
+        const b =
+          sharedMaximum > 0
+            ? (densityGrids.B.values[index] ?? 0) / sharedMaximum
+            : 0;
+        const total = a + b;
+        red = total > 0 ? (52 * a + 236 * b) / total : 0;
+        green = total > 0 ? (210 * a + 92 * b) / total : 0;
+        blue = 255;
+        alpha = Math.min(1, total);
+      }
+      const displayAlpha = alpha < 0.035 ? 0 : alpha ** 0.62 * 0.78;
+      pixels.data[pixel] = Math.round(red);
+      pixels.data[pixel + 1] = Math.round(green);
+      pixels.data[pixel + 2] = Math.round(blue);
+      pixels.data[pixel + 3] = Math.round(displayAlpha * 255);
+    }
+    context.putImageData(pixels, 0, 0);
+    return canvas;
+  }, [densityGrids, compareTeams, compareDensityMode]);
+  const selectedParticipantId = selectedSpatialEvent
+    ? participantId(selectedSpatialEvent)
+    : undefined;
+  const selectedParticipant = players.find(
+    (player) => player.id === selectedParticipantId,
+  );
   const eventFloor = positioned.length
     ? [...positioned]
         .map((event) => event.position!.z)
         .sort((left, right) => left - right)[Math.floor(positioned.length / 2)]!
     : 0;
+  const geometryLayers = useMemo(() => {
+    if (!geometry || typeof Path2D === "undefined") return null;
+    const bands = Array.from({ length: 5 }, () => new Path2D());
+    const edges = new Map<number, { count: number; a: number; b: number }>();
+    const vertexCount = geometry.positions.length / 3;
+    for (let offset = 0; offset < geometry.indices.length; offset += 3) {
+      const triangle = offset / 3;
+      const z = geometry.triangleZ?.[triangle] ?? eventFloor;
+      if (floorMode === "events" && Math.abs(z - eventFloor) > heightRadius)
+        continue;
+      const delta = z - eventFloor;
+      const band =
+        delta < -384
+          ? 0
+          : delta < -128
+            ? 1
+            : delta <= 128
+              ? 2
+              : delta <= 384
+                ? 3
+                : 4;
+      const path = bands[band]!;
+      const vertices = [0, 1, 2].map(
+        (corner) => geometry.indices[offset + corner] ?? 0,
+      );
+      for (let corner = 0; corner < 3; corner += 1) {
+        const vertex = vertices[corner]! * 3;
+        const x = geometry.positions[vertex] ?? 0;
+        const y = geometry.positions[vertex + 1] ?? 0;
+        if (corner === 0) path.moveTo(x, y);
+        else path.lineTo(x, y);
+      }
+      path.closePath();
+      for (let edge = 0; edge < 3; edge += 1) {
+        const first = vertices[edge]!;
+        const second = vertices[(edge + 1) % 3]!;
+        const a = Math.min(first, second);
+        const b = Math.max(first, second);
+        const key = a * vertexCount + b;
+        const existing = edges.get(key);
+        if (existing) existing.count += 1;
+        else edges.set(key, { count: 1, a, b });
+      }
+    }
+    const outline = new Path2D();
+    for (const edge of edges.values()) {
+      if (edge.count !== 1) continue;
+      const a = edge.a * 3;
+      const b = edge.b * 3;
+      outline.moveTo(
+        geometry.positions[a] ?? 0,
+        geometry.positions[a + 1] ?? 0,
+      );
+      outline.lineTo(
+        geometry.positions[b] ?? 0,
+        geometry.positions[b + 1] ?? 0,
+      );
+    }
+    return { bands, outline };
+  }, [geometry, floorMode, eventFloor, heightRadius]);
+  useEffect(() => {
+    setSelectedSpatialIndex(null);
+    setHoveredSpatialIndex(null);
+  }, [
+    eventScope,
+    halfScope,
+    rosterScope,
+    roleScope,
+    playerScope,
+    classScope,
+    tickRange,
+  ]);
+  useEffect(() => {
+    const images = infectedIconImages.current;
+    for (const infectedClass of INFECTED_CLASSES) {
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => setInfectedIconRevision((revision) => revision + 1);
+      image.src = `/art/si/${infectedClass.toLowerCase()}.png`;
+      images.set(infectedClass.toLowerCase(), image);
+    }
+    return () => {
+      for (const image of images.values()) image.onload = null;
+      images.clear();
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     setGeometry(undefined);
@@ -3537,92 +3952,275 @@ function DeathPositions({
     };
   }, [mapName]);
   useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const containWheel = (event: WheelEvent) => {
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+      event.preventDefault();
+      requestAnimationFrame(() => {
+        const root = document.documentElement;
+        const previousBehavior = root.style.scrollBehavior;
+        root.style.scrollBehavior = "auto";
+        window.scrollTo(scrollX, scrollY);
+        root.style.scrollBehavior = previousBehavior;
+      });
+    };
+    element.addEventListener("wheel", containWheel, { passive: false });
+    return () => element.removeEventListener("wheel", containWheel);
+  }, [geometry]);
+  useEffect(() => {
     if (!geometry || !canvas.current) return;
     const element = canvas.current;
     const draw = () => {
+      spatialRenderCount.current += 1;
+      element.dataset.renderCount = String(spatialRenderCount.current);
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       const width = Math.max(1, element.clientWidth);
       const height = Math.max(1, element.clientHeight);
-      element.width = width * ratio;
-      element.height = height * ratio;
+      const backingWidth = Math.round(width * ratio);
+      const backingHeight = Math.round(height * ratio);
+      if (element.width !== backingWidth) element.width = backingWidth;
+      if (element.height !== backingHeight) element.height = backingHeight;
       const context = element.getContext("2d");
       if (!context) return;
-      context.scale(ratio, ratio);
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.fillStyle = "#080d0a";
       context.fillRect(0, 0, width, height);
       const { min, max } = geometry.bounds;
+      const view = viewportValue.current;
       const scale =
         Math.min(
           (width - 32) / Math.max(1, max.x - min.x),
           (height - 32) / Math.max(1, max.y - min.y),
-        ) * spatialZoom;
+        ) * view.zoom;
       const drawnWidth = (max.x - min.x) * scale;
       const drawnHeight = (max.y - min.y) * scale;
       const point = (x: number, y: number) =>
         [
-          (width - drawnWidth) / 2 + (x - min.x) * scale,
-          (height + drawnHeight) / 2 - (y - min.y) * scale,
+          (width - drawnWidth) / 2 + (x - min.x) * scale + view.x,
+          (height + drawnHeight) / 2 - (y - min.y) * scale + view.y,
         ] as const;
-      context.fillStyle = "rgba(91, 118, 99, .28)";
-      context.strokeStyle = "rgba(167, 255, 56, .09)";
-      context.lineWidth = 0.5;
-      for (let offset = 0; offset < geometry.indices.length; offset += 3) {
-        const triangle = offset / 3;
-        if (
-          floorMode === "events" &&
-          geometry.triangleZ &&
-          Math.abs((geometry.triangleZ[triangle] ?? eventFloor) - eventFloor) >
-            256
-        )
-          continue;
-        context.beginPath();
-        for (let corner = 0; corner < 3; corner += 1) {
-          const vertex = (geometry.indices[offset + corner] ?? 0) * 3;
-          const [x, y] = point(
-            geometry.positions[vertex] ?? 0,
-            geometry.positions[vertex + 1] ?? 0,
-          );
-          if (corner === 0) context.moveTo(x, y);
-          else context.lineTo(x, y);
+      if (geometryLayers) {
+        context.save();
+        context.translate(
+          (width - drawnWidth) / 2 + view.x,
+          (height + drawnHeight) / 2 + view.y,
+        );
+        context.scale(scale, -scale);
+        context.translate(-min.x, -min.y);
+        const bandColors = [
+          "rgba(41, 58, 69, .18)",
+          "rgba(50, 75, 72, .24)",
+          "rgba(103, 139, 116, .38)",
+          "rgba(69, 106, 91, .28)",
+          "rgba(45, 70, 76, .2)",
+        ];
+        geometryLayers.bands.forEach((path, index) => {
+          context.fillStyle = bandColors[index]!;
+          context.fill(path);
+        });
+        context.strokeStyle = "rgba(181, 228, 187, .38)";
+        context.lineWidth = 1.2 / scale;
+        context.stroke(geometryLayers.outline);
+        if (view.zoom >= 2.4) {
+          context.strokeStyle = "rgba(196, 220, 202, .07)";
+          context.lineWidth = 0.45 / scale;
+          for (const path of geometryLayers.bands) context.stroke(path);
         }
-        context.closePath();
-        context.fill();
-        context.stroke();
+        context.restore();
       }
       canvasPoints.current = [];
-      for (const [index, event] of positioned.entries()) {
+      const projected = positioned.map((event, index) => {
         const [x, y] = point(event.position!.x, event.position!.y);
         canvasPoints.current.push({ x, y, index });
-        context.beginPath();
-        context.arc(
-          x,
-          y,
-          event.infectedClass === "Tank" ? 7 : 4,
-          0,
-          Math.PI * 2,
+        return { event, index, x, y };
+      });
+      canvasPointIndex.current = buildScreenPointIndex(canvasPoints.current);
+      for (const { half, area } of openingLandmarks) {
+        const [x, y] = point(area.center.x, area.center.y);
+        const radius = Math.max(
+          16,
+          Math.min(90, area.planarRadiusUnits * scale),
         );
-        context.fillStyle =
-          event.type === "pin_start" || event.type === "pin_end"
-            ? "#4ac7ff"
-            : event.infectedClass === "Witch"
-              ? "#d58cff"
-              : event.type === "tank_control"
-                ? "#ffc15c"
-                : event.type === "incap" || event.type === "death"
-                  ? "#ff665b"
-                  : "#a7ff38";
+        context.save();
+        context.beginPath();
+        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.fillStyle = "rgba(167, 255, 56, .055)";
         context.fill();
+        context.strokeStyle = "rgba(190, 255, 112, .82)";
+        context.lineWidth = 1.5;
+        context.setLineDash(half.id === "second" ? [2, 5] : [7, 4]);
+        context.stroke();
+        context.setLineDash([]);
+        context.fillStyle = "rgba(5, 10, 7, .9)";
+        context.fillRect(x - 4, y - radius - 16, 136, 18);
+        context.fillStyle = "#c9ff83";
+        context.font = "700 9px ui-monospace, monospace";
+        context.fillText(
+          `OBSERVED OPENING · ${half.id.toUpperCase()}`,
+          x + 2,
+          y - radius - 4,
+        );
+        context.restore();
+      }
+      if (
+        (displayMode === "density" || displayMode === "hybrid") &&
+        densityRaster
+      ) {
+        context.save();
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.drawImage(
+          densityRaster,
+          (width - drawnWidth) / 2 + view.x,
+          (height - drawnHeight) / 2 + view.y,
+          drawnWidth,
+          drawnHeight,
+        );
+        context.restore();
+      }
+      if (displayMode === "events" || displayMode === "hybrid") {
+        if (projected.length > 500 && view.zoom < 2.2) {
+          const clusters = new Map<
+            string,
+            { x: number; y: number; count: number }
+          >();
+          const clusterSize = 44;
+          for (const marker of projected) {
+            const key = `${Math.floor(marker.x / clusterSize)}:${Math.floor(marker.y / clusterSize)}`;
+            const cluster = clusters.get(key);
+            if (cluster) {
+              cluster.x += marker.x;
+              cluster.y += marker.y;
+              cluster.count += 1;
+            } else {
+              clusters.set(key, { x: marker.x, y: marker.y, count: 1 });
+            }
+          }
+          for (const cluster of clusters.values()) {
+            const x = cluster.x / cluster.count;
+            const y = cluster.y / cluster.count;
+            const radius = Math.min(18, 7 + Math.log2(cluster.count + 1) * 2);
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fillStyle = "rgba(9, 18, 13, .9)";
+            context.fill();
+            context.strokeStyle = "rgba(167, 255, 56, .86)";
+            context.lineWidth = 1.5;
+            context.stroke();
+            context.fillStyle = "#d9ffad";
+            context.font = "700 10px ui-monospace, monospace";
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText(String(cluster.count), x, y + 0.5);
+          }
+          context.textAlign = "start";
+          context.textBaseline = "alphabetic";
+        } else
+          for (const { event, index, x, y } of projected) {
+            const infectedIcon = event.infectedClass
+              ? infectedIconImages.current.get(
+                  event.infectedClass.toLowerCase(),
+                )
+              : undefined;
+            const iconSize = event.infectedClass === "Tank" ? 30 : 22;
+            if (infectedIcon?.complete && infectedIcon.naturalWidth > 0) {
+              context.save();
+              context.beginPath();
+              context.arc(x, y, iconSize / 2, 0, Math.PI * 2);
+              context.fillStyle = "rgba(4, 8, 6, .92)";
+              context.fill();
+              context.clip();
+              context.drawImage(
+                infectedIcon,
+                x - iconSize / 2,
+                y - iconSize / 2,
+                iconSize,
+                iconSize,
+              );
+              context.restore();
+              const roster = rosterForEvent(event);
+              context.beginPath();
+              context.arc(x, y, iconSize / 2 + 1.5, 0, Math.PI * 2);
+              context.strokeStyle =
+                compareTeams && roster?.id === "A"
+                  ? "#34d2ff"
+                  : compareTeams && roster?.id === "B"
+                    ? "#ec5cff"
+                    : index === selectedSpatialIndex
+                      ? "#ffffff"
+                      : "rgba(167, 255, 56, .72)";
+              context.lineWidth = index === selectedSpatialIndex ? 2.5 : 1.5;
+              context.stroke();
+              continue;
+            }
+            context.beginPath();
+            context.arc(
+              x,
+              y,
+              event.infectedClass === "Tank"
+                ? 8
+                : index === selectedSpatialIndex
+                  ? 7
+                  : 4.5,
+              0,
+              Math.PI * 2,
+            );
+            const roster = rosterForEvent(event);
+            context.fillStyle =
+              compareTeams && roster?.id === "A"
+                ? "#34d2ff"
+                : compareTeams && roster?.id === "B"
+                  ? "#ec5cff"
+                  : event.type === "pin_start" || event.type === "pin_end"
+                    ? "#4ac7ff"
+                    : event.infectedClass === "Witch"
+                      ? "#d58cff"
+                      : event.type === "tank_control"
+                        ? "#ffc15c"
+                        : event.type === "incap" || event.type === "death"
+                          ? "#ff665b"
+                          : "#a7ff38";
+            context.fill();
+            if (index === selectedSpatialIndex) {
+              context.strokeStyle = "#ffffff";
+              context.lineWidth = 2;
+              context.stroke();
+            }
+          }
       }
     };
+    drawSpatial.current = draw;
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(element);
-    return () => observer.disconnect();
-  }, [geometry, positioned, floorMode, spatialZoom, eventFloor]);
+    return () => {
+      observer.disconnect();
+      if (drawSpatial.current === draw) drawSpatial.current = null;
+    };
+  }, [
+    geometry,
+    positioned,
+    floorMode,
+    eventFloor,
+    heightRadius,
+    displayMode,
+    densityRadius,
+    selectedSpatialIndex,
+    compareTeams,
+    geometryLayers,
+    densityRaster,
+    compareDensityMode,
+    infectedIconRevision,
+    openingLandmarks,
+  ]);
   if (!positioned.length) return null;
   if (geometry)
     return (
-      <article className="panel death-map geometry-map">
+      <article
+        className={`panel death-map geometry-map${expanded ? " spatial-expanded" : ""}`}
+      >
         <div className="panel-heading">
           <div>
             <span className="eyebrow">
@@ -3635,61 +4233,531 @@ function DeathPositions({
           <span className="muted">Local official map · top-down</span>
         </div>
         <div className="spatial-controls" aria-label="Spatial map controls">
-          {geometry.triangleZ && (
-            <span>
+          <span className="spatial-mode-switch" aria-label="Display layer">
+            {(["events", "hybrid", "density"] as const).map((mode) => (
               <button
-                className={floorMode === "events" ? "active" : ""}
-                onClick={() => setFloorMode("events")}
+                key={mode}
+                className={displayMode === mode ? "active" : ""}
+                aria-pressed={displayMode === mode}
+                onClick={() => setDisplayMode(mode)}
               >
-                Event floor ±256u
-              </button>
-              <button
-                className={floorMode === "all" ? "active" : ""}
-                onClick={() => setFloorMode("all")}
-              >
-                All floors
-              </button>
-            </span>
-          )}
-          <span>
-            {[1, 1.5, 2].map((value) => (
-              <button
-                key={value}
-                className={spatialZoom === value ? "active" : ""}
-                onClick={() => setSpatialZoom(value)}
-              >
-                {value}×
+                {mode}
               </button>
             ))}
           </span>
+          <span className="spatial-viewport-actions">
+            <button
+              aria-label="Zoom out"
+              onClick={() =>
+                scheduleViewport((current) => ({
+                  ...current,
+                  zoom: Math.max(0.65, current.zoom / 1.3),
+                }))
+              }
+            >
+              −
+            </button>
+            <button
+              aria-label="Fit map"
+              onClick={() => setViewportImmediately({ zoom: 1, x: 0, y: 0 })}
+            >
+              Fit
+            </button>
+            <button
+              aria-label="Zoom in"
+              onClick={() =>
+                scheduleViewport((current) => ({
+                  ...current,
+                  zoom: Math.min(8, current.zoom * 1.3),
+                }))
+              }
+            >
+              +
+            </button>
+            <button
+              aria-label={expanded ? "Exit expanded map" : "Expand map"}
+              aria-pressed={expanded}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? "Close" : "Expand"}
+            </button>
+          </span>
         </div>
-        <canvas
-          ref={canvas}
-          aria-label={`Top-down ${mapName} world geometry with positioned combat events`}
-          onPointerDown={(pointerEvent) => {
-            const rect = pointerEvent.currentTarget.getBoundingClientRect();
-            const x = pointerEvent.clientX - rect.left;
-            const y = pointerEvent.clientY - rect.top;
-            const nearest = canvasPoints.current
-              .map((point) => ({
-                ...point,
-                distance: Math.hypot(point.x - x, point.y - y),
+        <details
+          className="spatial-filter-drawer"
+          open={filtersOpen}
+          onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+        >
+          <summary>
+            <span>Map filters</span>
+            <strong>
+              {
+                [
+                  eventScope,
+                  halfScope,
+                  rosterScope,
+                  roleScope,
+                  playerScope,
+                  classScope,
+                ].filter((value) => value !== "all").length
+              }{" "}
+              active
+            </strong>
+            <ChevronDown />
+          </summary>
+          <div className="spatial-filter-bar" aria-label="Map filters">
+            <label>
+              <span>Moments</span>
+              <select
+                value={eventScope}
+                onChange={(event) =>
+                  setEventScope(event.target.value as typeof eventScope)
+                }
+              >
+                <option value="all">All positioned events</option>
+                <option value="critical">Incaps, deaths & revives</option>
+                <option value="pins">Pins & clears</option>
+                <option value="boss">Tank & Witch</option>
+              </select>
+            </label>
+            <label>
+              <span>Half</span>
+              <select
+                value={halfScope}
+                onChange={(event) =>
+                  setHalfScope(event.target.value as typeof halfScope)
+                }
+              >
+                <option value="all">Both halves</option>
+                <option value="first">First half</option>
+                <option value="second">Second half</option>
+                <option value="unknown">Unknown segment</option>
+              </select>
+            </label>
+            <label>
+              <span>Squad</span>
+              <select
+                value={rosterScope}
+                disabled={!competitive?.rosters?.length}
+                onChange={(event) =>
+                  setRosterScope(event.target.value as typeof rosterScope)
+                }
+              >
+                <option value="all">Both teams</option>
+                <option value="A">Team A</option>
+                <option value="B">Team B</option>
+              </select>
+            </label>
+            <label>
+              <span>Role</span>
+              <select
+                value={roleScope}
+                disabled={!competitive?.halves.length}
+                onChange={(event) =>
+                  setRoleScope(event.target.value as typeof roleScope)
+                }
+              >
+                <option value="all">Both roles</option>
+                <option value="Survivor">Survivors</option>
+                <option value="Infected">Infected</option>
+              </select>
+            </label>
+            <label>
+              <span>Player</span>
+              <select
+                value={playerScope}
+                onChange={(event) => setPlayerScope(event.target.value)}
+              >
+                <option value="all">All players</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.alias}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>SI class</span>
+              <select
+                value={classScope}
+                onChange={(event) => setClassScope(event.target.value)}
+              >
+                <option value="all">All classes</option>
+                {infectedClasses.map((infectedClass) => (
+                  <option key={infectedClass} value={infectedClass}>
+                    {infectedClass}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
+        {competitive?.rosters?.length === 2 && (
+          <div className="spatial-compare-strip">
+            <div>
+              <span>Versus comparison</span>
+              <strong>
+                Team A × Team B · colors follow stable roster, not current role
+              </strong>
+              <small>
+                {rosterConfidence} roster inference · neutral labels · A{" "}
+                {comparisonCounts.A} · B {comparisonCounts.B} · unassigned{" "}
+                {comparisonCounts.unassigned}
+              </small>
+            </div>
+            <div className="spatial-compare-actions">
+              {compareTeams && (
+                <span aria-label="Team density comparison mode">
+                  {(["difference", "overlay"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={compareDensityMode === mode ? "active" : ""}
+                      aria-pressed={compareDensityMode === mode}
+                      onClick={() => setCompareDensityMode(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </span>
+              )}
+              <button
+                type="button"
+                className={compareTeams ? "active" : ""}
+                aria-pressed={compareTeams}
+                onClick={() => {
+                  setCompareTeams((current) => !current);
+                  setRosterScope("all");
+                }}
+              >
+                {compareTeams ? "Exit compare" : "Compare teams"}
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="spatial-canvas-shell">
+          <canvas
+            ref={canvas}
+            tabIndex={0}
+            aria-label={`Interactive top-down ${mapName} world geometry with ${positioned.length} positioned combat events. Drag to pan and scroll to zoom.`}
+            onWheel={(wheelEvent) => {
+              wheelEvent.preventDefault();
+              wheelEvent.stopPropagation();
+              const rect = wheelEvent.currentTarget.getBoundingClientRect();
+              const cursorX = wheelEvent.clientX - rect.left;
+              const cursorY = wheelEvent.clientY - rect.top;
+              scheduleViewport((current) => {
+                const nextZoom = Math.max(
+                  0.65,
+                  Math.min(
+                    8,
+                    current.zoom * Math.exp(-wheelEvent.deltaY * 0.0015),
+                  ),
+                );
+                const ratio = nextZoom / current.zoom;
+                return {
+                  zoom: nextZoom,
+                  x:
+                    current.x +
+                    (cursorX - rect.width / 2 - current.x) * (1 - ratio),
+                  y:
+                    current.y +
+                    (cursorY - rect.height / 2 - current.y) * (1 - ratio),
+                };
+              });
+            }}
+            onPointerDown={(pointerEvent) => {
+              pointerEvent.currentTarget.setPointerCapture(
+                pointerEvent.pointerId,
+              );
+              pointers.current.set(pointerEvent.pointerId, {
+                x: pointerEvent.clientX,
+                y: pointerEvent.clientY,
+              });
+              if (pointers.current.size === 2) {
+                const [first, second] = [...pointers.current.values()];
+                if (first && second) {
+                  pinch.current = {
+                    distance: Math.max(
+                      1,
+                      Math.hypot(second.x - first.x, second.y - first.y),
+                    ),
+                    midpointX: (first.x + second.x) / 2,
+                    midpointY: (first.y + second.y) / 2,
+                    viewport: { ...viewportValue.current },
+                  };
+                }
+                drag.current = null;
+                return;
+              }
+              drag.current = {
+                pointerId: pointerEvent.pointerId,
+                x: pointerEvent.clientX,
+                y: pointerEvent.clientY,
+                moved: false,
+              };
+            }}
+            onPointerMove={(pointerEvent) => {
+              if (pointers.current.has(pointerEvent.pointerId)) {
+                pointers.current.set(pointerEvent.pointerId, {
+                  x: pointerEvent.clientX,
+                  y: pointerEvent.clientY,
+                });
+              }
+              if (pointers.current.size >= 2 && pinch.current) {
+                const [first, second] = [...pointers.current.values()];
+                if (first && second) {
+                  const start = pinch.current;
+                  const distance = Math.max(
+                    1,
+                    Math.hypot(second.x - first.x, second.y - first.y),
+                  );
+                  const midpointX = (first.x + second.x) / 2;
+                  const midpointY = (first.y + second.y) / 2;
+                  const nextZoom = Math.max(
+                    0.65,
+                    Math.min(
+                      8,
+                      start.viewport.zoom * (distance / start.distance),
+                    ),
+                  );
+                  const ratio = nextZoom / start.viewport.zoom;
+                  scheduleViewport({
+                    zoom: nextZoom,
+                    x:
+                      start.viewport.x +
+                      (midpointX - start.midpointX) +
+                      (start.midpointX -
+                        pointerEvent.currentTarget.getBoundingClientRect()
+                          .left -
+                        pointerEvent.currentTarget.clientWidth / 2 -
+                        start.viewport.x) *
+                        (1 - ratio),
+                    y:
+                      start.viewport.y +
+                      (midpointY - start.midpointY) +
+                      (start.midpointY -
+                        pointerEvent.currentTarget.getBoundingClientRect().top -
+                        pointerEvent.currentTarget.clientHeight / 2 -
+                        start.viewport.y) *
+                        (1 - ratio),
+                  });
+                }
+                return;
+              }
+              const activeDrag = drag.current;
+              if (
+                activeDrag &&
+                activeDrag.pointerId === pointerEvent.pointerId
+              ) {
+                const dx = pointerEvent.clientX - activeDrag.x;
+                const dy = pointerEvent.clientY - activeDrag.y;
+                if (Math.abs(dx) + Math.abs(dy) > 1) activeDrag.moved = true;
+                activeDrag.x = pointerEvent.clientX;
+                activeDrag.y = pointerEvent.clientY;
+                scheduleViewport((current) => ({
+                  ...current,
+                  x: current.x + dx,
+                  y: current.y + dy,
+                }));
+                return;
+              }
+              const rect = pointerEvent.currentTarget.getBoundingClientRect();
+              const x = pointerEvent.clientX - rect.left;
+              const y = pointerEvent.clientY - rect.top;
+              const nearest = canvasPointIndex.current?.nearest(x, y, 14);
+              setHoveredSpatialIndex(nearest?.index ?? null);
+            }}
+            onPointerUp={(pointerEvent) => {
+              const activeDrag = drag.current;
+              pointers.current.delete(pointerEvent.pointerId);
+              pinch.current = null;
+              if (pointers.current.size === 1) {
+                const [remaining] = [...pointers.current.entries()];
+                if (remaining) {
+                  drag.current = {
+                    pointerId: remaining[0],
+                    x: remaining[1].x,
+                    y: remaining[1].y,
+                    moved: true,
+                  };
+                }
+                return;
+              }
+              drag.current = null;
+              if (activeDrag?.moved) return;
+              const rect = pointerEvent.currentTarget.getBoundingClientRect();
+              const x = pointerEvent.clientX - rect.left;
+              const y = pointerEvent.clientY - rect.top;
+              const nearest = canvasPointIndex.current?.nearest(x, y, 18);
+              if (nearest) setSelectedSpatialIndex(nearest.index);
+            }}
+            onPointerCancel={(pointerEvent) => {
+              pointers.current.delete(pointerEvent.pointerId);
+              pinch.current = null;
+              drag.current = null;
+            }}
+            onDoubleClick={() =>
+              scheduleViewport((current) => ({
+                ...current,
+                zoom: Math.min(8, current.zoom * 1.6),
               }))
-              .sort((left, right) => left.distance - right.distance)[0];
-            if (nearest && nearest.distance <= 18) {
-              setSelectedSpatialIndex(nearest.index);
             }
-          }}
-        />
+            onKeyDown={(event) => {
+              const step = event.shiftKey ? 80 : 32;
+              if (event.key === "Escape") {
+                setSelectedSpatialIndex(null);
+                setExpanded(false);
+              }
+              if (event.key === "0")
+                setViewportImmediately({ zoom: 1, x: 0, y: 0 });
+              if (event.key === "+" || event.key === "=")
+                scheduleViewport((current) => ({
+                  ...current,
+                  zoom: Math.min(8, current.zoom * 1.25),
+                }));
+              if (event.key === "-")
+                scheduleViewport((current) => ({
+                  ...current,
+                  zoom: Math.max(0.65, current.zoom / 1.25),
+                }));
+              if (
+                (event.key === "[" || event.key === "]") &&
+                positioned.length
+              ) {
+                event.preventDefault();
+                setSelectedSpatialIndex((current) => {
+                  const index = current ?? (event.key === "]" ? -1 : 0);
+                  return (
+                    (index + (event.key === "]" ? 1 : -1) + positioned.length) %
+                    positioned.length
+                  );
+                });
+              }
+              if (event.key.startsWith("Arrow")) {
+                event.preventDefault();
+                scheduleViewport((current) => ({
+                  ...current,
+                  x:
+                    current.x +
+                    (event.key === "ArrowLeft"
+                      ? step
+                      : event.key === "ArrowRight"
+                        ? -step
+                        : 0),
+                  y:
+                    current.y +
+                    (event.key === "ArrowUp"
+                      ? step
+                      : event.key === "ArrowDown"
+                        ? -step
+                        : 0),
+                }));
+              }
+            }}
+          />
+          <div className="spatial-map-status" aria-live="polite">
+            <span>{viewport.zoom.toFixed(2)}×</span>
+            <span>
+              {positioned.length} positioned moments
+              {positioned.length > 500 && viewport.zoom < 2.2
+                ? " · clustered"
+                : ""}
+            </span>
+            <span>Drag · scroll · pinch · [ ] select</span>
+          </div>
+          {hoveredSpatialIndex !== null && positioned[hoveredSpatialIndex] && (
+            <div className="spatial-hover-card" role="tooltip">
+              <strong>{positioned[hoveredSpatialIndex].detail}</strong>
+              <span>
+                {formatElapsedTime(positioned[hoveredSpatialIndex].timeSeconds)}{" "}
+                · tick {whole.format(positioned[hoveredSpatialIndex].tick)}
+              </span>
+            </div>
+          )}
+        </div>
+        <details className="spatial-advanced-controls">
+          <summary>Layers & height</summary>
+          <div>
+            {geometry.triangleZ && (
+              <label>
+                <span>Height band</span>
+                <select
+                  value={floorMode === "all" ? "all" : String(heightRadius)}
+                  onChange={(event) => {
+                    if (event.target.value === "all") setFloorMode("all");
+                    else {
+                      setFloorMode("events");
+                      setHeightRadius(Number(event.target.value));
+                    }
+                  }}
+                >
+                  <option value="128">Focused ±128u</option>
+                  <option value="256">Event level ±256u</option>
+                  <option value="512">Wide ±512u</option>
+                  <option value="all">All elevations</option>
+                </select>
+              </label>
+            )}
+            <label>
+              <span>Smoothing · {densityRadius} world units</span>
+              <input
+                type="range"
+                min="96"
+                max="768"
+                step="32"
+                value={densityRadius}
+                onChange={(event) =>
+                  setDensityRadius(Number(event.target.value))
+                }
+              />
+            </label>
+            <label className="spatial-time-range">
+              <span>
+                Tick range · {whole.format(tickRange[0])}–
+                {whole.format(tickRange[1])}
+              </span>
+              <input
+                aria-label="Start tick"
+                type="range"
+                min={tickMinimum}
+                max={tickMaximum}
+                value={tickRange[0]}
+                onChange={(event) =>
+                  setTickRange((current) => [
+                    Math.min(Number(event.target.value), current[1]),
+                    current[1],
+                  ])
+                }
+              />
+              <input
+                aria-label="End tick"
+                type="range"
+                min={tickMinimum}
+                max={tickMaximum}
+                value={tickRange[1]}
+                onChange={(event) =>
+                  setTickRange((current) => [
+                    current[0],
+                    Math.max(Number(event.target.value), current[0]),
+                  ])
+                }
+              />
+            </label>
+          </div>
+        </details>
         {selectedSpatialEvent && (
           <article className="spatial-selection" aria-live="polite">
             <div>
               <span>
-                {duration(selectedSpatialEvent.timeSeconds)} · tick{" "}
+                {formatElapsedTime(selectedSpatialEvent.timeSeconds)} · tick{" "}
                 {whole.format(selectedSpatialEvent.tick)}
               </span>
               <strong>{selectedSpatialEvent.detail}</strong>
               <small>
+                {selectedParticipant?.alias
+                  ? `${selectedParticipant.alias} · `
+                  : ""}
                 {selectedSpatialEvent.infectedClass ??
                   selectedSpatialEvent.type.replaceAll("_", " ")}
               </small>
@@ -3707,19 +4775,94 @@ function DeathPositions({
           </article>
         )}
         <div className="death-map-key">
-          <span>
-            <i /> Attacks and support
-          </span>
-          <span>
-            <i /> Incaps and deaths
-          </span>
+          {compareTeams ? (
+            <>
+              <span className="team-a">
+                <i /> Team A
+              </span>
+              <span className="team-b">
+                <i /> Team B
+              </span>
+              <span>
+                {positioned.filter((event) => rosterForEvent(event)?.id === "A")
+                  .length || 0}{" "}
+                /{" "}
+                {positioned.filter((event) => rosterForEvent(event)?.id === "B")
+                  .length || 0}{" "}
+                positioned moments
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="support">
+                <i /> Attack/support
+              </span>
+              <span className="critical">
+                <i /> Incap/death
+              </span>
+              <span className="pin">
+                <i /> Pin
+              </span>
+              <span className="tank">
+                <i /> Tank
+              </span>
+              <span className="witch">
+                <i /> Witch
+              </span>
+            </>
+          )}
+          {openingLandmarks.length > 0 && (
+            <span className="opening">
+              <i /> Observed opening
+            </span>
+          )}
         </div>
+        {displayMode !== "events" && densityGrids && (
+          <div className="spatial-density-legend">
+            <div
+              className={`spatial-density-ramp ${compareTeams ? compareDensityMode : "single"}`}
+            />
+            <strong>
+              {compareTeams && compareDensityMode === "difference"
+                ? "More Team A concentration ← normalized difference → More Team B concentration"
+                : compareTeams
+                  ? "Shared scale · Team A cyan · Team B magenta"
+                  : "Lower ← normalized share of positioned events → higher"}
+            </strong>
+            <span>
+              Smoothing {densityRadius} world units · normalized within each
+              cohort · A n={densityGrids.A.sampleCount} · B n=
+              {densityGrids.B.sampleCount}
+              {compareTeams &&
+              (densityGrids.A.sampleCount < 10 ||
+                densityGrids.B.sampleCount < 10)
+                ? " · sparse observations—patterns are unstable"
+                : ""}
+            </span>
+          </div>
+        )}
+        {openingLandmarks.length > 0 && (
+          <div className="spatial-landmark-notice">
+            <strong>Observed Survivor opening area</strong>
+            <span>
+              First observed round opening · demo-derived, not an authored
+              saferoom ·{" "}
+              {openingLandmarks
+                .map(
+                  ({ half, area }) =>
+                    `${half.id} ${area.samples.length}/${half.survivorPlayerIds.length} players · radius ${whole.format(area.planarRadiusUnits)}u · ticks ${whole.format(area.tickRange.start)}–${whole.format(area.tickRange.end)}`,
+                )
+                .join(" · ")}
+            </span>
+          </div>
+        )}
         <SpatialEventLinks
           events={positioned}
           demoSha256={demoSha256}
           onOpenTimeline={onOpenTimeline}
         />
         <small>
+          Density represents positioned timeline events, not player occupancy. ·{" "}
           {whole.format(geometry.coverage.emittedTriangles)} world-brush
           triangles · BSP {geometry.provenance.sourceBspSha256.slice(0, 12)} ·{" "}
           {whole.format(geometry.coverage.emittedDisplacements)} displacements
@@ -3761,7 +4904,7 @@ function DeathPositions({
             cy={282 - scale(event.position!.y, minY, maxY) * (282 / 900)}
             r={event.infectedClass === "Tank" ? 8 : 4}
           >
-            <title>{`${duration(event.timeSeconds)} · ${event.detail}`}</title>
+            <title>{`${formatElapsedTime(event.timeSeconds)} · ${event.detail}`}</title>
           </circle>
         ))}
       </svg>
@@ -3795,28 +4938,48 @@ function SpatialEventLinks({
   demoSha256: string | undefined;
   onOpenTimeline: (demoSha256: string, tick: number) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [limit, setLimit] = useState(100);
   if (!demoSha256) return null;
   return (
-    <details className="spatial-event-links">
+    <details
+      className="spatial-event-links"
+      onToggle={(event) => {
+        const nextOpen = event.currentTarget.open;
+        setOpen(nextOpen);
+        if (!nextOpen) setLimit(100);
+      }}
+    >
       <summary>
         Inspect {whole.format(events.length)} positioned moments
         <ChevronDown />
       </summary>
-      <div>
-        {events.map((event, index) => (
-          <button
-            type="button"
-            key={`${event.tick}:${event.type}:${index}`}
-            onClick={() => onOpenTimeline(demoSha256, event.tick)}
-          >
-            <span>
-              {event.infectedClass ?? event.type.replaceAll("_", " ")}
-            </span>
-            <strong>{event.detail}</strong>
-            <time>tick {whole.format(event.tick)}</time>
-          </button>
-        ))}
-      </div>
+      {open && (
+        <div>
+          {events.slice(0, limit).map((event, index) => (
+            <button
+              type="button"
+              key={`${event.tick}:${event.type}:${index}`}
+              onClick={() => onOpenTimeline(demoSha256, event.tick)}
+            >
+              <span>
+                {event.infectedClass ?? event.type.replaceAll("_", " ")}
+              </span>
+              <strong>{event.detail}</strong>
+              <time>tick {whole.format(event.tick)}</time>
+            </button>
+          ))}
+          {limit < events.length && (
+            <button
+              type="button"
+              className="spatial-event-more"
+              onClick={() => setLimit((current) => current + 100)}
+            >
+              Show next {whole.format(Math.min(100, events.length - limit))}
+            </button>
+          )}
+        </div>
+      )}
     </details>
   );
 }
@@ -3867,6 +5030,12 @@ function Timeline({
   } | null>(null);
   const [zoom, setZoom] = useState(() => (window.innerWidth <= 700 ? 1 : 2));
   const [fullscreen, setFullscreen] = useState(false);
+  const [timelineView, setTimelineView] = useState<"hits" | "timeline">("hits");
+  const [storyLimit, setStoryLimit] = useState(100);
+  const storyTabId = useId();
+  const timelineTabId = useId();
+  const storyPanelId = useId();
+  const timelinePanelId = useId();
   const typeRank: Record<MatchTimelineEvent["type"], number> = {
     round_start: 0,
     team_change: 1,
@@ -3924,6 +5093,21 @@ function Timeline({
     rounds: ["round_start", "round_end", "team_change"],
     support: ["revive"],
   };
+  const filterCounts = Object.fromEntries(
+    ["all", ...Object.keys(groups)].map((name) => [
+      name,
+      name === "all"
+        ? eventCount
+        : scopedDemos.reduce(
+            (count, demo) =>
+              count +
+              demo.events.filter(({ event }) =>
+                groups[name]?.includes(event.type),
+              ).length,
+            0,
+          ),
+    ]),
+  );
   const visibleDemos = scopedDemos.map((demo) => ({
     ...demo,
     events:
@@ -3987,6 +5171,7 @@ function Timeline({
       setSelected(null);
     }
   }, [analyses, mapScope]);
+  useEffect(() => setStoryLimit(100), [filter, mapScope]);
   useEffect(() => {
     if (!fullscreen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -4024,6 +5209,148 @@ function Timeline({
       "Tank",
       "Witch",
     ].includes(name ?? "");
+  const hitSummaries = scopedDemos.flatMap((demo) => {
+    const competitive = demo.demo.competitive;
+    if (!competitive) return [];
+    return competitive.hits.map((hit, index) => ({
+      hit,
+      index,
+      demo,
+      lives: hit.lifeIds.flatMap((lifeId) => {
+        const life = competitive.infectedLives.find(
+          (candidate) => candidate.id === lifeId,
+        );
+        return life ? [life] : [];
+      }),
+    }));
+  });
+  const openHit = (summary: (typeof hitSummaries)[number]) => {
+    const target = summary.demo.events
+      .filter(({ event }) => event.tick >= summary.hit.tickRange.start)
+      .sort(
+        (left, right) =>
+          Math.abs(left.event.tick - summary.hit.tickRange.start) -
+          Math.abs(right.event.tick - summary.hit.tickRange.start),
+      )[0];
+    if (target) setSelected(target.key);
+  };
+  const visibleHitSummaries = hitSummaries.filter((summary) => {
+    if (filter === "all" || filter === "infected") return true;
+    if (filter === "combat")
+      return (
+        summary.hit.controls > 0 || summary.hit.observedSurvivorHealthLoss > 0
+      );
+    if (filter === "pins") return summary.hit.peakSimultaneousPins > 0;
+    if (filter === "bosses")
+      return summary.lives.some(
+        (life) =>
+          life.infectedClass === "Tank" || life.infectedClass === "Witch",
+      );
+    return false;
+  });
+  const hitRoundContexts = new Map<
+    string,
+    { hit: number; round: number; observedBoundary: boolean }
+  >();
+  for (const demo of scopedDemos) {
+    const roundStarts = demo.events
+      .filter(({ event }) => event.type === "round_start")
+      .map(({ event }) => event.tick)
+      .sort((left, right) => left - right);
+    const demoHits = hitSummaries.filter(
+      (candidate) => candidate.demo.sha256 === demo.sha256,
+    );
+    const numbers = numberHitsByObservedRounds(
+      demoHits.map((summary) => ({
+        id: summary.hit.id,
+        startTick: summary.hit.tickRange.start,
+      })),
+      roundStarts,
+    );
+    for (const summary of demoHits) {
+      const number = numbers.get(summary.hit.id);
+      if (number)
+        hitRoundContexts.set(`${demo.sha256}:${summary.hit.id}`, number);
+    }
+  }
+  const hitRoundContext = (summary: (typeof hitSummaries)[number]) =>
+    hitRoundContexts.get(`${summary.demo.sha256}:${summary.hit.id}`) ?? {
+      hit: 1,
+      round: 0,
+      observedBoundary: false,
+    };
+  const majorStoryTypes = new Set<MatchTimelineEvent["type"]>([
+    "round_start",
+    "round_end",
+    "team_change",
+    "incap",
+    "death",
+    "revive",
+    "clear",
+    "tank_control",
+    "witch_spawn",
+    "witch_enrage",
+    "witch_burn",
+    "witch_end",
+  ]);
+  const storyEventGroups = new Map<string, Array<(typeof visible)[number]>>();
+  for (const item of visible.filter(({ event }) =>
+    majorStoryTypes.has(event.type),
+  )) {
+    const key = `${item.demo.sha256}:${item.event.tick}`;
+    const group = storyEventGroups.get(key) ?? [];
+    group.push(item);
+    storyEventGroups.set(key, group);
+  }
+  const storyItems = [
+    ...visibleHitSummaries.map((summary) => ({
+      kind: "hit" as const,
+      tick: summary.hit.tickRange.start,
+      summary,
+    })),
+    ...[...storyEventGroups.values()].map((items) => ({
+      kind: "event" as const,
+      tick: items[0]!.event.tick,
+      items,
+    })),
+  ].sort((left, right) => left.tick - right.tick);
+  const storyRoundStarts = new Map(
+    scopedDemos.map((demo) => [
+      demo.sha256,
+      demo.events
+        .filter(({ event }) => event.type === "round_start")
+        .map(({ event }) => event.tick)
+        .sort((left, right) => left - right),
+    ]),
+  );
+  const storyRoundContext = (story: (typeof storyItems)[number]) => {
+    const demo =
+      story.kind === "hit" ? story.summary.demo : story.items[0]!.demo;
+    const starts = storyRoundStarts.get(demo.sha256) ?? [];
+    const observedRound = starts.reduce(
+      (found, tick, index) => (tick <= story.tick ? index : found),
+      -1,
+    );
+    return {
+      key: `${demo.sha256}:${observedRound}`,
+      label: observedRound >= 0 ? `Round ${observedRound + 1}` : "Unsegmented",
+      detail:
+        observedRound >= 0
+          ? `Observed boundary · ${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
+          : "Boundary unavailable",
+    };
+  };
+  const storyEventLabel = (event: MatchTimelineEvent) => {
+    if (event.type === "tank_control") return "Tank entered play";
+    if (event.type === "witch_spawn") return "Witch observed";
+    if (event.type === "witch_enrage") return "Witch enraged";
+    if (event.type === "witch_burn") return "Witch burning";
+    if (event.type === "witch_end") return "Witch observation ended";
+    if (event.type === "round_start") return "Round started";
+    if (event.type === "round_end") return "Round ended";
+    if (event.type === "team_change") return "Side changed";
+    return event.type.replaceAll("_", " ");
+  };
   return (
     <div
       className={`tab-panel timeline-panel ${fullscreen ? "is-fullscreen" : ""}`}
@@ -4069,14 +5396,17 @@ function Timeline({
         </span>
         {["all", ...Object.keys(groups)].map((value) => (
           <button
+            type="button"
             className={filter === value ? "active" : ""}
+            aria-pressed={filter === value}
+            aria-label={value}
             key={value}
             onClick={() => {
               setFilter(value);
               setSelected(null);
             }}
           >
-            {value}
+            {value} <span aria-hidden="true">{filterCounts[value]}</span>
           </button>
         ))}
         <span className="timeline-zoom" aria-label="Timeline zoom">
@@ -4092,369 +5422,700 @@ function Timeline({
           ))}
         </span>
       </div>
-      {visible.length ? (
-        <div className="timeline-demo-stack">
-          <p className="timeline-hint">
-            Select a map, then scroll from tick 0 to its playback end. Select a
-            marker for full event evidence. Rows expand when moments collide.
+      <div
+        className="timeline-view-tabs"
+        role="tablist"
+        aria-label="Match story view"
+      >
+        <button
+          id={storyTabId}
+          type="button"
+          role="tab"
+          aria-controls={storyPanelId}
+          aria-selected={timelineView === "hits"}
+          tabIndex={timelineView === "hits" ? 0 : -1}
+          className={timelineView === "hits" ? "active" : ""}
+          onClick={() => setTimelineView("hits")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+              event.preventDefault();
+              setTimelineView("timeline");
+              document.getElementById(timelineTabId)?.focus();
+            }
+          }}
+        >
+          Story
+        </button>
+        <button
+          id={timelineTabId}
+          type="button"
+          role="tab"
+          aria-controls={timelinePanelId}
+          aria-selected={timelineView === "timeline"}
+          tabIndex={timelineView === "timeline" ? 0 : -1}
+          className={timelineView === "timeline" ? "active" : ""}
+          onClick={() => setTimelineView("timeline")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setTimelineView("hits");
+              document.getElementById(storyTabId)?.focus();
+            }
+          }}
+        >
+          Timeline
+        </button>
+      </div>
+      {timelineView === "hits" && (
+        <section
+          id={storyPanelId}
+          role="tabpanel"
+          aria-labelledby={storyTabId}
+          className={`hit-roundup hit-density-${zoom}`}
+        >
+          <header>
+            <strong>{storyItems.length} filtered major moments</strong>
+            <span>Select a moment, then open Timeline for full evidence</span>
+          </header>
+          <p className="story-availability-note">
+            Saferoom departure/arrival, pills taken, and Witch crowns are not
+            available in retained demo telemetry; they are not inferred here.
           </p>
-          {visibleDemos.map((source) => {
-            const maximumTick = Math.max(1, source.demo.playbackTicks);
-            const baseCanvasWidth = Math.max(
-              1260,
-              Math.round(source.demo.durationSeconds * 3),
-            );
-            const canvasWidth = baseCanvasWidth * zoom;
-            const guideCount = Math.max(
-              2,
-              Math.ceil(source.demo.durationSeconds / 60),
-            );
-            const pinBands = source.events.flatMap((item, index) => {
-              if (item.event.type !== "pin_start") return [];
-              const end = source.events.slice(index + 1).find((candidate) => {
-                if (
-                  candidate.event.type !== "pin_end" &&
-                  candidate.event.type !== "death"
-                )
-                  return false;
-                const sameActor =
-                  item.event.actorPlayerId &&
-                  (candidate.event.type === "death"
-                    ? candidate.event.victimPlayerId
-                    : candidate.event.actorPlayerId)
-                    ? item.event.actorPlayerId ===
-                      (candidate.event.type === "death"
-                        ? candidate.event.victimPlayerId
-                        : candidate.event.actorPlayerId)
-                    : candidate.event.type === "death"
-                      ? item.event.actor === candidate.event.victim
-                      : item.event.actor === candidate.event.actor;
-                if (candidate.event.type === "death")
-                  return (
-                    sameActor &&
-                    item.event.infectedClass === candidate.event.infectedClass
-                  );
-                const sameVictim =
-                  item.event.victimPlayerId && candidate.event.victimPlayerId
-                    ? item.event.victimPlayerId ===
-                      candidate.event.victimPlayerId
-                    : item.event.victim === candidate.event.victim;
+          {storyItems.length ? (
+            <div className="hit-roundup-scroll">
+              {storyItems.slice(0, storyLimit).map((story, storyIndex) => {
+                const round = storyRoundContext(story);
+                const previousRound =
+                  storyIndex > 0
+                    ? storyRoundContext(storyItems[storyIndex - 1]!)
+                    : undefined;
                 return (
-                  sameActor &&
-                  sameVictim &&
-                  item.event.infectedClass === candidate.event.infectedClass
-                );
-              });
-              if (!end) return [];
-              return [
-                {
-                  id: `pin:${item.key}`,
-                  kind: "pin" as const,
-                  start: item.event.tick,
-                  end: end.event.tick,
-                  label: `${item.event.infectedClass ?? "SI"} pin`,
-                  detail: `${item.event.actor ?? "Special Infected"} controlled ${item.event.victim ?? "a Survivor"}`,
-                },
-              ];
-            });
-            const hitBands = (source.demo.competitive?.hits ?? []).map(
-              (hit) => ({
-                id: hit.id,
-                kind: "hit" as const,
-                start: hit.tickRange.start,
-                end: hit.tickRange.end,
-                label: `${hit.infectedClasses.join(" + ") || "SI"} hit`,
-                detail: `${hit.playerIds.length} players, ${hit.controls} controls, peak ${hit.peakSimultaneousPins} simultaneous pins`,
-              }),
-            );
-            const tankBands = (
-              source.demo.competitive?.tankEncounters ?? []
-            ).map((tank) => ({
-              id: tank.id,
-              kind: "tank" as const,
-              start: tank.tickRange.start,
-              end: tank.tickRange.end,
-              label: `Tank · ${tank.controllerAlias}`,
-              detail: `${duration(tank.durationSeconds)}, ${tank.punches} punches, ${tank.registeredRockThrows} registered throws`,
-            }));
-            return (
-              <section className="match-timeline" key={source.demoIndex}>
-                <header className="timeline-demo-head">
-                  <div>
-                    <span className="eyebrow">Demo {source.demoIndex + 1}</span>
-                    <h3>{source.mapName}</h3>
-                  </div>
-                  <span>
-                    {source.sha256.slice(0, 12)} ·{" "}
-                    {whole.format(source.demo.playbackTicks)} ticks ·{" "}
-                    {source.demo.tickRate === null
-                      ? "time unavailable"
-                      : duration(source.demo.durationSeconds)}
-                  </span>
-                </header>
-                <div className="timeline-scroll">
-                  <span className="timeline-scroll-cue" aria-hidden="true">
-                    Scroll horizontally
-                  </span>
-                  <div
-                    className="timeline-canvas"
-                    style={{ width: canvasWidth }}
+                  <Fragment
+                    key={
+                      story.kind === "hit"
+                        ? `${story.summary.demo.sha256}:${story.summary.hit.id}`
+                        : `story:${story.items[0]!.key}`
+                    }
                   >
-                    <div className="timeline-axis">
-                      <strong>Playback time</strong>
-                      <div>
-                        {Array.from({ length: guideCount + 1 }, (_, index) => (
-                          <span
-                            key={index}
-                            style={{ left: `${(index / guideCount) * 100}%` }}
-                          >
-                            {duration(
-                              (source.demo.durationSeconds * index) /
-                                guideCount,
-                            )}
-                          </span>
-                        ))}
+                    {previousRound?.key !== round.key && (
+                      <div className="story-round-divider">
+                        <strong>{round.label}</strong>
+                        <span>{round.detail}</span>
                       </div>
-                    </div>
-                    <div
-                      className="timeline-lanes"
-                      aria-label={`Interactive ${source.mapName} timeline`}
-                    >
-                      {lanes.map((lane) => {
-                        const laneEvents = source.events.filter(({ event }) =>
-                          lane.types.includes(event.type),
-                        );
-                        const occupiedRows: number[] = [];
-                        const minimumGap = (86 / canvasWidth) * 100;
-                        const packed = laneEvents.map((item) => {
-                          const position = Math.min(
-                            99.5,
-                            Math.max(
-                              0.5,
-                              (item.event.tick / maximumTick) * 100,
-                            ),
-                          );
-                          let row = occupiedRows.findIndex(
-                            (last) => position - last >= minimumGap,
-                          );
-                          if (row < 0) row = occupiedRows.length;
-                          occupiedRows[row] = position;
-                          return { ...item, position, row };
-                        });
-                        const laneBands =
-                          lane.name === "SI actions"
-                            ? hitBands
-                            : lane.name === "Pins + clears"
-                              ? pinBands
-                              : lane.name === "Bosses"
-                                ? tankBands
-                                : [];
-                        const bandRows: number[] = [];
-                        const packedBands = laneBands.map((band) => {
-                          const left = Math.max(
-                            0.2,
-                            (band.start / maximumTick) * 100,
-                          );
-                          const right = Math.min(
-                            99.8,
-                            (Math.max(band.start + 1, band.end) / maximumTick) *
-                              100,
-                          );
-                          let row = bandRows.findIndex(
-                            (lastRight) => left - lastRight >= 0.35,
-                          );
-                          if (row < 0) row = bandRows.length;
-                          bandRows[row] = right;
-                          return {
-                            ...band,
-                            left,
-                            width: Math.max(0.55, right - left),
-                            row,
-                          };
-                        });
-                        const bandArea = packedBands.length
-                          ? 16 + bandRows.length * 26
-                          : 0;
-                        const laneHeight = Math.max(
-                          laneEvents.length === 0 ? 76 : 132,
-                          34 + bandArea + occupiedRows.length * 42,
-                        );
-                        return (
-                          <div
-                            className="timeline-lane"
-                            key={lane.name}
-                            style={{ minHeight: laneHeight }}
-                          >
+                    )}
+                    {story.kind === "event" ? (
+                      <button
+                        type="button"
+                        className={`hit-summary-card story-event-row ${story.items
+                          .map(({ event }) => `story-event-${event.type}`)
+                          .join(" ")}`}
+                        onClick={() => setSelected(story.items[0]!.key)}
+                      >
+                        <span className="story-event-context">
+                          {story.items[0]!.event.infectedClass && (
+                            <InfectedIcon
+                              infectedClass={
+                                story.items[0]!.event.infectedClass
+                              }
+                              label={story.items[0]!.event.infectedClass}
+                            />
+                          )}
+                          <span>
                             <strong>
-                              <span>{lane.name}</span>
-                              <small>{laneEvents.length} events</small>
+                              {story.items[0]!.event.actor ??
+                                story.items[0]!.event.subject ??
+                                story.items[0]!.event.victim ??
+                                "Match"}
                             </strong>
-                            <div style={{ minHeight: laneHeight }}>
-                              <i />
-                              {packedBands.map((band) => (
-                                <span
-                                  key={band.id}
-                                  className={`timeline-band ${band.kind}`}
-                                  style={{
-                                    left: `${band.left}%`,
-                                    width: `${band.width}%`,
-                                    top: `${12 + band.row * 26}px`,
-                                  }}
-                                  title={`${band.label}. ${band.detail}`}
-                                >
-                                  <b>{band.label}</b>
+                            <small>
+                              {story.items[0]!.event.infectedClass ??
+                                "match state"}
+                            </small>
+                          </span>
+                        </span>
+                        <span className="story-event-core">
+                          <small>
+                            {story.items.length > 1
+                              ? `${story.items.length} linked moments`
+                              : storyEventLabel(story.items[0]!.event)}
+                          </small>
+                          <span>
+                            <strong>
+                              {story.items.some(
+                                ({ event }) => event.type === "death",
+                              )
+                                ? "†"
+                                : story.items.some(
+                                      ({ event }) => event.type === "incap",
+                                    )
+                                  ? "!"
+                                  : story.items.some(
+                                        ({ event }) => event.type === "revive",
+                                      )
+                                    ? "+"
+                                    : "•"}
+                            </strong>
+                          </span>
+                          <small>
+                            {formatElapsedTime(
+                              story.items[0]!.event.timeSeconds,
+                            )}
+                          </small>
+                        </span>
+                        <span className="story-event-detail">
+                          <strong>
+                            {story.items
+                              .map(({ event }) => event.detail)
+                              .join(" · ")}
+                          </strong>
+                          <small>
+                            {story.items[0]!.event.weapon ??
+                              (story.items.some(({ event }) => event.position)
+                                ? "position observed"
+                                : "position unavailable")}
+                          </small>
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="hit-summary-card"
+                        onClick={() => openHit(story.summary)}
+                      >
+                        <span className="hit-summary-core">
+                          <small>
+                            {hitRoundContext(story.summary).observedBoundary
+                              ? `Round ${hitRoundContext(story.summary).round}`
+                              : "Unsegmented"}{" "}
+                            · Hit{" "}
+                            {String(
+                              hitRoundContext(story.summary).hit,
+                            ).padStart(2, "0")}
+                          </small>
+                          <span>
+                            <strong>
+                              {whole.format(
+                                story.summary.hit.observedSurvivorHealthLoss,
+                              )}
+                            </strong>
+                            <small>observed HP loss</small>
+                          </span>
+                          <small>
+                            {formatTickTime(
+                              story.summary.hit.tickRange.start,
+                              story.summary.demo.demo.tickRate,
+                            )}
+                            –
+                            {formatTickTime(
+                              story.summary.hit.tickRange.end,
+                              story.summary.demo.demo.tickRate,
+                            )}
+                          </small>
+                        </span>
+                        <span className="hit-summary-lineup">
+                          {story.summary.lives.map((life) => {
+                            const damageEntry = Object.entries(
+                              life.counterDeltas,
+                            ).find(
+                              ([name]) =>
+                                name.startsWith("m_checkpointPZ") &&
+                                name.endsWith("Damage"),
+                            );
+                            const damage = damageEntry?.[1];
+                            return (
+                              <span key={life.id} className="hit-life">
+                                <InfectedIcon
+                                  infectedClass={life.infectedClass}
+                                  label={life.infectedClass}
+                                />
+                                <span>
+                                  <strong>{life.playerAlias}</strong>
+                                  <small>
+                                    {life.infectedClass} ·{" "}
+                                    {damage !== undefined
+                                      ? `${whole.format(damage)} dmg`
+                                      : "damage unavailable"}
+                                  </small>
+                                  <i>
+                                    <i
+                                      style={{
+                                        width: `${Math.min(100, (damage ?? 0) / 2)}%`,
+                                      }}
+                                    />
+                                  </i>
                                 </span>
-                              ))}
-                              {packed.map(({ event, key, position, row }) => {
-                                const infectedMarker = hasInfectedIcon(
-                                  event.infectedClass,
-                                );
-                                const time =
-                                  source.demo.tickRate === null
-                                    ? "time unavailable"
-                                    : duration(event.timeSeconds);
-                                return (
-                                  <button
-                                    key={key}
-                                    className={`${event.type} ${active?.key === key ? "active" : ""} ${infectedMarker ? "infected-marker" : ""}`}
-                                    style={{
-                                      left: `${position}%`,
-                                      top: `${17 + bandArea + row * 42}px`,
-                                    }}
-                                    onClick={() => setSelected(key)}
-                                    onPointerDown={() => setSelected(key)}
-                                    onPointerEnter={(event) => {
-                                      const rect =
-                                        event.currentTarget.getBoundingClientRect();
-                                      const above =
-                                        rect.bottom + 170 > window.innerHeight;
-                                      setHovered({
-                                        key,
-                                        x: Math.min(
-                                          window.innerWidth - 332,
-                                          Math.max(12, rect.left - 24),
-                                        ),
-                                        y: above
-                                          ? Math.max(12, rect.top - 156)
-                                          : rect.bottom + 10,
-                                      });
-                                    }}
-                                    onPointerLeave={() => setHovered(null)}
-                                    onFocus={(event) => {
-                                      const rect =
-                                        event.currentTarget.getBoundingClientRect();
-                                      setHovered({
-                                        key,
-                                        x: Math.min(
-                                          window.innerWidth - 332,
-                                          Math.max(12, rect.left - 24),
-                                        ),
-                                        y: Math.min(
-                                          window.innerHeight - 156,
-                                          rect.bottom + 10,
-                                        ),
-                                      });
-                                    }}
-                                    onBlur={() => setHovered(null)}
-                                    aria-pressed={active?.key === key}
-                                    data-timeline-active={
-                                      active?.key === key ? "true" : undefined
-                                    }
-                                    aria-label={`${source.mapName}, tick ${event.tick}, ${event.type.replaceAll("_", " ")}: ${event.detail}`}
-                                  >
-                                    <b>
-                                      {infectedMarker && event.infectedClass ? (
-                                        <InfectedIcon
-                                          infectedClass={event.infectedClass}
-                                        />
-                                      ) : (
-                                        event.type.replaceAll("_", " ")
-                                      )}
-                                    </b>
-                                    {(event.actor || event.subject) && (
-                                      <small>
-                                        {event.actor ?? event.subject}
-                                      </small>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </section>
-            );
-          })}
+                              </span>
+                            );
+                          })}
+                        </span>
+                        <span className="hit-summary-metrics">
+                          <span>
+                            <strong>
+                              {whole.format(story.summary.hit.controls)}
+                            </strong>
+                            <small>controls</small>
+                            <i>
+                              <i
+                                style={{
+                                  width: `${Math.min(100, story.summary.hit.controls * 25)}%`,
+                                }}
+                              />
+                            </i>
+                          </span>
+                          <span>
+                            <strong>
+                              {whole.format(
+                                story.summary.hit.peakSimultaneousPins,
+                              )}
+                            </strong>
+                            <small>peak pins</small>
+                            <i>
+                              <i
+                                style={{
+                                  width: `${Math.min(100, story.summary.hit.peakSimultaneousPins * 25)}%`,
+                                }}
+                              />
+                            </i>
+                          </span>
+                          <span>
+                            <strong>
+                              {story.summary.hit.spawnSpreadSeconds.toFixed(1)}s
+                            </strong>
+                            <small>spawn spread</small>
+                            <i>
+                              <i
+                                style={{
+                                  width: `${Math.min(100, story.summary.hit.spawnSpreadSeconds * 12.5)}%`,
+                                }}
+                              />
+                            </i>
+                          </span>
+                        </span>
+                        <span className="hit-summary-footnote">
+                          Survivor → SI damage unavailable · spawn-gap-v1
+                          grouping
+                        </span>
+                      </button>
+                    )}
+                  </Fragment>
+                );
+              })}
+              {storyLimit < storyItems.length && (
+                <button
+                  type="button"
+                  className="story-show-more"
+                  onClick={() => setStoryLimit((current) => current + 100)}
+                >
+                  Show next {Math.min(100, storyItems.length - storyLimit)} of{" "}
+                  {storyItems.length} moments
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="muted">
+              No major story moments match the current map and category filters.
+            </p>
+          )}
           {active && (
-            <article className={`timeline-focus ${active.event.type}`}>
+            <article className="story-inspector" aria-live="polite">
               <div>
-                <time>
-                  {active.demo.demo.tickRate === null
-                    ? "Time N/A"
-                    : duration(active.event.timeSeconds)}
-                </time>
-                <span>tick {whole.format(active.event.tick)}</span>
-              </div>
-              <div>
-                <span className="eyebrow">
-                  {active.demo.mapName} ·{" "}
+                <span>
+                  {formatElapsedTime(active.event.timeSeconds)} ·{" "}
                   {active.event.type.replaceAll("_", " ")}
                 </span>
-                <h3>{active.event.detail}</h3>
-                <p>
-                  {[
-                    active.event.infectedClass,
-                    active.event.weapon,
-                    active.event.headshot ? "headshot" : undefined,
-                    active.event.position
-                      ? `position ${Math.round(active.event.position.x)}, ${Math.round(active.event.position.y)}, ${Math.round(active.event.position.z)}`
-                      : undefined,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+                <strong>{active.event.detail}</strong>
+                <small>
+                  tick {whole.format(active.event.tick)} · {active.demo.mapName}
+                </small>
               </div>
-              <span>{active.demo.sha256.slice(0, 12)}</span>
+              <button type="button" onClick={() => setTimelineView("timeline")}>
+                Inspect on Timeline
+              </button>
             </article>
           )}
-          {hovered &&
-            (() => {
-              const item = visible.find(
-                (candidate) => candidate.key === hovered.key,
-              );
-              if (!item) return null;
-              return createPortal(
-                <div
-                  className="timeline-float-tooltip"
-                  role="tooltip"
-                  style={{ left: hovered.x, top: hovered.y }}
-                >
-                  <em>
-                    {item.demo.mapName} · tick {whole.format(item.event.tick)} ·{" "}
-                    {item.demo.demo.tickRate === null
-                      ? "time unavailable"
-                      : duration(item.event.timeSeconds)}
-                  </em>
-                  <strong>
-                    {item.event.actor ?? item.event.subject ?? "Match"}
-                    {item.event.victim ? ` to ${item.event.victim}` : ""}
-                  </strong>
-                  <small>{item.event.detail}</small>
-                </div>,
-                document.body,
-              );
-            })()}
-        </div>
-      ) : (
-        <Empty
-          title="No detailed timeline available"
-          text="This analysis predates detailed event retention or the demo did not expose supported match events."
-        />
+        </section>
       )}
+      {timelineView === "timeline" &&
+        (visible.length ? (
+          <div
+            id={timelinePanelId}
+            role="tabpanel"
+            aria-labelledby={timelineTabId}
+            className="timeline-demo-stack"
+          >
+            <p className="timeline-hint">
+              Select a map, then scroll from tick 0 to its playback end. Select
+              a marker for full event evidence. Rows expand when moments
+              collide.
+            </p>
+            {visibleDemos.map((source) => {
+              const maximumTick = Math.max(1, source.demo.playbackTicks);
+              const baseCanvasWidth = Math.max(
+                1260,
+                Math.round(source.demo.durationSeconds * 3),
+              );
+              const canvasWidth = baseCanvasWidth * zoom;
+              const guideCount = Math.max(
+                2,
+                Math.ceil(source.demo.durationSeconds / 60),
+              );
+              const pinBands = source.events.flatMap((item, index) => {
+                if (item.event.type !== "pin_start") return [];
+                const end = source.events.slice(index + 1).find((candidate) => {
+                  if (
+                    candidate.event.type !== "pin_end" &&
+                    candidate.event.type !== "death"
+                  )
+                    return false;
+                  const sameActor =
+                    item.event.actorPlayerId &&
+                    (candidate.event.type === "death"
+                      ? candidate.event.victimPlayerId
+                      : candidate.event.actorPlayerId)
+                      ? item.event.actorPlayerId ===
+                        (candidate.event.type === "death"
+                          ? candidate.event.victimPlayerId
+                          : candidate.event.actorPlayerId)
+                      : candidate.event.type === "death"
+                        ? item.event.actor === candidate.event.victim
+                        : item.event.actor === candidate.event.actor;
+                  if (candidate.event.type === "death")
+                    return (
+                      sameActor &&
+                      item.event.infectedClass === candidate.event.infectedClass
+                    );
+                  const sameVictim =
+                    item.event.victimPlayerId && candidate.event.victimPlayerId
+                      ? item.event.victimPlayerId ===
+                        candidate.event.victimPlayerId
+                      : item.event.victim === candidate.event.victim;
+                  return (
+                    sameActor &&
+                    sameVictim &&
+                    item.event.infectedClass === candidate.event.infectedClass
+                  );
+                });
+                if (!end) return [];
+                return [
+                  {
+                    id: `pin:${item.key}`,
+                    kind: "pin" as const,
+                    start: item.event.tick,
+                    end: end.event.tick,
+                    label: `${item.event.infectedClass ?? "SI"} pin`,
+                    detail: `${item.event.actor ?? "Special Infected"} controlled ${item.event.victim ?? "a Survivor"}`,
+                  },
+                ];
+              });
+              const hitBands = (source.demo.competitive?.hits ?? []).map(
+                (hit) => ({
+                  id: hit.id,
+                  kind: "hit" as const,
+                  start: hit.tickRange.start,
+                  end: hit.tickRange.end,
+                  label: `${hit.infectedClasses.join(" + ") || "SI"} hit`,
+                  detail: `${hit.playerIds.length} players, ${hit.controls} controls, peak ${hit.peakSimultaneousPins} simultaneous pins`,
+                }),
+              );
+              const tankBands = (
+                source.demo.competitive?.tankEncounters ?? []
+              ).map((tank) => ({
+                id: tank.id,
+                kind: "tank" as const,
+                start: tank.tickRange.start,
+                end: tank.tickRange.end,
+                label: `Tank · ${tank.controllerAlias}`,
+                detail: `${duration(tank.durationSeconds)}, ${tank.punches} punches, ${tank.registeredRockThrows} registered throws`,
+              }));
+              return (
+                <section className="match-timeline" key={source.demoIndex}>
+                  <header className="timeline-demo-head">
+                    <div>
+                      <span className="eyebrow">
+                        Demo {source.demoIndex + 1}
+                      </span>
+                      <h3>{source.mapName}</h3>
+                    </div>
+                    <span>
+                      {source.sha256.slice(0, 12)} ·{" "}
+                      {whole.format(source.demo.playbackTicks)} ticks ·{" "}
+                      {source.demo.tickRate === null
+                        ? "time unavailable"
+                        : duration(source.demo.durationSeconds)}
+                    </span>
+                  </header>
+                  <div className="timeline-scroll">
+                    <span className="timeline-scroll-cue" aria-hidden="true">
+                      Scroll horizontally
+                    </span>
+                    <div
+                      className="timeline-canvas"
+                      style={{ width: canvasWidth }}
+                    >
+                      <div className="timeline-axis">
+                        <strong>Playback time</strong>
+                        <div>
+                          {Array.from(
+                            { length: guideCount + 1 },
+                            (_, index) => (
+                              <span
+                                key={index}
+                                style={{
+                                  left: `${(index / guideCount) * 100}%`,
+                                }}
+                              >
+                                {duration(
+                                  (source.demo.durationSeconds * index) /
+                                    guideCount,
+                                )}
+                              </span>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        className="timeline-lanes"
+                        aria-label={`Interactive ${source.mapName} timeline`}
+                      >
+                        {lanes.map((lane) => {
+                          const laneEvents = source.events.filter(({ event }) =>
+                            lane.types.includes(event.type),
+                          );
+                          const occupiedRows: number[] = [];
+                          const minimumGap = (86 / canvasWidth) * 100;
+                          const packed = laneEvents.map((item) => {
+                            const position = Math.min(
+                              99.5,
+                              Math.max(
+                                0.5,
+                                (item.event.tick / maximumTick) * 100,
+                              ),
+                            );
+                            let row = occupiedRows.findIndex(
+                              (last) => position - last >= minimumGap,
+                            );
+                            if (row < 0) row = occupiedRows.length;
+                            occupiedRows[row] = position;
+                            return { ...item, position, row };
+                          });
+                          const laneBands =
+                            lane.name === "SI actions"
+                              ? hitBands
+                              : lane.name === "Pins + clears"
+                                ? pinBands
+                                : lane.name === "Bosses"
+                                  ? tankBands
+                                  : [];
+                          const bandRows: number[] = [];
+                          const packedBands = laneBands.map((band) => {
+                            const left = Math.max(
+                              0.2,
+                              (band.start / maximumTick) * 100,
+                            );
+                            const right = Math.min(
+                              99.8,
+                              (Math.max(band.start + 1, band.end) /
+                                maximumTick) *
+                                100,
+                            );
+                            let row = bandRows.findIndex(
+                              (lastRight) => left - lastRight >= 0.35,
+                            );
+                            if (row < 0) row = bandRows.length;
+                            bandRows[row] = right;
+                            return {
+                              ...band,
+                              left,
+                              width: Math.max(0.55, right - left),
+                              row,
+                            };
+                          });
+                          const bandArea = packedBands.length
+                            ? 16 + bandRows.length * 26
+                            : 0;
+                          const laneHeight = Math.max(
+                            laneEvents.length === 0 ? 76 : 132,
+                            34 + bandArea + occupiedRows.length * 42,
+                          );
+                          return (
+                            <div
+                              className="timeline-lane"
+                              key={lane.name}
+                              style={{ minHeight: laneHeight }}
+                            >
+                              <strong>
+                                <span>{lane.name}</span>
+                                <small>{laneEvents.length} events</small>
+                              </strong>
+                              <div style={{ minHeight: laneHeight }}>
+                                <i />
+                                {packedBands.map((band) => (
+                                  <span
+                                    key={band.id}
+                                    className={`timeline-band ${band.kind}`}
+                                    style={{
+                                      left: `${band.left}%`,
+                                      width: `${band.width}%`,
+                                      top: `${12 + band.row * 26}px`,
+                                    }}
+                                    title={`${band.label}. ${band.detail}`}
+                                  >
+                                    <b>{band.label}</b>
+                                  </span>
+                                ))}
+                                {packed.map(({ event, key, position, row }) => {
+                                  const infectedMarker = hasInfectedIcon(
+                                    event.infectedClass,
+                                  );
+                                  const time =
+                                    source.demo.tickRate === null
+                                      ? "time unavailable"
+                                      : formatElapsedTime(event.timeSeconds);
+                                  return (
+                                    <button
+                                      key={key}
+                                      className={`${event.type} ${active?.key === key ? "active" : ""} ${infectedMarker ? "infected-marker" : ""}`}
+                                      style={{
+                                        left: `${position}%`,
+                                        top: `${17 + bandArea + row * 42}px`,
+                                      }}
+                                      onClick={() => setSelected(key)}
+                                      onPointerDown={() => setSelected(key)}
+                                      onPointerEnter={(event) => {
+                                        const rect =
+                                          event.currentTarget.getBoundingClientRect();
+                                        const above =
+                                          rect.bottom + 170 >
+                                          window.innerHeight;
+                                        setHovered({
+                                          key,
+                                          x: Math.min(
+                                            window.innerWidth - 332,
+                                            Math.max(12, rect.left - 24),
+                                          ),
+                                          y: above
+                                            ? Math.max(12, rect.top - 156)
+                                            : rect.bottom + 10,
+                                        });
+                                      }}
+                                      onPointerLeave={() => setHovered(null)}
+                                      onFocus={(event) => {
+                                        const rect =
+                                          event.currentTarget.getBoundingClientRect();
+                                        setHovered({
+                                          key,
+                                          x: Math.min(
+                                            window.innerWidth - 332,
+                                            Math.max(12, rect.left - 24),
+                                          ),
+                                          y: Math.min(
+                                            window.innerHeight - 156,
+                                            rect.bottom + 10,
+                                          ),
+                                        });
+                                      }}
+                                      onBlur={() => setHovered(null)}
+                                      aria-pressed={active?.key === key}
+                                      data-timeline-active={
+                                        active?.key === key ? "true" : undefined
+                                      }
+                                      aria-label={`${source.mapName}, tick ${event.tick}, ${event.type.replaceAll("_", " ")}: ${event.detail}`}
+                                    >
+                                      <b>
+                                        {infectedMarker &&
+                                        event.infectedClass ? (
+                                          <InfectedIcon
+                                            infectedClass={event.infectedClass}
+                                          />
+                                        ) : (
+                                          event.type.replaceAll("_", " ")
+                                        )}
+                                      </b>
+                                      {(event.actor || event.subject) && (
+                                        <small>
+                                          {event.actor ?? event.subject}
+                                        </small>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+            {active && (
+              <article className={`timeline-focus ${active.event.type}`}>
+                <div>
+                  <time>
+                    {active.demo.demo.tickRate === null
+                      ? "Time N/A"
+                      : formatElapsedTime(active.event.timeSeconds)}
+                  </time>
+                  <span>tick {whole.format(active.event.tick)}</span>
+                </div>
+                <div>
+                  <span className="eyebrow">
+                    {active.demo.mapName} ·{" "}
+                    {active.event.type.replaceAll("_", " ")}
+                  </span>
+                  <h3>{active.event.detail}</h3>
+                  <p>
+                    {[
+                      active.event.infectedClass,
+                      active.event.weapon,
+                      active.event.headshot ? "headshot" : undefined,
+                      active.event.position
+                        ? `position ${Math.round(active.event.position.x)}, ${Math.round(active.event.position.y)}, ${Math.round(active.event.position.z)}`
+                        : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <span>{active.demo.sha256.slice(0, 12)}</span>
+              </article>
+            )}
+            {hovered &&
+              (() => {
+                const item = visible.find(
+                  (candidate) => candidate.key === hovered.key,
+                );
+                if (!item) return null;
+                return createPortal(
+                  <div
+                    className="timeline-float-tooltip"
+                    role="tooltip"
+                    style={{ left: hovered.x, top: hovered.y }}
+                  >
+                    <em>
+                      {item.demo.mapName} · tick {whole.format(item.event.tick)}{" "}
+                      ·{" "}
+                      {item.demo.demo.tickRate === null
+                        ? "time unavailable"
+                        : formatElapsedTime(item.event.timeSeconds)}
+                    </em>
+                    <strong>
+                      {item.event.actor ?? item.event.subject ?? "Match"}
+                      {item.event.victim ? ` to ${item.event.victim}` : ""}
+                    </strong>
+                    <small>{item.event.detail}</small>
+                  </div>,
+                  document.body,
+                );
+              })()}
+          </div>
+        ) : (
+          <Empty
+            title="No detailed timeline available"
+            text="This analysis predates detailed event retention or the demo did not expose supported match events."
+          />
+        ))}
     </div>
   );
 }

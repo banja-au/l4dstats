@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 const halfSummary = (infectedClasses: string[] = []) => ({
   sampleCount: 100,
@@ -100,7 +100,7 @@ const stats = {
       infectedClass: "Hunter",
       weapon: "rifle_ak47",
       detail: "Player 9A72F0 killed Hunter with rifle_ak47",
-      position: { x: 120, y: -40, z: 10 },
+      position: { x: 120, y: 40, z: 10 },
     },
     {
       tick: 9030,
@@ -110,6 +110,15 @@ const stats = {
       victim: "Player 9A72F0",
       infectedClass: "Hunter",
       detail: "Player 9A72F0 cleared Player 9A72F0 from a Hunter pounce",
+    },
+    {
+      tick: 9200,
+      timeSeconds: 306.667,
+      type: "tank_control",
+      actor: "Player 10BDEE",
+      actorPlayerId: "p2",
+      infectedClass: "Tank",
+      detail: "Player 10BDEE took control of the Tank",
     },
     {
       tick: 9400,
@@ -131,6 +140,12 @@ const stats = {
       type: "witch_end",
       infectedClass: "Witch",
       detail: "Witch entity ended near a Witch death event",
+    },
+    {
+      tick: 9900,
+      timeSeconds: 330,
+      type: "round_end",
+      detail: "Round ended after the Survivor team was stopped",
     },
   ],
   competitive: {
@@ -156,8 +171,28 @@ const stats = {
         id: "first",
         secondHalf: false,
         tickRange: { start: 0, end: 11000 },
-        survivorPlayerIds: ["p1"],
+        survivorPlayerIds: ["p1", "p3"],
         infectedPlayerIds: ["p2"],
+        observedOpeningArea: {
+          availability: "derived",
+          derivation: "survivor-opening-area-v1",
+          anchor: { kind: "round-start", tick: 20 },
+          tickRange: { start: 22, end: 24 },
+          samples: [
+            { playerId: "p1", tick: 22, position: { x: 80, y: 80, z: 10 } },
+            { playerId: "p3", tick: 24, position: { x: 120, y: 100, z: 10 } },
+          ],
+          center: { x: 100, y: 90, z: 10 },
+          bounds: {
+            min: { x: 80, y: 80, z: 10 },
+            max: { x: 120, y: 100, z: 10 },
+          },
+          planarRadiusUnits: 22.36,
+          limitations: [
+            "demo-derived-not-map-authored",
+            "first-observed-position-per-player",
+          ],
+        },
         players: [
           {
             playerId: "p1",
@@ -448,10 +483,79 @@ async function visualAudit(page: Page, name: string) {
   });
 }
 
-async function mockAnalysis(page: Page) {
+async function mockAnalysis(page: Page, options: { dense?: boolean } = {}) {
   let upload = 0;
+  const denseGeometry = options.dense
+    ? (JSON.parse(
+        readFileSync("../../map-geometry/c5m3_cemetery.json", "utf8"),
+      ) as {
+        positions: number[];
+        indices: number[];
+        bounds: {
+          min: { x: number; y: number; z: number };
+          max: { x: number; y: number; z: number };
+        };
+      })
+    : undefined;
+  const denseTimeline = denseGeometry
+    ? Array.from({ length: 2_000 }, (_, index) => {
+        const triangleCount = denseGeometry.indices.length / 3;
+        const triangleOffset = ((index * 7_919) % triangleCount) * 3;
+        const vertices = [0, 1, 2].map(
+          (corner) => denseGeometry.indices[triangleOffset + corner]! * 3,
+        );
+        const centroid = (axis: 0 | 1 | 2) =>
+          vertices.reduce(
+            (sum, vertex) => sum + denseGeometry.positions[vertex + axis]!,
+            0,
+          ) / 3;
+        const type =
+          index === 0 || index === 1_000
+            ? ("round_start" as const)
+            : index === 999 || index === 1_999
+              ? ("round_end" as const)
+              : index % 17 === 0
+                ? ("incap" as const)
+                : ("attack" as const);
+        return {
+          tick: 100 + index * 9,
+          timeSeconds: (100 + index * 9) / 30,
+          type,
+          actor: `Player ${index % 8}`,
+          actorPlayerId: `p${(index % 8) + 1}`,
+          victim: `Player ${(index + 1) % 8}`,
+          victimPlayerId: `p${((index + 1) % 8) + 1}`,
+          infectedClass: [
+            "Hunter",
+            "Smoker",
+            "Charger",
+            "Jockey",
+            "Spitter",
+            "Boomer",
+          ][index % 6],
+          detail:
+            type === "round_start"
+              ? `Observed round start ${index === 0 ? 1 : 2}`
+              : type === "round_end"
+                ? `Observed round end ${index < 1_000 ? 1 : 2}`
+                : `Deterministic positioned event ${index + 1}`,
+          position: {
+            x: centroid(0),
+            y: centroid(1),
+            z: centroid(2),
+          },
+        };
+      })
+    : undefined;
   await page.route("**/api/maps/*/geometry", async (route) => {
     const map = route.request().url().split("/").at(-2)!;
+    if (options.dense || process.env.WITCHWATCH_VISUAL_AUDIT_REAL_GEOMETRY) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: readFileSync("../../map-geometry/c5m3_cemetery.json"),
+      });
+      return;
+    }
     await route.fulfill({
       json: {
         format: "witchwatch-map-mesh-v1",
@@ -512,6 +616,23 @@ async function mockAnalysis(page: Page) {
   });
   await page.route("**/api/jobs/*", async (route) => {
     const id = route.request().url().split("/").pop()!;
+    const result = analysis(
+      id,
+      options.dense && id === "job1"
+        ? "c5m3_cemetery"
+        : id === "job1"
+          ? "c2m3_coaster"
+          : "c2m4_barns",
+    );
+    if (denseTimeline && id === "job1") {
+      result.engineResult.demo.stats = {
+        ...stats,
+        playbackTicks: 18_100,
+        durationSeconds: 603.33,
+        eventCount: denseTimeline.length,
+        timeline: denseTimeline,
+      };
+    }
     await route.fulfill({
       json: {
         id,
@@ -519,7 +640,7 @@ async function mockAnalysis(page: Page) {
         progress: 1,
         message: "Analysis complete",
         source: { kind: "local" },
-        analysis: analysis(id, id === "job1" ? "c2m3_coaster" : "c2m4_barns"),
+        analysis: result,
       },
     });
   });
@@ -709,6 +830,10 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   ).toBeVisible();
   await expect(page.getByText("Death correlated").first()).toBeVisible();
   await expect(page.getByText(/actual BSP geometry/)).toBeVisible();
+  await expect(page.getByText("Observed Survivor opening area")).toBeVisible();
+  await expect(
+    page.getByText(/demo-derived, not an authored saferoom/),
+  ).toBeVisible();
   expect(
     await page.locator(".hit-board > div:visible").count(),
   ).toBeLessThanOrEqual(8);
@@ -717,6 +842,64 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   await expect(spatialWorkspace.locator(".death-map h3")).toContainText(
     "c2m3_coaster",
   );
+  await expect(
+    spatialWorkspace.getByRole("button", { name: "Fit map" }),
+  ).toBeVisible();
+  await expect(
+    spatialWorkspace.getByRole("button", { name: "hybrid" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await spatialWorkspace.getByRole("button", { name: "density" }).click();
+  await expect(
+    spatialWorkspace.getByRole("button", { name: "density" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  if ((page.viewportSize()?.width ?? 0) <= 700)
+    await spatialWorkspace.getByText("Map filters", { exact: true }).click();
+  await spatialWorkspace.getByLabel("Moments").selectOption("critical");
+  await expect(
+    spatialWorkspace.getByText(/positioned moments/).first(),
+  ).toBeVisible();
+  const spatialCanvas = spatialWorkspace.locator("canvas");
+  const spatialEventLinks = spatialWorkspace.locator(".spatial-event-links");
+  await expect(spatialEventLinks.locator("button")).toHaveCount(0);
+  await spatialEventLinks.locator("summary").click();
+  expect(await spatialEventLinks.locator("button").count()).toBeLessThanOrEqual(
+    101,
+  );
+  await spatialEventLinks.locator("summary").click();
+  await spatialCanvas.hover({ position: { x: 220, y: 180 } });
+  await page.waitForTimeout(100);
+  const rendersBeforeWheelBurst = Number(
+    await spatialCanvas.getAttribute("data-render-count"),
+  );
+  await spatialCanvas.evaluate((canvas) => {
+    for (let index = 0; index < 80; index += 1) {
+      canvas.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX: 220,
+          clientY: 180,
+          deltaY: index % 2 ? 2 : -2,
+        }),
+      );
+    }
+  });
+  await page.waitForTimeout(50);
+  const rendersAfterWheelBurst = Number(
+    await spatialCanvas.getAttribute("data-render-count"),
+  );
+  expect(rendersAfterWheelBurst - rendersBeforeWheelBurst).toBeLessThanOrEqual(
+    3,
+  );
+  const pageScrollBeforeMapZoom = await page.evaluate(() => window.scrollY);
+  await page.mouse.wheel(0, -500);
+  await expect(spatialWorkspace.getByText("1.00×")).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(
+    pageScrollBeforeMapZoom,
+  );
+  await spatialWorkspace.getByRole("button", { name: "Fit map" }).click();
+  await expect(spatialWorkspace.getByText("1.00×")).toBeVisible();
+  await spatialWorkspace.getByRole("button", { name: "hybrid" }).click();
   await page
     .getByRole("button", { name: "Show spatial combat for c2m4_barns" })
     .click();
@@ -743,7 +926,66 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   expect(await page.evaluate(() => window.history.length)).toBe(
     combatHistoryLength,
   );
-  await expect(page.getByText("6 tick-addressed moments")).toBeVisible();
+  await expect(page.getByText("8 tick-addressed moments")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator(".story-round-divider")).toContainText(
+    "Unsegmented",
+  );
+  const storyTab = page.getByRole("tab", { name: "Story" });
+  await storyTab.focus();
+  await storyTab.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("tab", { name: "Timeline" }).press("ArrowLeft");
+  await expect(storyTab).toHaveAttribute("aria-selected", "true");
+  const compactStoryEvents = page.locator(".story-event-row");
+  await expect(compactStoryEvents.getByText("2 linked moments")).toBeVisible();
+  await expect(page.locator(".story-event-tank_control")).toBeVisible();
+  await expect(page.locator(".story-event-round_end")).toBeVisible();
+  const compactStoryEventHeights = await compactStoryEvents.evaluateAll(
+    (rows) => rows.map((row) => row.getBoundingClientRect().height),
+  );
+  expect(Math.max(...compactStoryEventHeights)).toBeLessThanOrEqual(64);
+  await compactStoryEvents.first().click();
+  await expect(page.locator(".story-inspector")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Inspect on Timeline" }),
+  ).toBeVisible();
+  const hitSummary = page.locator(".hit-summary-card:not(.story-event-row)");
+  await expect(hitSummary).toHaveCount(1);
+  await expect(hitSummary).toContainText("Unsegmented · Hit 01");
+  await expect(hitSummary.locator(".infected-icon")).toBeVisible();
+  await expect(hitSummary).toContainText("Player 10BDEE");
+  await expect(hitSummary).toContainText("Hunter");
+  await expect(hitSummary).toContainText("observed HP loss");
+  await visualAudit(page, "story");
+  await page
+    .locator(".timeline-filters")
+    .getByRole("button", { name: "support", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "No major story moments match the current map and category filters.",
+    ),
+  ).toBeVisible();
+  await page
+    .locator(".timeline-filters")
+    .getByRole("button", { name: "all", exact: true })
+    .click();
+  await page
+    .locator(".timeline-filters")
+    .getByRole("button", { name: "detail", exact: true })
+    .click();
+  await expect(page.locator(".hit-roundup")).toHaveClass(/hit-density-4/);
+  await page
+    .locator(".timeline-view-tabs")
+    .getByRole("tab", { name: "Timeline" })
+    .click();
   await expect(page.getByText("One independent clock per demo")).toBeVisible();
   await expect(page.getByText("SI actions", { exact: true })).toBeVisible();
   await expect(page.getByText("Pins + clears", { exact: true })).toBeVisible();
@@ -825,6 +1067,10 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     .click();
   await expect(page).toHaveURL(/\/timeline\?demo=.*&tick=\d+$/);
   expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+  await page
+    .locator(".timeline-view-tabs")
+    .getByRole("tab", { name: "Timeline" })
+    .click();
   await expect(page.locator(".timeline-focus")).toContainText("tick");
   await page.getByRole("button", { name: "data coverage" }).click();
   await expect(
@@ -864,6 +1110,106 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
       );
     expect(undersizedTargets).toEqual([]);
   }
+});
+
+test("bounds dense spatial interaction on the heaviest committed Parish geometry", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    const durations: number[] = [];
+    new PerformanceObserver((entries) => {
+      for (const entry of entries.getEntries()) durations.push(entry.duration);
+    }).observe({ entryTypes: ["longtask"] });
+    (
+      window as typeof window & {
+        __witchwatchLongTasks: number[];
+      }
+    ).__witchwatchLongTasks = durations;
+  });
+  await mockAnalysis(page, { dense: true });
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "dense-c5m3.dem",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("HL2DEMO-dense-c5m3"),
+  });
+  await expect(
+    page.getByRole("heading", { name: "c5m3_cemetery" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "combat" }).click();
+  const workspace = page.locator(".spatial-workspace");
+  await expect(
+    workspace.getByText("2000 positioned combat moments on c5m3_cemetery"),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    workspace.getByText(/71,551 world-brush triangles/),
+  ).toBeVisible();
+  await expect(workspace.locator(".spatial-event-links button")).toHaveCount(0);
+  await visualAudit(page, "dense-events");
+  await workspace.getByRole("button", { name: "density", exact: true }).click();
+  await expect(
+    workspace.getByRole("button", { name: "density", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await visualAudit(page, "dense-density");
+  await workspace.getByRole("button", { name: "Compare teams" }).click();
+  await expect(workspace.getByText(/A \d+ · B \d+ · unassigned/)).toBeVisible();
+  await visualAudit(page, "dense-difference");
+  await workspace.getByRole("button", { name: "hybrid", exact: true }).click();
+
+  const canvas = workspace.locator("canvas");
+  await expect(canvas).toHaveAttribute("data-render-count", /\d+/);
+  await page.waitForTimeout(100);
+  const before = Number(await canvas.getAttribute("data-render-count"));
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __witchwatchLongTasks: number[];
+      }
+    ).__witchwatchLongTasks.length = 0;
+  });
+  await canvas.evaluate(async (element) => {
+    for (let index = 0; index < 60; index += 1) {
+      element.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX: 420,
+          clientY: 260,
+          deltaY: index % 2 ? 5 : -5,
+        }),
+      );
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+    }
+  });
+  const after = Number(await canvas.getAttribute("data-render-count"));
+  expect(after - before).toBeGreaterThanOrEqual(30);
+  expect(after - before).toBeLessThanOrEqual(62);
+  const longTasks = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __witchwatchLongTasks: number[];
+        }
+      ).__witchwatchLongTasks,
+  );
+  expect(longTasks.filter((duration) => duration >= 50)).toHaveLength(0);
+  await page.getByRole("button", { name: "timeline", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(await page.locator(".hit-summary-card").count()).toBeLessThanOrEqual(
+    100,
+  );
+  await expect(page.locator(".story-round-divider")).toContainText([
+    "Round 1",
+    "Round 2",
+  ]);
+  await expect(page.locator(".story-show-more")).toBeVisible();
+  await visualAudit(page, "dense-story");
 });
 
 test("rejects an upload batch above the ten-demo limit", async ({ page }) => {
@@ -958,9 +1304,13 @@ test("restores a complete grouped game and scopes every tab by enabled maps", as
   await expect(
     page.getByRole("heading", { level: 1, name: "Hard Rain" }),
   ).toBeVisible();
-  await expect(page.locator(".match-timeline")).toHaveCount(1);
+  await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect(page.getByRole("button", { name: "All maps" })).toHaveCount(0);
   await page.getByRole("button", { name: "c4m2_sugarmill_a" }).click();
+  await page.getByRole("tab", { name: "Timeline" }).click();
   await expect(page.locator(".match-timeline")).toHaveCount(1);
   await expect(page.locator(".match-timeline h3")).toHaveText(
     "c4m2_sugarmill_a",

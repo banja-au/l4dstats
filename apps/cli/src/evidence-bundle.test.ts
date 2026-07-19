@@ -12,6 +12,7 @@ import {
   buildEvidenceBundleFromPrepared,
   clusterSpawnWindows,
   deriveCompetitiveStats,
+  deriveObservedOpeningAreaV1,
   deriveSurvivorHealthTraces,
   maximumObservedHealthDrawdown,
   sumPositiveCounterDeltas,
@@ -148,6 +149,7 @@ const projectedRow = (input: {
   frustration?: number;
   pounceVictim?: number;
   counters?: Record<string, number>;
+  position?: { x: number; y: number; z: number };
 }): ProjectedPlayerObservation => ({
   observation: {
     schemaVersion: 1,
@@ -155,7 +157,9 @@ const projectedRow = (input: {
     playerEpochId: input.id,
     tick: input.tick,
     demoTimeSeconds: { availability: "derived", value: input.tick / 10 },
-    position: { availability: "unavailable", reason: "fixture" },
+    position: input.position
+      ? { availability: "observed", value: input.position }
+      : { availability: "unavailable", reason: "fixture" },
     eyeAngles: { availability: "unavailable", reason: "fixture" },
     team: { availability: "observed", value: input.team },
     playerClass: { availability: "observed", value: input.playerClass },
@@ -185,6 +189,75 @@ const projectedRow = (input: {
 });
 
 describe("competitive artifact derivation", () => {
+  it("derives a bounded observed Survivor opening area without claiming a saferoom", () => {
+    const projected = [
+      ["s1", 100, 200, 12],
+      ["s2", 140, 220, 13],
+      ["s3", 120, 260, 14],
+      ["s4", 160, 240, 15],
+    ].map(([id, x, y, tick]) =>
+      projectedRow({
+        id: String(id),
+        tick: Number(tick),
+        team: 2,
+        playerClass: "Survivor",
+        position: { x: Number(x), y: Number(y), z: 32 },
+      }),
+    );
+    const result = deriveObservedOpeningAreaV1({
+      projected,
+      timeline: [
+        {
+          tick: 10,
+          timeSeconds: 1,
+          type: "round_start",
+          detail: "round started",
+        },
+      ],
+      halfTickRange: { start: 0, end: 1_000 },
+      survivorPlayerIds: ["s1", "s2", "s3", "s4"],
+      tickIntervalSeconds: 0.1,
+    });
+    expect(result).toMatchObject({
+      availability: "derived",
+      center: { x: 130, y: 230, z: 32 },
+      derivation: "survivor-opening-area-v1",
+    });
+    if (result.availability !== "derived") throw new Error("expected area");
+    expect(result.samples.map((sample) => sample.playerId)).toEqual([
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+    ]);
+    expect(result.planarRadiusUnits).toBeCloseTo(Math.sqrt(1_800));
+    expect(JSON.stringify(result)).not.toMatch(/safe.?room/i);
+  });
+
+  it("does not infer an opening area without an observed round start", () => {
+    const result = deriveObservedOpeningAreaV1({
+      projected: [
+        projectedRow({
+          id: "s1",
+          tick: 0,
+          team: 2,
+          playerClass: "Survivor",
+          position: { x: 0, y: 0, z: 0 },
+        }),
+      ],
+      timeline: [],
+      halfTickRange: { start: 0, end: 1_000 },
+      survivorPlayerIds: ["s1"],
+      tickIntervalSeconds: 0.1,
+    });
+    expect(result).toEqual({
+      availability: "unavailable",
+      derivation: "survivor-opening-area-v1",
+      reason: "round-start-unobserved",
+      observedPlayerIds: [],
+    });
+  });
+
   it("bounds hit windows from the first spawn instead of chaining long lives", () => {
     const windows = clusterSpawnWindows(
       [
