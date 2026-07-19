@@ -6,6 +6,7 @@ import { extractEntry, inspectZip, type ZipLimits } from "./zip.js";
 
 export const supportedDemoExtensions = [
   ".dem",
+  ".zip",
   ".dem.zip",
   ".dem.gz",
   ".dem.xz",
@@ -151,7 +152,7 @@ export async function prepareUploadedDemo(
       throw new Error("demo content does not match the .dem extension");
     bytes = input;
     sourceFormat = "raw";
-  } else if (lower.endsWith(".dem.zip")) {
+  } else if (lower.endsWith(".zip")) {
     if (!startsWith(input, magic.zip))
       throw new Error("archive content does not match the .zip extension");
     const zipLimits: ZipLimits = {

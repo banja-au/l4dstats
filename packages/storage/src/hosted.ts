@@ -187,9 +187,15 @@ function validateSource(source: HostedSource): void {
   if (!Number.isSafeInteger(source.bytes) || source.bytes < 1)
     throw new Error("hosted source byte size is invalid");
   if (
-    ![".dem", ".dem.zip", ".dem.gz", ".dem.xz", ".dem.bz2", ".dem.zst"].some(
-      (suffix) => source.filename.toLowerCase().endsWith(suffix),
-    ) ||
+    ![
+      ".dem",
+      ".zip",
+      ".dem.zip",
+      ".dem.gz",
+      ".dem.xz",
+      ".dem.bz2",
+      ".dem.zst",
+    ].some((suffix) => source.filename.toLowerCase().endsWith(suffix)) ||
     /[/\\\0]/.test(source.filename)
   )
     throw new Error("hosted source filename is invalid or unsupported");

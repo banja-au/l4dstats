@@ -13,9 +13,11 @@ native parser would also blur the existing bytes-only `.dem` trust boundary.
 
 ## Decision
 
-The hosted upload boundary accepts only a raw `.dem` or one of these explicit
-single-demo names: `.dem.zip`, `.dem.gz`, `.dem.xz`, `.dem.bz2`, `.dem.zst`.
-Generic `.zip`, tar, 7z, nested compression and extension polyglots are rejected.
+The hosted upload boundary accepts a raw `.dem`, any safe `.zip` basename, or
+one of these explicit single-stream names: `.dem.gz`, `.dem.xz`, `.dem.bz2`,
+`.dem.zst`. A ZIP's outer name is not trusted; its central directory and
+expanded content establish whether it contains one valid demo. Tar, 7z, nested
+compression and extension polyglots are rejected.
 
 Before the parser runs, the container independently verifies:
 

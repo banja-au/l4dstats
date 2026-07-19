@@ -13,6 +13,7 @@ import {
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const SUPPORTED_UPLOAD_SUFFIXES = [
   ".dem",
+  ".zip",
   ".dem.zip",
   ".dem.gz",
   ".dem.xz",
@@ -247,7 +248,7 @@ async function upload(
   if (!isSupportedUploadFilename(filename))
     return json(400, {
       error:
-        "filename must be a safe basename ending in .dem, .dem.zip, .dem.gz, .dem.xz, .dem.bz2, or .dem.zst",
+        "filename must be a safe basename ending in .dem, .zip, .dem.gz, .dem.xz, .dem.bz2, or .dem.zst",
     });
   const sha256 = request.headers.get("x-content-sha256") ?? "";
   if (!SHA256.test(sha256))

@@ -24,6 +24,7 @@ describe("compressed hosted demo preparation", () => {
     const cases: Array<[string, Buffer, string]> = [
       ["match.dem", demo, "raw"],
       ["match.dem.zip", zip("match.dem", demo), "zip"],
+      ["cedapug-match.zip", zip("match.dem", demo), "zip"],
       ["match.dem.gz", gzipSync(demo), "gzip"],
       [
         "match.dem.xz",
@@ -57,12 +58,12 @@ describe("compressed hosted demo preparation", () => {
     for (const filename of [
       "../match.dem.zip",
       "folder/match.dem",
-      "match.zip",
       "match.tar.gz",
       "match.dem.7z",
       "match.dem.zip.exe",
     ])
       expect(isSupportedDemoFilename(filename)).toBe(false);
+    expect(isSupportedDemoFilename("match.zip")).toBe(true);
     await expect(
       prepareUploadedDemo("match.dem.gz", demo, limits),
     ).rejects.toThrow("does not match");

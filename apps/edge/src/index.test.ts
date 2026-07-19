@@ -60,6 +60,7 @@ describe("edge dispatcher", () => {
     for (const filename of [
       "match.dem",
       "match.dem.zip",
+      "cedapug-match.zip",
       "match.dem.gz",
       "match.dem.xz",
       "match.dem.bz2",
@@ -71,7 +72,6 @@ describe("edge dispatcher", () => {
       "",
       "../match.dem",
       "folder/match.dem",
-      "match.zip",
       "match.tar.gz",
       "match.dem.7z",
       "match.dem.zip.exe",

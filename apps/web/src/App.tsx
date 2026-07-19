@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   Activity,
   AlertCircle,
+  Braces,
   Check,
   ChevronDown,
   CircleHelp,
@@ -91,6 +92,7 @@ const routeTab = (): Tab => {
 const MAX_DEMOS = 10;
 const DEMO_FILE_SUFFIXES = [
   ".dem",
+  ".zip",
   ".dem.zip",
   ".dem.gz",
   ".dem.xz",
@@ -296,6 +298,14 @@ function BanjaAttribution({
         title={t("brand.banjaAddress")}
       >
         <Mail aria-hidden="true" />
+      </a>
+      <a
+        className="banja-developers"
+        href="https://developers.l4dstats.gg/"
+        aria-label={t("brand.developers")}
+        title={t("brand.developers")}
+      >
+        <Braces aria-hidden="true" />
       </a>
     </div>
   );
@@ -888,19 +898,24 @@ function App() {
             ) : (
               <PlayerLookup />
             )}
-            <button
-              className="landing-tool-switch"
-              type="button"
-              onClick={() =>
-                setLandingTool(landingTool === "upload" ? "player" : "upload")
-              }
-            >
-              {t(
-                landingTool === "upload"
-                  ? "playerSearch.switchTo"
-                  : "playerSearch.switchBack",
-              )}
-            </button>
+            <div className="landing-tool-links">
+              <button
+                className="landing-tool-switch"
+                type="button"
+                onClick={() =>
+                  setLandingTool(landingTool === "upload" ? "player" : "upload")
+                }
+              >
+                {t(
+                  landingTool === "upload"
+                    ? "playerSearch.switchTo"
+                    : "playerSearch.switchBack",
+                )}
+              </button>
+              <a href="/game/0b1b114c-ece0-415e-91ae-7844c8b990fb/overview">
+                {t("results.exampleGame")}
+              </a>
+            </div>
           </div>
           <BanjaAttribution placement="homepage" />
         </main>

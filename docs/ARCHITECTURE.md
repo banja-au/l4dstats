@@ -50,7 +50,7 @@ permission model does not constrain syscalls made by an addon, so native addon
 permission is not granted to the API, worker or web processes.
 
 Hosted browser acquisition also accepts one raw `.dem` or one explicitly named
-single-demo compressed stream (`.dem.zip`, `.dem.gz`, `.dem.xz`, `.dem.bz2`, or
+single-demo ZIP archive (`.zip`) or compressed stream (`.dem.gz`, `.dem.xz`, `.dem.bz2`, or
 `.dem.zst`). Expansion happens in the networking parent before the parser child,
 with suffix/magic agreement, member/path/type checks, compressed and expanded
 byte caps, a ratio cap and bounded decoder execution. No archive path is ever

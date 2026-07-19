@@ -12,7 +12,7 @@ const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const EMAIL = /^[^\s@]{1,128}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
 const UPLOAD_ID = /^[a-f0-9-]{16,64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
-const DEMO_SUFFIX = /\.dem(?:\.(?:zip|gz|xz|bz2|zst))?$/i;
+const DEMO_SUFFIX = /(?:\.zip|\.dem(?:\.(?:gz|xz|bz2|zst))?)$/i;
 
 function db(environment: DeveloperEnvironment): Client {
   return createClient({

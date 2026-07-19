@@ -19,6 +19,7 @@ const english = {
   "brand.banjaEmail": "Email Banja Labs at labs@banja.au",
   "brand.banjaName": "Banja Labs",
   "brand.banjaAddress": "labs@banja.au",
+  "brand.developers": "L4DStats developer API",
   "brand.by": "by",
   "upload.choose": "Choose demo files",
   "upload.drop": "DROP DEMOS",
@@ -54,6 +55,7 @@ const english = {
   "results.defaultGame": "L4D2 GAME",
   "results.defaultMatch": "MATCH RESULTS",
   "results.addDemos": "ADD DEMOS",
+  "results.exampleGame": "View example game",
   "results.demoLimit": "10 / 10 DEMOS",
   "results.update": "Analysis update available",
   "results.updateDetail":
@@ -247,6 +249,7 @@ const spanish: Record<keyof typeof english, string> = {
   "brand.banjaEmail": "Enviar un correo a Banja Labs a labs@banja.au",
   "brand.banjaName": "Banja Labs",
   "brand.banjaAddress": "labs@banja.au",
+  "brand.developers": "API para desarrolladores de L4DStats",
   "brand.by": "por",
   "upload.choose": "Elegir archivos de demo",
   "upload.drop": "SUELTA LAS DEMOS",
@@ -282,6 +285,7 @@ const spanish: Record<keyof typeof english, string> = {
   "results.defaultGame": "PARTIDA DE L4D2",
   "results.defaultMatch": "RESULTADOS DE LA PARTIDA",
   "results.addDemos": "AÑADIR DEMOS",
+  "results.exampleGame": "Ver partida de ejemplo",
   "results.demoLimit": "10 / 10 DEMOS",
   "results.update": "Hay una actualización del análisis",
   "results.updateDetail":
