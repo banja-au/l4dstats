@@ -100,7 +100,7 @@ export async function runBackfill(input: {
   );
   let completed = 0;
   let failed = 0;
-  const gameIds = new Set<string>();
+  const importedJobIds = new Set<string>();
   const store = new ContentAddressedStore(input.objectRoot);
   const activeObjects = new Map<string, number>();
   const retain = (hash: string) =>
@@ -187,7 +187,7 @@ export async function runBackfill(input: {
           serialized: analysis.serialized,
         });
         input.state.complete(item, published);
-        gameIds.add(published.gameId);
+        importedJobIds.add(published.jobId);
         completed += 1;
         log(`[${item.gameHint ?? "unassociated"}] complete ${item.filename}`);
       } catch (error) {
@@ -208,11 +208,12 @@ export async function runBackfill(input: {
       }
     }
   });
+  const gameIds = await input.publisher.resolveGameIds([...importedJobIds]);
   return {
     discovered: discovered.length,
     selected: selected.length,
     completed,
     failed,
-    gameIds: [...gameIds].sort(),
+    gameIds,
   };
 }

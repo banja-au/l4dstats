@@ -30,6 +30,7 @@ export interface Publisher {
     result: EngineAnalysisResult;
     serialized: Uint8Array;
   }): Promise<PublishResult>;
+  resolveGameIds(jobIds: readonly string[]): Promise<string[]>;
   close(): void;
 }
 
@@ -170,6 +171,17 @@ export class HostedPublisher implements Publisher {
     const gameId = await this.repository.getGameIdForJob(job.id);
     if (!gameId) throw new Error("backfill job has no hosted game association");
     return { resultSha256, resultKey, jobId: job.id, gameId };
+  }
+
+  public async resolveGameIds(jobIds: readonly string[]): Promise<string[]> {
+    const gameIds = new Set<string>();
+    for (const jobId of jobIds) {
+      const gameId = await this.repository.getGameIdForJob(jobId);
+      if (!gameId)
+        throw new Error(`hosted job has no current game association: ${jobId}`);
+      gameIds.add(gameId);
+    }
+    return [...gameIds].sort();
   }
 
   public close(): void {
