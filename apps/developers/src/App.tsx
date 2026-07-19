@@ -48,7 +48,7 @@ export function App() {
 
   const refresh = async () => {
     const me = await api<{
-      account: Account;
+      account: Account | null;
       keys: ApiKey[];
       logs: LogEntry[];
     }>("/me");

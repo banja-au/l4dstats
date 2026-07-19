@@ -41,6 +41,20 @@ async function register(database: ReturnType<typeof createClient>) {
 }
 
 describe("developer account boundary", () => {
+  it("reports an anonymous console session without a noisy auth failure", async () => {
+    const response = await handleDeveloperConsole(
+      new Request("https://developers.l4dstats.gg/developer-api/me"),
+      environment,
+      client(),
+    );
+    expect(response?.status).toBe(200);
+    expect(await response?.json()).toEqual({
+      account: null,
+      keys: [],
+      logs: [],
+    });
+  });
+
   it("requires exact-origin mutations and stores a hashed password", async () => {
     const database = client();
     const rejected = await handleDeveloperConsole(

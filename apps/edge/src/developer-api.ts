@@ -335,6 +335,12 @@ export async function handleDeveloperConsole(
       );
     }
     const accountId = await sessionAccount(client, request);
+    if (
+      !accountId &&
+      request.method === "GET" &&
+      url.pathname === "/developer-api/me"
+    )
+      return json(200, { account: null, keys: [], logs: [] });
     if (!accountId) return json(401, { error: "Sign in required" });
     if (
       request.method === "DELETE" &&
