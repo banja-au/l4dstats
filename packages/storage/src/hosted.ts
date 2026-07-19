@@ -164,7 +164,28 @@ export class HostedJobRepository {
       "SELECT * FROM hosted_jobs WHERE idempotency_key=?",
       [idempotencyKey],
     );
-    if (existing.rows[0]) return parseJob(existing.rows[0]);
+    if (existing.rows[0]) {
+      const job = parseJob(existing.rows[0]);
+      if (job.state !== "failed") return job;
+      const timestamp = iso(at);
+      const revived = await this.client.execute(
+        `UPDATE hosted_jobs
+         SET state='queued',source_json=?,attempt=0,progress=0,message=NULL,
+             lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+         WHERE id=? AND state='failed'`,
+        [JSON.stringify(source), timestamp, job.id],
+      );
+      if (revived.rowsAffected === 1) {
+        await this.audit(
+          "job.requeued",
+          job.id,
+          { sourceKind: source.kind },
+          at,
+        );
+        return (await this.getJob(job.id))!;
+      }
+      return (await this.getJob(job.id))!;
+    }
     const id = randomUUID();
     const timestamp = iso(at);
     await this.client.execute(

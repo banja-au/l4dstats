@@ -137,6 +137,39 @@ describe("HostedJobRepository", () => {
       close();
     }
   });
+
+  it("requeues a failed idempotent upload only after a new source is stored", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const job = await repo.enqueue(source, "upload:failed-reupload");
+      await repo.claim({ id: job.id, owner: "worker-a", leaseMs: 60_000 });
+      await repo.finish({
+        id: job.id,
+        owner: "worker-a",
+        state: "failed",
+        message: "bounded attempts exhausted",
+      });
+      const replacement = { ...source, key: "uploads/replacement/demo.dem" };
+      await expect(
+        repo.enqueue(replacement, "upload:failed-reupload"),
+      ).resolves.toMatchObject({
+        id: job.id,
+        state: "queued",
+        source: replacement,
+        attempt: 0,
+        progress: 0,
+        message: null,
+      });
+      await expect(
+        repo.enqueue(
+          { ...source, key: "uploads/concurrent-loser/demo.dem" },
+          "upload:failed-reupload",
+        ),
+      ).resolves.toMatchObject({ source: replacement, state: "queued" });
+    } finally {
+      close();
+    }
+  });
 });
 
 class MemoryR2 implements R2BucketLike {
