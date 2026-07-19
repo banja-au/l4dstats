@@ -11,6 +11,7 @@ interface Options {
   maxDemos: number;
   state: string;
   objects: string;
+  settleMinutes: number;
 }
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -54,6 +55,10 @@ export function parseArguments(args: string[]): Options {
     state: process.env.L4DSTATS_BACKFILL_DB ?? "data/backfill/state.sqlite",
     objects:
       process.env.L4DSTATS_BACKFILL_OBJECT_ROOT ?? "data/backfill/objects",
+    settleMinutes: positiveInteger(
+      "L4DSTATS_SETTLE_MINUTES",
+      process.env.L4DSTATS_SETTLE_MINUTES ?? "60",
+    ),
   };
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
@@ -63,9 +68,11 @@ export function parseArguments(args: string[]): Options {
       options.maxDemos = positiveInteger(flag, args[++index]);
     else if (flag === "--state") options.state = args[++index] ?? "";
     else if (flag === "--objects") options.objects = args[++index] ?? "";
+    else if (flag === "--settle-minutes")
+      options.settleMinutes = positiveInteger(flag, args[++index]);
     else if (flag === "--help") {
       process.stdout.write(
-        `Usage: pnpm backfill [options]\n\n  --concurrency N  Parallel downloads/parsers (default 2)\n  --max-demos N    Maximum source demos attempted (default 20)\n  --state PATH     Local checkpoint SQLite path\n  --objects PATH   Local content-addressed object root\n`,
+        `Usage: pnpm backfill [options]\n\n  --concurrency N    Parallel source games (default 2)\n  --max-demos N      Target demo cap; source games are never split (default 20)\n  --settle-minutes N Source game quiet period before import (default 60)\n  --state PATH       Local checkpoint SQLite path\n  --objects PATH     Local content-addressed object root\n`,
       );
       process.exit(0);
     } else throw new Error(`unknown argument: ${flag}`);
@@ -94,7 +101,7 @@ async function main(): Promise<void> {
   if (!pseudonymKey) throw new Error("L4DSTATS_PSEUDONYM_KEY is required");
   const state = new BackfillState(workspacePath(options.state));
   log(
-    `backfill starting: concurrency=${options.concurrency}, maxDemos=${options.maxDemos}, state=${workspacePath(options.state)}, objects=${workspacePath(options.objects)}`,
+    `backfill starting: concurrency=${options.concurrency}, maxDemos=${options.maxDemos}, settleMinutes=${options.settleMinutes}, state=${workspacePath(options.state)}, objects=${workspacePath(options.objects)}`,
   );
   const publisher = new HostedPublisher(process.env, log);
   try {
@@ -106,6 +113,7 @@ async function main(): Promise<void> {
       pseudonymKey,
       concurrency: options.concurrency,
       maxDemos: options.maxDemos,
+      settleMinutes: options.settleMinutes,
       log,
       signal: shutdown.signal,
     });

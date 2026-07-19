@@ -149,6 +149,11 @@ parser's 512 MiB hard input cap and a 200:1 compression ratio.
 At completion, the command prints one production `/game/:id/overview` URL for
 each unique game imported during that run. Several processed map demos can
 therefore produce one game URL.
+By default, source games must be quiet for 60 minutes before processing. The
+`--max-demos` value is a target: the selector may exceed it to keep one source
+game intact, and it never imports only the first half of a currently visible
+group. Override the quiet period with `--settle-minutes` only when the source is
+known to be historical and stable.
 
 `pnpm dev:docker` force-recreates the three application containers so the web
 proxy and API cannot retain different authentication environments. Named

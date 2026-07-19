@@ -308,6 +308,65 @@ describe("HostedJobRepository", () => {
       close();
     }
   });
+
+  it("associates a settled external source group and preserves merged URLs", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const jobs = await Promise.all([
+        repo.enqueue(source, "source-group:first"),
+        repo.enqueue(
+          { ...source, key: "uploads/job/second.dem" },
+          "source-group:second",
+        ),
+      ]);
+      for (const [index, job] of jobs.entries())
+        await repo.recordAnalysis({
+          jobId: job.id,
+          demoSha256: String(index + 1).repeat(64),
+          resultKey: `sha256/result-${index}`,
+          resultSha256: String(index + 3).repeat(64),
+          resultBytes: 100,
+          engineResult: {
+            demo: {
+              mapName: "c2m1_highway",
+              session: {
+                serverToken: `server-${index}`,
+                rosterToken: `roster-${index}`,
+                campaign: "c2",
+                serverCount: 1,
+                chapter: 1,
+                evidence: ["embedded-session"],
+              },
+            },
+          },
+        });
+      const previousIds = await Promise.all(
+        jobs.map((job) => repo.getGameIdForJob(job.id)),
+      );
+      expect(new Set(previousIds).size).toBe(2);
+      const canonical = await repo.associateSourceGroup({
+        sourceId: "l4d2center",
+        sourceGroupKey: "GAMEFIXTURE",
+        jobIds: jobs.map((job) => job.id),
+      });
+      await expect(repo.getGame(canonical)).resolves.toMatchObject({
+        id: canonical,
+        evidence: expect.arrayContaining(["external-source-group:l4d2center"]),
+        analyses: expect.arrayContaining(
+          jobs.map((job) => expect.objectContaining({ jobId: job.id })),
+        ),
+      });
+      const obsolete = previousIds.find((id) => id !== canonical)!;
+      await expect(repo.getGame(obsolete)).resolves.toMatchObject({
+        id: canonical,
+        analyses: expect.arrayContaining(
+          jobs.map((job) => expect.objectContaining({ jobId: job.id })),
+        ),
+      });
+    } finally {
+      close();
+    }
+  });
 });
 
 class MemoryR2 implements R2BucketLike {

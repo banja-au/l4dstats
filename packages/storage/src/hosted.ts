@@ -187,6 +187,19 @@ export const hostedMigrations = [
   )`,
   `CREATE INDEX IF NOT EXISTS hosted_player_demo_stats_player_idx
      ON hosted_player_demo_stats(steam_id64,created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS hosted_game_aliases (
+    alias_id TEXT PRIMARY KEY,
+    game_id TEXT NOT NULL REFERENCES hosted_games(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS hosted_source_groups (
+    source_id TEXT NOT NULL,
+    source_group_key TEXT NOT NULL,
+    game_id TEXT NOT NULL REFERENCES hosted_games(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(source_id,source_group_key)
+  )`,
 ] as const;
 
 const hostedStatsVersion = `hosted-stats-v2:${l4dStatsRatingVersion}`;
@@ -799,6 +812,19 @@ export class HostedJobRepository {
       );
     for (const duplicate of candidates.slice(1)) {
       await this.client.execute(
+        `INSERT INTO hosted_game_aliases VALUES(?,?,?)
+         ON CONFLICT(alias_id) DO UPDATE SET game_id=excluded.game_id`,
+        [duplicate, gameId, timestamp],
+      );
+      await this.client.execute(
+        "UPDATE hosted_game_aliases SET game_id=? WHERE game_id=?",
+        [gameId, duplicate],
+      );
+      await this.client.execute(
+        "UPDATE hosted_source_groups SET game_id=?,updated_at=? WHERE game_id=?",
+        [gameId, timestamp, duplicate],
+      );
+      await this.client.execute(
         "UPDATE hosted_game_demos SET game_id=? WHERE game_id=?",
         [gameId, duplicate],
       );
@@ -1284,24 +1310,143 @@ export class HostedJobRepository {
     return row ? String(row.game_id) : null;
   }
 
+  public async associateSourceGroup(input: {
+    sourceId: string;
+    sourceGroupKey: string;
+    jobIds: readonly string[];
+  }): Promise<string> {
+    if (!/^[a-z0-9-]{1,64}$/.test(input.sourceId))
+      throw new Error("source group source ID is invalid");
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(input.sourceGroupKey))
+      throw new Error("source group key is invalid");
+    const jobIds = [...new Set(input.jobIds)];
+    if (jobIds.length < 1 || jobIds.length > 100)
+      throw new Error("source group must contain between 1 and 100 jobs");
+    const gameIds: string[] = [];
+    for (const jobId of jobIds) {
+      const gameId = await this.getGameIdForJob(jobId);
+      if (!gameId)
+        throw new Error(`source group job is unassociated: ${jobId}`);
+      if (!gameIds.includes(gameId)) gameIds.push(gameId);
+    }
+    const existing = (
+      await this.client.execute(
+        `SELECT game_id FROM hosted_source_groups
+         WHERE source_id=? AND source_group_key=?`,
+        [input.sourceId, input.sourceGroupKey],
+      )
+    ).rows[0]?.game_id;
+    const canonical = typeof existing === "string" ? existing : gameIds[0]!;
+    if (!gameIds.includes(canonical)) gameIds.unshift(canonical);
+    const campaigns = new Set<string>();
+    for (const gameId of gameIds) {
+      const row = (
+        await this.client.execute(
+          "SELECT campaign FROM hosted_games WHERE id=?",
+          [gameId],
+        )
+      ).rows[0];
+      if (!row) throw new Error(`source group game is unavailable: ${gameId}`);
+      if (row.campaign !== null) campaigns.add(String(row.campaign));
+    }
+    if (campaigns.size > 1)
+      throw new Error("source group contains conflicting embedded campaigns");
+    const timestamp = iso();
+    const transaction = await this.client.transaction("write");
+    try {
+      for (const duplicate of gameIds.filter((id) => id !== canonical)) {
+        await transaction.execute(
+          `INSERT INTO hosted_game_aliases VALUES(?,?,?)
+           ON CONFLICT(alias_id) DO UPDATE SET game_id=excluded.game_id`,
+          [duplicate, canonical, timestamp],
+        );
+        await transaction.execute(
+          "UPDATE hosted_game_aliases SET game_id=? WHERE game_id=?",
+          [canonical, duplicate],
+        );
+        await transaction.execute(
+          "UPDATE hosted_game_demos SET game_id=? WHERE game_id=?",
+          [canonical, duplicate],
+        );
+        await transaction.execute(
+          "UPDATE hosted_player_demos SET game_id=? WHERE game_id=?",
+          [canonical, duplicate],
+        );
+        await transaction.execute(
+          "UPDATE hosted_source_groups SET game_id=?,updated_at=? WHERE game_id=?",
+          [canonical, timestamp, duplicate],
+        );
+        await transaction.execute("DELETE FROM hosted_games WHERE id=?", [
+          duplicate,
+        ]);
+      }
+      await transaction.execute(
+        `INSERT INTO hosted_source_groups VALUES(?,?,?,?,?)
+         ON CONFLICT(source_id,source_group_key) DO UPDATE SET
+           game_id=excluded.game_id,updated_at=excluded.updated_at`,
+        [input.sourceId, input.sourceGroupKey, canonical, timestamp, timestamp],
+      );
+      const game = (
+        await transaction.execute(
+          "SELECT evidence_json FROM hosted_games WHERE id=?",
+          [canonical],
+        )
+      ).rows[0];
+      const evidence = new Set<string>(
+        JSON.parse(String(game?.evidence_json ?? "[]")) as string[],
+      );
+      evidence.add(`external-source-group:${input.sourceId}`);
+      await transaction.execute(
+        "UPDATE hosted_games SET evidence_json=?,updated_at=? WHERE id=?",
+        [JSON.stringify([...evidence]), timestamp, canonical],
+      );
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+    await this.audit("game.source-group-associated", canonical, {
+      sourceId: input.sourceId,
+      sourceGroupKey: input.sourceGroupKey,
+      jobCount: jobIds.length,
+    });
+    return canonical;
+  }
+
   public async getGame(
     gameId: string,
   ): Promise<HostedGameReference | undefined> {
-    const game = (
+    let resolvedGameId = gameId;
+    let game = (
       await this.client.execute("SELECT * FROM hosted_games WHERE id=?", [
-        gameId,
+        resolvedGameId,
       ])
     ).rows[0];
+    if (!game) {
+      const alias = (
+        await this.client.execute(
+          "SELECT game_id FROM hosted_game_aliases WHERE alias_id=?",
+          [gameId],
+        )
+      ).rows[0]?.game_id;
+      if (typeof alias !== "string") return undefined;
+      resolvedGameId = alias;
+      game = (
+        await this.client.execute("SELECT * FROM hosted_games WHERE id=?", [
+          resolvedGameId,
+        ])
+      ).rows[0];
+    }
     if (!game) return undefined;
     const rows = (
       await this.client.execute(
         `SELECT a.* FROM hosted_game_demos d JOIN hosted_analyses a ON a.job_id=d.job_id
        WHERE d.game_id=? ORDER BY COALESCE(d.chapter,2147483647),COALESCE(d.server_count,2147483647),d.job_id`,
-        [gameId],
+        [resolvedGameId],
       )
     ).rows;
     return {
-      id: gameId,
+      id: resolvedGameId,
       confidence: String(game.confidence) as HostedGameReference["confidence"],
       evidence: JSON.parse(String(game.evidence_json)) as string[],
       createdAt: String(game.created_at),

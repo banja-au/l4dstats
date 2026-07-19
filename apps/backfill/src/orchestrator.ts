@@ -55,6 +55,7 @@ export async function runBackfill(input: {
   pseudonymKey: string;
   concurrency: number;
   maxDemos: number;
+  settleMinutes: number;
   log?: (message: string) => void;
   signal?: AbortSignal;
 }): Promise<BackfillSummary> {
@@ -94,13 +95,12 @@ export async function runBackfill(input: {
     );
     throw error;
   }
-  const selected = input.state.pending(input.maxDemos);
+  const selected = input.state.pending(input.maxDemos, input.settleMinutes);
   log(
-    `catalog checkpoint complete; selected ${selected.length} demos for local download and Rust processing`,
+    `catalog checkpoint complete; selected ${selected.length} demos from whole source games quiet for at least ${input.settleMinutes} minutes`,
   );
   let completed = 0;
   let failed = 0;
-  const importedJobIds = new Set<string>();
   const store = new ContentAddressedStore(input.objectRoot);
   const activeObjects = new Map<string, number>();
   const retain = (hash: string) =>
@@ -187,7 +187,6 @@ export async function runBackfill(input: {
           serialized: analysis.serialized,
         });
         input.state.complete(item, published);
-        importedJobIds.add(published.jobId);
         completed += 1;
         log(`[${item.gameHint ?? "unassociated"}] complete ${item.filename}`);
       } catch (error) {
@@ -208,12 +207,33 @@ export async function runBackfill(input: {
       }
     }
   });
-  const gameIds = await input.publisher.resolveGameIds([...importedJobIds]);
+  const gameIds = new Set<string>();
+  for (const group of grouped.values()) {
+    const first = group[0];
+    if (!first?.gameHint) continue;
+    const jobIds = input.state.completedJobIdsForGroup(
+      first.sourceId,
+      first.gameHint,
+    );
+    if (!jobIds) {
+      log(`[${first.gameHint}] source game incomplete; suppressing game URL`);
+      continue;
+    }
+    const gameId = await input.publisher.finalizeSourceGroup({
+      sourceId: first.sourceId,
+      sourceGroupKey: first.gameHint,
+      jobIds,
+    });
+    gameIds.add(gameId);
+    log(
+      `[${first.gameHint}] finalized ${jobIds.length} demos as hosted game ${gameId}`,
+    );
+  }
   return {
     discovered: discovered.length,
     selected: selected.length,
     completed,
     failed,
-    gameIds,
+    gameIds: [...gameIds].sort(),
   };
 }

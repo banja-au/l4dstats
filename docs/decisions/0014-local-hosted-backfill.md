@@ -14,11 +14,21 @@ the same compact reports available through the hosted Turso and R2 boundary.
 
 Add a local backfill application with source-specific discovery adapters and an
 ignored SQLite checkpoint database. Discovery records source item identity,
-publication time, sanitized URL metadata and an optional source game hint.
-Items are scheduled by newest source game first and chronologically within a
-source game. Source hints affect scheduling only. Canonical game association
-continues to use the protected embedded server identity, stable roster,
-campaign, chapter and adjacent server-generation evidence from ADR 0008.
+publication time, sanitized URL metadata and an optional provider-issued source
+game key. Source games must remain unchanged for a default 60-minute settlement
+window before selection. `--max-demos` is a target cap and never splits one
+source game. Items are scheduled by newest settled source game first and
+chronologically within a source game.
+
+After every catalog member succeeds, the publisher finalizes the provider group
+as one hosted game. Embedded server, stable-roster, campaign, chapter and
+generation evidence from ADR 0008 remains retained independently. A provider
+group may join same-chapter segments that embedded-only reconstruction keeps
+separate, but conflicting embedded campaigns fail closed. The game evidence is
+stamped `external-source-group:<source>` and remains provisional unless the
+ordinary embedded rules independently justify high confidence. A quiet window
+is an ingestion-stability heuristic, not proof that a played match reached its
+intended final chapter.
 
 Downloads reuse the allowlisted, bounded acquisition boundary. Compressed and
 expanded bytes retain independent hashes and sizes. Expanded demos are stored
@@ -43,6 +53,10 @@ wire versions. The local source item database additionally prevents repeated
 downloads after success and retains bounded retry state. Filenames and source
 game identifiers are provenance and scheduling hints, never canonical game
 identity.
+
+Game merges retain aliases from every replaced UUID to the surviving game.
+Previously issued `/game/:id` URLs therefore remain resolvable after later
+chapters or source finalization consolidate provisional games.
 
 ## Consequences
 

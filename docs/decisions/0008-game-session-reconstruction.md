@@ -27,6 +27,22 @@ at `/api/games/:id`; the web report uses `/game/:id/:tab`. Map inclusion is a
 view scope, so disabling a map recalculates every tab without changing the
 stored game.
 
+## External source groups
+
+ADR 0014 adds an operator backfill boundary for a narrowly configured external
+catalog. A source adapter may expose a provider-issued match key separately from
+the canonical demo hash. After a settlement window and successful processing of
+every catalog member, that key may associate same-match segments that cannot be
+joined from demo telemetry alone, including two recordings of one chapter.
+
+This is not filename-independent embedded evidence. The hosted game retains an
+`external-source-group:<source>` evidence label, rejects conflicting embedded
+campaigns, and does not upgrade confidence merely because the source key
+matches. Provider grouping rules are adapter-specific and require their own
+tests and provenance. Ordinary browser uploads continue to use only the
+embedded continuity decision above. When either path merges provisional game
+UUIDs, durable aliases preserve all previously issued game URLs.
+
 ## Real sample proof
 
 The eight demos in the ignored `tmp/demos` corpus produce exactly three groups

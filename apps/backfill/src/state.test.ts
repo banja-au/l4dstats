@@ -43,6 +43,23 @@ describe("BackfillState", () => {
     state.close();
   });
 
+  it("waits for source games to settle and never splits one at the demo cap", async () => {
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-backfill-"));
+    roots.push(root);
+    const state = new BackfillState(join(root, "state.sqlite"));
+    state.upsertDiscovered([
+      demo("GAMESETTLED", 1, "2026-07-20T00:00:00.000Z"),
+      demo("GAMESETTLED", 2, "2026-07-20T00:01:00.000Z"),
+      demo("GAMELIVE", 1, "2026-07-20T00:55:00.000Z"),
+    ]);
+    const selected = state.pending(1, 30, new Date("2026-07-20T01:00:00.000Z"));
+    expect(selected.map((item) => item.gameHint)).toEqual([
+      "GAMESETTLED",
+      "GAMESETTLED",
+    ]);
+    state.close();
+  });
+
   it("does not revive a completed source item during rediscovery", async () => {
     const root = await mkdtemp(join(tmpdir(), "l4dstats-backfill-"));
     roots.push(root);

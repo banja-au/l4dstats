@@ -31,6 +31,11 @@ export interface Publisher {
     serialized: Uint8Array;
   }): Promise<PublishResult>;
   resolveGameIds(jobIds: readonly string[]): Promise<string[]>;
+  finalizeSourceGroup(input: {
+    sourceId: string;
+    sourceGroupKey: string;
+    jobIds: readonly string[];
+  }): Promise<string>;
   close(): void;
 }
 
@@ -182,6 +187,14 @@ export class HostedPublisher implements Publisher {
       gameIds.add(gameId);
     }
     return [...gameIds].sort();
+  }
+
+  public async finalizeSourceGroup(input: {
+    sourceId: string;
+    sourceGroupKey: string;
+    jobIds: readonly string[];
+  }): Promise<string> {
+    return this.repository.associateSourceGroup(input);
   }
 
   public close(): void {

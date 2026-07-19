@@ -142,23 +142,32 @@ export class BackfillState {
       .run(detail.slice(0, 2_000), sourceId);
   }
 
-  /** Recent games first; within each source game hint, process maps oldest first. */
-  public pending(limit: number): PendingDemo[] {
+  /** Select settled source games atomically; never cut a game at the demo limit. */
+  public pending(
+    limit: number,
+    settleMinutes = 0,
+    at = new Date(),
+  ): PendingDemo[] {
+    const cutoff = new Date(
+      at.getTime() - settleMinutes * 60_000,
+    ).toISOString();
     const rows = this.db
       .prepare(
-        `WITH eligible AS (
+        `WITH catalog AS (
           SELECT i.*,
             MAX(published_at) OVER (PARTITION BY source_id,game_hint) AS game_recency
           FROM source_items i
-          WHERE i.state NOT IN ('complete','permanent_failure')
-            AND (i.next_attempt_at IS NULL OR i.next_attempt_at<=?)
+        ), eligible AS (
+          SELECT * FROM catalog
+          WHERE state NOT IN ('complete','permanent_failure')
+            AND (next_attempt_at IS NULL OR next_attempt_at<=?)
+            AND game_recency<=?
         )
         SELECT * FROM eligible
-        ORDER BY game_recency DESC,game_hint,published_at ASC,source_item_key
-        LIMIT ?`,
+        ORDER BY game_recency DESC,source_id,game_hint,published_at ASC,source_item_key`,
       )
-      .all(new Date().toISOString(), limit) as Record<string, unknown>[];
-    return rows.map((row) => ({
+      .all(at.toISOString(), cutoff) as Record<string, unknown>[];
+    const pending = rows.map((row) => ({
       sourceId: String(row.source_id),
       sourceItemKey: String(row.source_item_key),
       publishedAt: String(row.published_at),
@@ -173,6 +182,39 @@ export class BackfillState {
       >,
       attempts: Number(row.attempts),
     }));
+    const groups = new Map<string, PendingDemo[]>();
+    for (const item of pending) {
+      const key = `${item.sourceId}:${item.gameHint ?? item.sourceItemKey}`;
+      const group = groups.get(key) ?? [];
+      group.push(item);
+      groups.set(key, group);
+    }
+    const selected: PendingDemo[] = [];
+    for (const group of groups.values()) {
+      if (selected.length > 0 && selected.length + group.length > limit)
+        continue;
+      selected.push(...group);
+      if (selected.length >= limit) break;
+    }
+    return selected;
+  }
+
+  public completedJobIdsForGroup(
+    sourceId: string,
+    gameHint: string,
+  ): string[] | undefined {
+    const rows = this.db
+      .prepare(
+        `SELECT state,turso_job_id FROM source_items
+         WHERE source_id=? AND game_hint=? ORDER BY published_at,source_item_key`,
+      )
+      .all(sourceId, gameHint) as Array<Record<string, unknown>>;
+    if (
+      rows.length === 0 ||
+      rows.some((row) => row.state !== "complete" || !row.turso_job_id)
+    )
+      return undefined;
+    return rows.map((row) => String(row.turso_job_id));
   }
 
   public start(item: PendingDemo): void {
