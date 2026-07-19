@@ -183,4 +183,14 @@ describe("edge dispatcher", () => {
     expect(response.headers.get("location")).toBeNull();
     await expect(response.text()).resolves.toContain("L4DStats Developers");
   });
+
+  it("serves a valid developer robots file instead of the SPA fallback", async () => {
+    const response = await fetchHandler(
+      new Request("https://developers.l4dstats.gg/robots.txt"),
+      environment(),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    await expect(response.text()).resolves.toBe("User-agent: *\nAllow: /\n");
+  });
 });

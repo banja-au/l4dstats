@@ -528,6 +528,13 @@ export async function fetchHandler(
     const developerHost =
       url.hostname === "developers.l4dstats.com" ||
       url.hostname === "developers.l4dstats.gg";
+    if (developerHost && url.pathname === "/robots.txt") {
+      const headers = secureHeaders({
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "public, max-age=3600",
+      });
+      return new Response("User-agent: *\nAllow: /\n", { headers });
+    }
     const assetUrl = new URL(request.url);
     if (developerHost) {
       const isDeveloperAsset =

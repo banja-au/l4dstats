@@ -12,6 +12,7 @@ type Variables = Record<string, number | string>;
 
 const english = {
   "language.label": "Language",
+  "language.toggle": "EN / ES",
   "language.english": "English",
   "language.spanish": "Español",
   "brand.home": "L4DStats home",
@@ -238,6 +239,7 @@ const english = {
 
 const spanish: Record<keyof typeof english, string> = {
   "language.label": "Idioma",
+  "language.toggle": "EN / ES",
   "language.english": "English",
   "language.spanish": "Español",
   "brand.home": "Inicio de L4DStats",
