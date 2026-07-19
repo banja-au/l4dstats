@@ -28,7 +28,7 @@ if [ -e "$output" ]; then
 fi
 
 sed \
-  -e "s/ENVIRONMENT/$environment/g" \
+  -e "s/__ENV__/$environment/g" \
   -e "s|HOSTED_DISPATCHER_ENTRYPOINT|../../$entrypoint|g" \
   -e "s/HOSTED_DOMAIN/$domain/g" \
   deploy/cloudflare/wrangler.template.jsonc > "$output"

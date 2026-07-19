@@ -151,10 +151,6 @@ quality gate runs first, Terraform plans and applies through the protected
 `production` GitHub environment, then Wrangler publishes secrets and deploys
 the verified commit. Configure these GitHub production environment values:
 
-The Worker also keeps its `workers.dev` hostname enabled. This provides a
-temporary deployment URL while custom-domain DNS is propagating and remains a
-useful direct health-check target afterward.
-
 - variable `PRODUCTION_HOSTNAME`;
 - secrets `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`;
 - secrets `TF_STATE_R2_BUCKET`, `TF_STATE_R2_ACCESS_KEY_ID` and

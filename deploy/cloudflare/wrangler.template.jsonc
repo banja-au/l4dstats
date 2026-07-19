@@ -1,12 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "l4dstats-ENVIRONMENT",
+  "name": "l4dstats-__ENV__",
   "main": "HOSTED_DISPATCHER_ENTRYPOINT",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
+  "workers_dev": false,
   "routes": [{ "pattern": "HOSTED_DOMAIN", "custom_domain": true }],
-  "vars": { "L4DSTATS_ENVIRONMENT": "ENVIRONMENT" },
+  "vars": { "L4DSTATS_ENVIRONMENT": "__ENV__" },
   "assets": {
     "directory": "../../apps/web/dist",
     "binding": "ASSETS",
@@ -16,37 +16,37 @@
   "r2_buckets": [
     {
       "binding": "TEMPORARY_DEMOS",
-      "bucket_name": "l4dstats-ENVIRONMENT-temporary",
+      "bucket_name": "l4dstats-__ENV__-temporary",
     },
     {
       "binding": "DERIVED_ARTIFACTS",
-      "bucket_name": "l4dstats-ENVIRONMENT-artifacts",
+      "bucket_name": "l4dstats-__ENV__-artifacts",
     },
   ],
   "queues": {
     "producers": [
       {
         "binding": "ANALYSIS_QUEUE",
-        "queue": "l4dstats-ENVIRONMENT-analysis",
+        "queue": "l4dstats-__ENV__-analysis",
       },
     ],
     "consumers": [
       {
-        "queue": "l4dstats-ENVIRONMENT-analysis",
+        "queue": "l4dstats-__ENV__-analysis",
         "max_batch_size": 1,
         "max_batch_timeout": 5,
         "max_retries": 5,
-        "dead_letter_queue": "l4dstats-ENVIRONMENT-analysis-dlq",
+        "dead_letter_queue": "l4dstats-__ENV__-analysis-dlq",
       },
     ],
   },
   "containers": [
     {
       "class_name": "AnalysisContainer",
-      "image": "./container/Dockerfile",
+      "image": "../../Dockerfile.cloudflare",
       "max_instances": 1,
       "instance_type": "standard-2",
-      "name": "l4dstats-ENVIRONMENT-analysis",
+      "name": "l4dstats-__ENV__-analysis",
       "ssh": {
         "enabled": false,
       },
