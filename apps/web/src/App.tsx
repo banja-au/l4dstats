@@ -340,6 +340,11 @@ function App() {
   );
   const input = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<UploadItem[]>([]);
+  const [routeLoading, setRouteLoading] = useState(() =>
+    Boolean(
+      gameRouteParts() || parsePlayerProfilePath(window.location.pathname),
+    ),
+  );
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>(routeTab);
   const [selectedGame, setSelectedGame] = useState<string | null>(
@@ -354,6 +359,11 @@ function App() {
   const [disabledDemos, setDisabledDemos] = useState<string[]>([]);
   const [disabledHalves, setDisabledHalves] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState("");
+  const [landingTool, setLandingTool] = useState<"upload" | "player">(() =>
+    new URLSearchParams(window.location.search).has("player")
+      ? "player"
+      : "upload",
+  );
   const refreshedGames = useRef(false);
 
   const update = (key: string, patch: Partial<UploadItem>) =>
@@ -508,6 +518,7 @@ function App() {
               analysis,
             })),
           );
+          setRouteLoading(false);
         },
         (error) => {
           setItems([
@@ -522,6 +533,7 @@ function App() {
                   : tx("Game not found", "Partida no encontrada"),
             },
           ]);
+          setRouteLoading(false);
         },
       );
       return;
@@ -800,8 +812,9 @@ function App() {
       6,
   );
   const parserProvenance = parserProvenanceLabel(analyses);
-  const phase =
-    items.length === 0
+  const phase = routeLoading
+    ? "loading"
+    : items.length === 0
       ? "landing"
       : isWorking || !hasResults
         ? "loading"
@@ -841,35 +854,53 @@ function App() {
             <b>STATS</b>
           </div>
           <div className="landing-actions">
-            <button
-              className={`dropzone ${dragging ? "is-dragging" : ""}`}
-              onClick={() => input.current?.click()}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node))
+            {landingTool === "upload" ? (
+              <button
+                className={`dropzone ${dragging ? "is-dragging" : ""}`}
+                onClick={() => input.current?.click()}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={(event) => {
+                  if (
+                    !event.currentTarget.contains(event.relatedTarget as Node)
+                  )
+                    setDragging(false);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
                   setDragging(false);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(false);
-                addFiles([...event.dataTransfer.files]);
-              }}
+                  addFiles([...event.dataTransfer.files]);
+                }}
+              >
+                {picker}
+                <UploadCloud />
+                <span>{t("upload.drop")}</span>
+                <small>{t("upload.hint", { maximum: MAX_DEMOS })}</small>
+                {uploadError && (
+                  <em className="upload-error" role="alert">
+                    {uploadError}
+                  </em>
+                )}
+              </button>
+            ) : (
+              <PlayerLookup />
+            )}
+            <button
+              className="landing-tool-switch"
+              type="button"
+              onClick={() =>
+                setLandingTool(landingTool === "upload" ? "player" : "upload")
+              }
             >
-              {picker}
-              <UploadCloud />
-              <span>{t("upload.drop")}</span>
-              <small>{t("upload.hint", { maximum: MAX_DEMOS })}</small>
-              {uploadError && (
-                <em className="upload-error" role="alert">
-                  {uploadError}
-                </em>
+              {t(
+                landingTool === "upload"
+                  ? "playerSearch.switchTo"
+                  : "playerSearch.switchBack",
               )}
             </button>
-            <PlayerLookup />
           </div>
           <BanjaAttribution placement="homepage" />
         </main>
@@ -896,7 +927,9 @@ function App() {
               <strong>{Math.round(overallProgress * 100)}%</strong>
               <span>
                 {items.find((item) => item.state !== "succeeded")?.message ??
-                  t("analysis.safeRoom")}
+                  (routeLoading
+                    ? tx("Loading game", "Cargando partida")
+                    : t("analysis.safeRoom"))}
               </span>
             </div>
             <div className="master-progress">

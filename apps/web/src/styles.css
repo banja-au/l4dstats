@@ -4957,10 +4957,10 @@ body.timeline-fullscreen-open {
   left: clamp(4vw, 8vw, 130px);
   bottom: clamp(6vh, 10vh, 126px);
   display: grid;
-  grid-template-columns: minmax(360px, 1.35fr) minmax(300px, 0.85fr);
-  width: min(980px, 72vw);
+  grid-template-columns: minmax(0, 1fr);
+  width: min(570px, 43vw);
   min-height: clamp(290px, 36vh, 430px);
-  gap: 16px;
+  gap: 12px;
   align-items: stretch;
 }
 .phase-landing .landing-actions .dropzone {
@@ -4968,6 +4968,19 @@ body.timeline-fullscreen-open {
   inset: auto;
   width: 100%;
   min-height: 100%;
+}
+.landing-tool-switch {
+  justify-self: start;
+  padding: 2px 1px;
+  color: var(--muted);
+  border-bottom: 1px solid rgb(237 244 239 / 24%);
+  background: transparent;
+  font-size: 12px;
+}
+.landing-tool-switch:hover,
+.landing-tool-switch:focus-visible {
+  color: var(--green);
+  border-color: var(--green);
 }
 .player-lookup {
   position: relative;
@@ -5479,7 +5492,7 @@ body.timeline-fullscreen-open {
 
 @media (min-width: 1400px) and (min-height: 800px) {
   .landing-actions {
-    width: min(1100px, 76vw);
+    width: min(620px, 44vw);
   }
   .phase-landing .landing-actions .dropzone {
     min-height: min(540px, 54vh);
