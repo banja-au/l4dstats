@@ -135,6 +135,16 @@ pnpm maps:install
 pnpm maps:extract
 ```
 
+To copy the validated complete cache out of Docker's named volume and into the
+checkout, run:
+
+```bash
+pnpm maps:export
+```
+
+The export is idempotent. It refuses to copy a partial cache and requires 57
+official map meshes plus `catalog.json` before writing `map-geometry/`.
+
 On a fresh x86-64 Ubuntu host, the idempotent setup script installs Docker from
 Docker's official apt repository, validates available storage, and runs both
 steps:
