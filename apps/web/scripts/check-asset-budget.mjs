@@ -16,7 +16,9 @@ const budgets = {
   javascript: 415 * kib,
   css: 99 * kib,
   transferTotal: 1025 * kib,
-  transferJavascript: 125 * kib,
+  // Production retains the PostHog initialization branch when its build-time
+  // token is present; keep a small measured allowance for that real variant.
+  transferJavascript: 130 * kib,
   transferCss: 21 * kib,
   hero: 230 * kib,
   backdrop: 150 * kib,
