@@ -1,4 +1,4 @@
-import { Container } from "@cloudflare/containers";
+import { Container, type StopParams } from "@cloudflare/containers";
 import { env } from "cloudflare:workers";
 import type { EdgeEnvironment } from "./index.js";
 
@@ -12,4 +12,14 @@ export class AnalysisContainer extends Container<EdgeEnvironment> {
   override envVars = {
     L4DSTATS_PSEUDONYM_KEY: runtimeEnvironment.L4DSTATS_PSEUDONYM_KEY,
   };
+
+  override onStop({ exitCode, reason }: StopParams): void {
+    console.error(
+      JSON.stringify({
+        event: "hosted.container.stopped",
+        exitCode,
+        reason,
+      }),
+    );
+  }
 }
