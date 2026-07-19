@@ -48,4 +48,5 @@ ENV NODE_ENV=production
 ENV NODE_OPTIONS=--conditions=production
 ENV L4DSTATS_CONTAINER_WORK_ROOT=/tmp/l4dstats
 
+EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/l4dstats-cloudflare-container"]

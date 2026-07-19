@@ -9,9 +9,4 @@ if [ ! -f "$hosted_entrypoint" ]; then
   exit 78
 fi
 
-if [ -z "${L4DSTATS_PSEUDONYM_KEY:-}" ]; then
-  printf '%s\n' "L4DSTATS_PSEUDONYM_KEY is required" >&2
-  exit 78
-fi
-
 exec node "$hosted_entrypoint" "$@"

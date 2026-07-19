@@ -128,6 +128,8 @@ createServer(async (request, response) => {
       declaredBytes > MAX_SOURCE_BYTES
     )
       throw new Error("source content length is invalid");
+    if (!process.env.L4DSTATS_PSEUDONYM_KEY)
+      throw new Error("analysis pseudonym key is unavailable");
     const directory = join(workRoot, randomUUID());
     const path = join(directory, "source.dem");
     await mkdir(directory, { mode: 0o700 });
