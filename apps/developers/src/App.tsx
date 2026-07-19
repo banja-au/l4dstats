@@ -1,11 +1,4 @@
-import {
-  BookOpen,
-  Copy,
-  KeyRound,
-  LogOut,
-  Terminal,
-  UploadCloud,
-} from "lucide-react";
+import { BookOpen, Copy, KeyRound, LogOut } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 type Account = {
@@ -128,34 +121,24 @@ export function App() {
       </header>
       <main className="mx-auto max-w-7xl px-5 py-12">
         {!account ? (
-          <section className="grid gap-12 lg:grid-cols-[1.3fr_.7fr] lg:items-center">
+          <section className="grid gap-10 lg:grid-cols-[1fr_24rem] lg:items-start">
             <div>
-              <p className="eyebrow">THE PARSER, WITHOUT THE PLUMBING</p>
-              <h1 className="mt-4 max-w-3xl text-5xl font-black leading-[.94] tracking-[-.06em] md:text-7xl">
-                Turn raw demos into <em>structured evidence.</em>
+              <p className="eyebrow">L4DSTATS API</p>
+              <h1 className="mt-4 text-4xl font-black tracking-[-.04em] md:text-5xl">
+                Developer API
               </h1>
-              <p className="mt-7 max-w-2xl text-lg leading-8 text-stone-400">
-                Upload up to ten L4D2 demos, follow every analysis job, and
-                retrieve the complete versioned parser result. Every account
-                includes 100 API requests each UTC day.
+              <p className="mt-5 max-w-2xl leading-7 text-stone-400">
+                Upload up to 10 L4D2 demos per batch and retrieve their parser
+                results. Accounts are limited to 100 API requests per UTC day.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <a className="pill" href="#openapi">
-                  <BookOpen size={16} /> OpenAPI reference
-                </a>
-                <span className="pill">
-                  <Terminal size={16} /> JSON over HTTPS
-                </span>
-                <span className="pill">
-                  <UploadCloud size={16} /> 10 demos per batch
-                </span>
-              </div>
+              <a className="pill mt-7 inline-flex" href="#openapi">
+                <BookOpen size={16} /> API reference
+              </a>
             </div>
             <form onSubmit={authenticate} className="panel p-7">
               <p className="eyebrow">
-                {mode === "register" ? "CREATE AN ACCOUNT" : "WELCOME BACK"}
+                {mode === "register" ? "REGISTER" : "SIGN IN"}
               </p>
-              <h2 className="mt-2 text-2xl font-bold">Start building</h2>
               <label>
                 Email
                 <input
@@ -183,7 +166,7 @@ export function App() {
                 </p>
               )}
               <button className="primary mt-5 w-full" type="submit">
-                {mode === "register" ? "Create free account" : "Sign in"}
+                {mode === "register" ? "Create account" : "Sign in"}
               </button>
               <button
                 className="mt-4 w-full text-sm text-stone-400 hover:text-white"
@@ -204,7 +187,7 @@ export function App() {
               <div>
                 <p className="eyebrow">DEVELOPER CONSOLE</p>
                 <h1 className="mt-2 text-4xl font-black tracking-tight">
-                  Good to see you.
+                  Account
                 </h1>
                 <p className="mt-2 text-stone-400">{account.email}</p>
               </div>
@@ -327,9 +310,7 @@ export function App() {
         <section id="openapi" className="mt-20 border-t border-white/10 pt-12">
           <p className="eyebrow">API REFERENCE</p>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-            <h2 className="text-4xl font-black tracking-tight">
-              Three endpoints. Full lineage.
-            </h2>
+            <h2 className="text-4xl font-black tracking-tight">Endpoints</h2>
             <a className="pill" href="/openapi.json">
               <BookOpen size={16} /> OpenAPI JSON
             </a>
@@ -338,17 +319,17 @@ export function App() {
             <Endpoint
               method="POST"
               path="/v1/batches"
-              text="Create a batch containing one to ten bounded demo uploads."
+              text="Create a batch containing 1–10 demo uploads."
             />
             <Endpoint
               method="PUT"
               path="/v1/uploads/{id}"
-              text="Stream one raw or supported compressed demo directly to private staging."
+              text="Upload one raw or supported compressed demo."
             />
             <Endpoint
               method="GET"
               path="/v1/jobs/{id}"
-              text="Read state and, when complete, the full versioned parser result."
+              text="Read job state and the parser result when complete."
             />
           </div>
         </section>
