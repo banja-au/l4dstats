@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const root = mkdtempSync(join(tmpdir(), "witchwatch-real-e2e-"));
+const root = mkdtempSync(join(tmpdir(), "l4dstats-real-e2e-"));
 process.once("exit", () => rmSync(root, { recursive: true, force: true }));
 
 export default defineConfig({
@@ -20,7 +20,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `exec env WITCHWATCH_E2E_ROOT=${root} node scripts/run-real-boundary-stack.mjs`,
+      command: `exec env L4DSTATS_E2E_ROOT=${root} node scripts/run-real-boundary-stack.mjs`,
       url: "http://127.0.0.1:8787/health",
       reuseExistingServer: false,
       timeout: 120_000,

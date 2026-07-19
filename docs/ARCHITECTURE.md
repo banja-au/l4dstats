@@ -63,6 +63,14 @@ permission is not granted to the API, worker or web processes.
 
 SQLite stores jobs, metadata, indexes, findings, reviews, and audit events. Raw archives/demos, observation chunks, reports, and clips live under `sha256/aa/<hash>` through a storage interface. Production may replace these with PostgreSQL and S3-compatible storage. Redis/BullMQ is deferred until multiple workers make it necessary.
 
+The proposed hosted boundary in ADR 0010 preserves local SQLite/Compose while
+adding asynchronous Turso metadata, private R2 objects, an at-least-once Queue,
+and bounded native parser Containers. Hosted raw demos are staging objects:
+after derived objects and their lineage are verified and committed, deletion of
+the source must be confirmed before the job becomes successful. Large result
+and telemetry JSON stays out of Turso. Cloudflare placement is provider-selected
+and does not guarantee Los Angeles execution.
+
 ## Visualization ladder
 
 1. Tick timeline and detector lanes.

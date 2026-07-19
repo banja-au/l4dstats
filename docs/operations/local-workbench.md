@@ -34,7 +34,7 @@ ingest dialog. Local files must resolve beneath that root, use the `.dem` extens
 be regular files below the configured byte limit, and are SHA-256 hashed before the
 job is queued.
 
-Remote input accepts HTTPS URLs from `WITCHWATCH_ALLOWED_HOSTS` (default:
+Remote input accepts HTTPS URLs from `L4DSTATS_ALLOWED_HOSTS` (default:
 `cedapug.com`). The worker streams the allowlisted response through the guarded
 downloader with redirect, timeout, and two-GiB compressed-input limits. A `.dem` is
 stored directly; an archive must pass entry, expansion, per-entry, traversal, and
@@ -62,31 +62,31 @@ parser exists.
 
 Runtime configuration:
 
-- `WITCHWATCH_DB` selects the SQLite metadata database.
-- `WITCHWATCH_ARTIFACT_ROOT` selects content-addressed source and result storage.
-- `WITCHWATCH_LOCAL_ROOTS` is a comma-separated local ingest allowlist.
-- `WITCHWATCH_ALLOWED_HOSTS` is a comma-separated remote HTTPS allowlist.
-- `WITCHWATCH_PSEUDONYM_KEY` keys the HMAC used to associate the same stable
+- `L4DSTATS_DB` selects the SQLite metadata database.
+- `L4DSTATS_ARTIFACT_ROOT` selects content-addressed source and result storage.
+- `L4DSTATS_LOCAL_ROOTS` is a comma-separated local ingest allowlist.
+- `L4DSTATS_ALLOWED_HOSTS` is a comma-separated remote HTTPS allowlist.
+- `L4DSTATS_PSEUDONYM_KEY` keys the HMAC used to associate the same stable
   identity across independently ingested demos without using a mutable player
   name as a join key. Local analysis artifacts also retain the demo's display
   name and SteamID64 so the statistics UI can identify players and link profiles.
-- `WITCHWATCH_STALE_JOB_MS` and `WITCHWATCH_MAX_JOB_ATTEMPTS` control abandoned
+- `L4DSTATS_STALE_JOB_MS` and `L4DSTATS_MAX_JOB_ATTEMPTS` control abandoned
   lease recovery.
-- `WITCHWATCH_MUTATION_RATE_LIMIT` and
-  `WITCHWATCH_MUTATION_RATE_WINDOW_MS` bound non-read API requests per direct
+- `L4DSTATS_MUTATION_RATE_LIMIT` and
+  `L4DSTATS_MUTATION_RATE_WINDOW_MS` bound non-read API requests per direct
   client address, or per verified web identity when the authenticated proxy
   supplies one. The local default is 120 mutations per minute. Identity headers
   are ignored for quota selection unless the request also carries the valid
   internal bearer token.
-- `WITCHWATCH_API_TOKEN` enables bearer authentication for every `/api` route.
+- `L4DSTATS_API_TOKEN` enables bearer authentication for every `/api` route.
   It must contain at least 32 bytes. The Vite proxy injects it server-side, so
   normal browser requests do not expose it in shipped JavaScript or browser
   storage. `/health` stays unauthenticated for container health checks. The
   Compose default is development-only; set a random secret before sharing the
   service. This protects the API boundary but does not authenticate a browser
   user because the trusted web proxy injects the bearer token.
-- `WITCHWATCH_AUTH_FAILURE_LIMIT` and
-  `WITCHWATCH_AUTH_FAILURE_WINDOW_MS` bound invalid bearer attempts per direct
+- `L4DSTATS_AUTH_FAILURE_LIMIT` and
+  `L4DSTATS_AUTH_FAILURE_WINDOW_MS` bound invalid bearer attempts per direct
   client address. Successful authentication clears that client's failure
   bucket. The default is 20 failures per five minutes.
 - Parser subprocesses use a direct shell-free Node invocation with bounded
@@ -109,7 +109,7 @@ V8 heap, 5 GiB address-space, 300-second CPU, 64-file and 16 MiB captured-output
 limits. Cancellation sends TERM to the process group and KILL after one second;
 the native task itself is not cooperatively cancelled.
 
-- `WITCHWATCH_WEB_USERNAME` and `WITCHWATCH_WEB_PASSWORD` enable a single-user
+- `L4DSTATS_WEB_USERNAME` and `L4DSTATS_WEB_PASSWORD` enable a single-user
   HTTP Basic gate in front of the complete web surface. They must be set
   together and the password must contain at least 16 bytes. Use this only over
   a trusted encrypted tunnel or TLS because Basic credentials are not encrypted
@@ -117,7 +117,7 @@ the native task itself is not cooperatively cancelled.
   substitute for multi-user identities, RBAC or an external identity proxy.
   Both development and production web gates bound failures to 20 attempts per
   client address over five minutes; a valid login clears the bucket.
-- `WITCHWATCH_WEB_USERS_JSON` replaces the two single-user variables for a
+- `L4DSTATS_WEB_USERS_JSON` replaces the two single-user variables for a
   small team deployment. It is a JSON array of unique objects with `username`,
   a password of at least 16 bytes, and role `viewer`, `reviewer`, or `admin`.
   Viewers can open reports and use read-only API routes but cannot submit API
@@ -129,7 +129,7 @@ the native task itself is not cooperatively cancelled.
   exposure, terminate TLS and prefer a mature external identity provider.
 
 The bundled pseudonym key is development-only. Set a long random
-`WITCHWATCH_PSEUDONYM_KEY` before reviewing non-fixture demos, keep it out of Git,
+`L4DSTATS_PSEUDONYM_KEY` before reviewing non-fixture demos, keep it out of Git,
 and retain it securely for the lifetime of the database. Rotating or losing the key
 intentionally prevents new demos from joining older cases. Tokens produced with
 different keys, and demo-local epochs where stable identity was unavailable, never
@@ -203,10 +203,10 @@ identities.
 pnpm retention:docker -- 30 --confirm-purge
 ```
 
-Only uploaded files beneath `WITCHWATCH_UPLOAD_ROOT` are eligible for source
+Only uploaded files beneath `L4DSTATS_UPLOAD_ROOT` are eligible for source
 deletion. Files from the read-only inbox are never removed. Unreferenced
 content-addressed demo and result objects are deleted from
-`WITCHWATCH_ARTIFACT_ROOT`. Take and verify a backup before the first purge.
+`L4DSTATS_ARTIFACT_ROOT`. Take and verify a backup before the first purge.
 
 ## Browser verification
 
@@ -232,7 +232,7 @@ if the emitted first-load files exceed any raw-byte ceiling:
 - HTML: 8 KiB.
 
 Run the check again against an existing build with `pnpm --filter
-@witchwatch/web test:budget`. Raw bytes are deliberately enforced rather than
+@l4dstats/web test:budget`. Raw bytes are deliberately enforced rather than
 trusting compression estimates, while Vite also reports gzip sizes during builds.
 
 The Sprint 4 workbench is one cohesive screen rather than a set of independent

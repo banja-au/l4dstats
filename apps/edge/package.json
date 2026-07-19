@@ -1,0 +1,20 @@
+{
+  "name": "@l4dstats/edge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "check": "tsc -p tsconfig.json --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@libsql/client": "0.17.0",
+    "@l4dstats/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260719.1",
+    "vitest": "3.2.6"
+  }
+}

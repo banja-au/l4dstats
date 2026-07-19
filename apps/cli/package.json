@@ -1,10 +1,10 @@
 {
-  "name": "@witchwatch/cli",
+  "name": "@l4dstats/cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "bin": {
-    "witchwatch": "./dist/main.js"
+    "l4dstats": "./dist/main.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
@@ -13,9 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@witchwatch/contracts": "workspace:*",
-    "@witchwatch/detectors": "workspace:*",
-    "@witchwatch/scoring": "workspace:*"
+    "@l4dstats/contracts": "workspace:*",
+    "@l4dstats/detectors": "workspace:*",
+    "@l4dstats/scoring": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

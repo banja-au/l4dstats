@@ -12,7 +12,7 @@ import {
   telemetryLimits,
   type ReviewStatus,
   type WorkbenchRepository,
-} from "@witchwatch/storage";
+} from "@l4dstats/storage";
 import { exportReport } from "./report.js";
 import { validateSource, type IngestionPolicy } from "./validation.js";
 
@@ -31,7 +31,7 @@ const openApiDocument = JSON.parse(
 ) as unknown;
 
 function assertGeometryArtifact(record: Record<string, unknown>, map: string) {
-  if (record.format !== "witchwatch-map-mesh-v1")
+  if (record.format !== "l4dstats-map-mesh-v1")
     throw new RangeError("map geometry artifact format is unsupported");
   const positions = record.positions,
     indices = record.indices,
@@ -165,7 +165,7 @@ function assertGeometryArtifact(record: Record<string, unknown>, map: string) {
     Number(provenance.sourceBytes) <= 0 ||
     Number(provenance.sourceBytes) > 768 * 1024 * 1024 ||
     typeof provenance.extractor !== "string" ||
-    !provenance.extractor.startsWith("@witchwatch/map-source1@") ||
+    !provenance.extractor.startsWith("@l4dstats/map-source1@") ||
     (provenance.steamBuildId !== undefined &&
       !/^[0-9]+$/.test(String(provenance.steamBuildId)))
   )
@@ -180,7 +180,7 @@ function assertCatalogEntry(
 ) {
   const provenance = artifact.provenance as Record<string, unknown>;
   if (
-    catalog.format !== "witchwatch-map-catalog-v1" ||
+    catalog.format !== "l4dstats-map-catalog-v1" ||
     catalog.sourceKind !== provenance.sourceKind ||
     (catalog.sourceKind === "steam-dedicated-server" &&
       catalog.steamAppId !== 222860) ||
@@ -351,7 +351,7 @@ export function createApi(
       const bearerValid = options.apiToken
         ? hasValidBearerToken(request, options.apiToken)
         : true;
-      const suppliedUser = request.headers["x-witchwatch-user"];
+      const suppliedUser = request.headers["x-l4dstats-user"];
       const authenticatedUser =
         bearerValid &&
         typeof suppliedUser === "string" &&

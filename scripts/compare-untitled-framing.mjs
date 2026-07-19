@@ -3,21 +3,19 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import process from "node:process";
 
-const [dumpDirectory, witchwatchPath, commitPath] = process.argv.slice(2);
-if (!dumpDirectory || !witchwatchPath || !commitPath) {
+const [dumpDirectory, l4dstatsPath, commitPath] = process.argv.slice(2);
+if (!dumpDirectory || !l4dstatsPath || !commitPath) {
   process.stderr.write(
-    "Usage: node scripts/compare-untitled-framing.mjs <dump-directory> <witchwatch-corpus.json> <untitled-parser.commit>\n",
+    "Usage: node scripts/compare-untitled-framing.mjs <dump-directory> <l4dstats-corpus.json> <untitled-parser.commit>\n",
   );
   process.exitCode = 2;
 } else {
-  const witchwatch = JSON.parse(await readFile(witchwatchPath, "utf8"));
+  const l4dstats = JSON.parse(await readFile(l4dstatsPath, "utf8"));
   const commit = (await readFile(commitPath, "utf8")).trim();
   const dumps = (await readdir(dumpDirectory))
     .filter((name) => name.endsWith("--demo-dump.txt"))
     .sort();
-  const byFixture = new Map(
-    witchwatch.demos.map((demo) => [demo.fixture, demo]),
-  );
+  const byFixture = new Map(l4dstats.demos.map((demo) => [demo.fixture, demo]));
   const commandKinds = {
     SIGNON: "signon",
     PACKET: "packet",
@@ -42,7 +40,7 @@ if (!dumpDirectory || !witchwatchPath || !commitPath) {
     const text = bytes.toString("utf8").replace(/^\uFEFF/, "");
     const fixture = field(text, "file name");
     const demo = byFixture.get(fixture);
-    if (!demo) throw new Error(`no WitchWatch result for ${fixture}`);
+    if (!demo) throw new Error(`no L4DStats result for ${fixture}`);
     const frames = [...text.matchAll(/^\[(-?\d+)\] ([A-Z]+) \(\d+\)$/gm)].map(
       (match) => {
         const kind = commandKinds[match[2]];

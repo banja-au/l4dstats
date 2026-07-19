@@ -2,7 +2,7 @@ import {
   scoreSchemaVersion,
   type ReviewScore,
   type ScoreContribution,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 import { calibratedProbability, rawLogit } from "./logistic.js";
 import type {
   AggregatedPlayer,

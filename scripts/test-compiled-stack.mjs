@@ -31,7 +31,7 @@ async function waitFor(url, init, accepted = (response) => response.ok) {
   throw new Error(`service did not become ready: ${url}`);
 }
 
-const root = await mkdtemp(join(tmpdir(), "witchwatch-compiled-stack-"));
+const root = await mkdtemp(join(tmpdir(), "l4dstats-compiled-stack-"));
 const apiPort = await availablePort();
 const webPort = await availablePort();
 const apiToken = "compiled-stack-api-token-0123456789";
@@ -58,10 +58,10 @@ function service(command, args, env) {
 const api = service(process.execPath, ["apps/api/dist/main.js"], {
   NODE_OPTIONS: "--conditions=production",
   PORT: String(apiPort),
-  WITCHWATCH_DB: join(root, "workbench.sqlite"),
-  WITCHWATCH_API_TOKEN: apiToken,
-  WITCHWATCH_SEED_EXAMPLE: "false",
-  WITCHWATCH_WORKER_HEARTBEAT: heartbeatPath,
+  L4DSTATS_DB: join(root, "workbench.sqlite"),
+  L4DSTATS_API_TOKEN: apiToken,
+  L4DSTATS_SEED_EXAMPLE: "false",
+  L4DSTATS_WORKER_HEARTBEAT: heartbeatPath,
 });
 
 try {
@@ -72,11 +72,11 @@ try {
 
   const web = service(process.execPath, ["apps/web/server.mjs"], {
     PORT: String(webPort),
-    WITCHWATCH_API_URL: `http://127.0.0.1:${apiPort}`,
-    WITCHWATCH_API_TOKEN: apiToken,
-    WITCHWATCH_WEB_USERNAME: username,
-    WITCHWATCH_WEB_PASSWORD: password,
-    WITCHWATCH_REQUIRE_AUTH: "true",
+    L4DSTATS_API_URL: `http://127.0.0.1:${apiPort}`,
+    L4DSTATS_API_TOKEN: apiToken,
+    L4DSTATS_WEB_USERNAME: username,
+    L4DSTATS_WEB_PASSWORD: password,
+    L4DSTATS_REQUIRE_AUTH: "true",
   });
   const publicHealth = await waitFor(`http://127.0.0.1:${webPort}/health`, {
     headers: { authorization },

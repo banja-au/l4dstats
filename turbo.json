@@ -12,10 +12,10 @@
       "persistent": true,
       "env": [
         "CHOKIDAR_USEPOLLING",
-        "WITCHWATCH_API_TOKEN",
-        "WITCHWATCH_API_URL",
-        "WITCHWATCH_WEB_PASSWORD",
-        "WITCHWATCH_WEB_USERNAME"
+        "L4DSTATS_API_TOKEN",
+        "L4DSTATS_API_URL",
+        "L4DSTATS_WEB_PASSWORD",
+        "L4DSTATS_WEB_USERNAME"
       ]
     },
     "test": {

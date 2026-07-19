@@ -7,7 +7,7 @@ import {
   segmentEncounters,
   type DetectorContext,
   type DetectorResult,
-} from "@witchwatch/detectors";
+} from "@l4dstats/detectors";
 
 export interface FeatureRequest {
   readonly detectorId: string;

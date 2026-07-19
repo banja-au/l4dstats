@@ -1,4 +1,4 @@
-import { evidenceKinds } from "@witchwatch/contracts";
+import { evidenceKinds } from "@l4dstats/contracts";
 import type {
   AggregatedPlayer,
   AggregationCaps,

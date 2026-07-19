@@ -11,10 +11,10 @@ Commands are JSON argv arrays and must contain `{demo}`. They never pass through
 a shell. Example:
 
 ```bash
-export WITCHWATCH_NATIVE_BENCH_COMMAND='["/workspace/target/release/demo-source1-stage","framing","{demo}"]'
-export WITCHWATCH_NATIVE_BENCH_ARTIFACT='/workspace/target/release/demo-source1-stage'
-export WITCHWATCH_NATIVE_BENCH_VERSION='demo-source1-native@0.1.0'
-export WITCHWATCH_NATIVE_BENCH_BUILD_SHA256='<64 lowercase hex characters>'
+export L4DSTATS_NATIVE_BENCH_COMMAND='["/workspace/target/release/demo-source1-stage","framing","{demo}"]'
+export L4DSTATS_NATIVE_BENCH_ARTIFACT='/workspace/target/release/demo-source1-stage'
+export L4DSTATS_NATIVE_BENCH_VERSION='demo-source1-native@0.1.0'
+export L4DSTATS_NATIVE_BENCH_BUILD_SHA256='<64 lowercase hex characters>'
 node tools/demo-benchmark/benchmark.mjs \
   --mode stage --warmups 1 --repetitions 5 \
   --max-median-wall-ms 60000 --max-median-rss-kib 1500000 \
@@ -24,8 +24,8 @@ node tools/demo-benchmark/benchmark.mjs \
   > /ignored/results.json
 ```
 
-`WITCHWATCH_BENCH_DEMOS` may instead contain a JSON array of explicit paths.
-`WITCHWATCH_NATIVE_BENCH_ARTIFACT` records the exact native artifact independently
+`L4DSTATS_BENCH_DEMOS` may instead contain a JSON array of explicit paths.
+`L4DSTATS_NATIVE_BENCH_ARTIFACT` records the exact native artifact independently
 of the command used to invoke it. Stage benchmarks require an executable beneath
 `target/release`; end-to-end benchmarks require the exact `.node` addon, while
 the native command may legitimately begin with `node`. The artifact basename, byte

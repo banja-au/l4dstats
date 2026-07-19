@@ -1,0 +1,195 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+
+import type { R2BucketLike } from "./r2.js";
+import { R2ObjectStore } from "./r2.js";
+import { HostedJobRepository } from "./hosted.js";
+import { TursoSqlClient } from "./turso.js";
+
+const roots: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    roots.splice(0).map((root) => rm(root, { recursive: true })),
+  );
+});
+
+async function repository(): Promise<{
+  repository: HostedJobRepository;
+  close(): void;
+}> {
+  const root = await mkdtemp(join(tmpdir(), "l4dstats-hosted-"));
+  roots.push(root);
+  const client = TursoSqlClient.fromEnvironment({
+    TURSO_DATABASE_URL: `file:${join(root, "hosted.db")}`,
+  });
+  const repository = new HostedJobRepository(client);
+  await repository.migrate();
+  return { repository, close: () => client.close() };
+}
+
+const source = {
+  kind: "object" as const,
+  bucket: "temporary",
+  key: "uploads/job/demo.dem",
+  sha256: "a".repeat(64),
+  bytes: 1024,
+  filename: "demo.dem",
+};
+
+describe("HostedJobRepository", () => {
+  it("enqueues idempotently and leases one job", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const first = await repo.enqueue(source, "upload:fixture");
+      const duplicate = await repo.enqueue(source, "upload:fixture");
+      expect(duplicate.id).toBe(first.id);
+
+      const claimed = await repo.claimNext({
+        owner: "worker-a",
+        leaseMs: 60_000,
+        at: new Date("2026-07-19T00:00:00.000Z"),
+      });
+      expect(claimed).toMatchObject({
+        id: first.id,
+        state: "running",
+        attempt: 1,
+        leaseOwner: "worker-a",
+      });
+      expect(
+        await repo.claimNext({
+          owner: "worker-b",
+          leaseMs: 60_000,
+          at: new Date("2026-07-19T00:00:30.000Z"),
+        }),
+      ).toBeUndefined();
+    } finally {
+      close();
+    }
+  });
+
+  it("reclaims an expired lease and rejects the former owner", async () => {
+    const { repository: repo, close } = await repository();
+    try {
+      const job = await repo.enqueue(
+        source,
+        "upload:reclaim",
+        new Date("2026-07-19T00:00:00.000Z"),
+      );
+      await repo.claimNext({
+        owner: "worker-a",
+        leaseMs: 1_000,
+        at: new Date("2026-07-19T00:00:00.000Z"),
+      });
+      const reclaimed = await repo.claimNext({
+        owner: "worker-b",
+        leaseMs: 60_000,
+        at: new Date("2026-07-19T00:00:02.000Z"),
+      });
+      expect(reclaimed).toMatchObject({
+        id: job.id,
+        attempt: 2,
+        leaseOwner: "worker-b",
+      });
+      await expect(
+        repo.finish({ id: job.id, owner: "worker-a", state: "succeeded" }),
+      ).rejects.toThrow("lease was lost");
+      await repo.finish({
+        id: job.id,
+        owner: "worker-b",
+        state: "succeeded",
+      });
+      await expect(repo.getJob(job.id)).resolves.toMatchObject({
+        state: "succeeded",
+        leaseOwner: null,
+      });
+    } finally {
+      close();
+    }
+  });
+});
+
+class MemoryR2 implements R2BucketLike {
+  readonly objects = new Map<
+    string,
+    { bytes: Uint8Array; sha256: string; contentType: string }
+  >();
+
+  async head(key: string) {
+    const value = this.objects.get(key);
+    return value
+      ? {
+          key,
+          size: value.bytes.byteLength,
+          customMetadata: { sha256: value.sha256 },
+          httpMetadata: { contentType: value.contentType },
+        }
+      : null;
+  }
+
+  async get(
+    key: string,
+    options?: { range: { offset: number; length: number } },
+  ) {
+    const value = this.objects.get(key);
+    if (!value) return null;
+    const bytes = options
+      ? value.bytes.slice(
+          options.range.offset,
+          options.range.offset + options.range.length,
+        )
+      : value.bytes;
+    return {
+      key,
+      size: value.bytes.byteLength,
+      customMetadata: { sha256: value.sha256 },
+      httpMetadata: { contentType: value.contentType },
+      async arrayBuffer() {
+        return bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer;
+      },
+    };
+  }
+
+  async put(
+    key: string,
+    bytes: Uint8Array,
+    options: {
+      customMetadata: Record<string, string>;
+      httpMetadata: { contentType: string };
+    },
+  ) {
+    this.objects.set(key, {
+      bytes: bytes.slice(),
+      sha256: options.customMetadata.sha256!,
+      contentType: options.httpMetadata.contentType,
+    });
+    return this.head(key);
+  }
+
+  async delete(key: string) {
+    this.objects.delete(key);
+  }
+}
+
+describe("R2ObjectStore", () => {
+  it("stores, ranges, verifies metadata and confirms deletion", async () => {
+    const store = new R2ObjectStore(new MemoryR2());
+    const bytes = new TextEncoder().encode("derived-artifact");
+    const sha256 = "b".repeat(64);
+    await expect(
+      store.put("sha256/bb/hash", bytes, {
+        sha256,
+        contentType: "application/json",
+      }),
+    ).resolves.toMatchObject({ bytes: bytes.byteLength, sha256 });
+    await expect(store.getRange("sha256/bb/hash", 8, 16)).resolves.toEqual(
+      new TextEncoder().encode("artifact"),
+    );
+    await store.delete("sha256/bb/hash");
+    await expect(store.head("sha256/bb/hash")).resolves.toBeUndefined();
+  });
+});

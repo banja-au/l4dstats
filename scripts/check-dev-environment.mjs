@@ -5,10 +5,10 @@ const compose = await readFile("compose.yaml", "utf8");
 const declared = new Set(turbo.tasks?.dev?.env ?? []);
 const required = [
   "CHOKIDAR_USEPOLLING",
-  "WITCHWATCH_API_TOKEN",
-  "WITCHWATCH_API_URL",
-  "WITCHWATCH_WEB_PASSWORD",
-  "WITCHWATCH_WEB_USERNAME",
+  "L4DSTATS_API_TOKEN",
+  "L4DSTATS_API_URL",
+  "L4DSTATS_WEB_PASSWORD",
+  "L4DSTATS_WEB_USERNAME",
 ];
 const missing = required.filter((name) => !declared.has(name));
 if (missing.length)
@@ -17,7 +17,7 @@ if (missing.length)
   );
 if (
   !compose.includes(
-    "WITCHWATCH_GEOMETRY_ROOTS: /var/lib/witchwatch/geometry:/workspace/map-geometry",
+    "L4DSTATS_GEOMETRY_ROOTS: /var/lib/l4dstats/geometry:/workspace/map-geometry",
   )
 )
   throw new Error(

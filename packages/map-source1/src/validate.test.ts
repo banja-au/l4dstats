@@ -15,13 +15,13 @@ afterEach(async () => {
 });
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "witchwatch-map-validate-"));
+  const root = await mkdtemp(join(tmpdir(), "l4dstats-map-validate-"));
   roots.push(root);
   const bsp = join(root, "c4m1_milltown_a.bsp");
   const json = join(root, "c4m1_milltown_a.json");
   const source = Buffer.from("fixture BSP bytes");
   const artifact: SourceMapArtifact = {
-    format: "witchwatch-map-mesh-v1",
+    format: "l4dstats-map-mesh-v1",
     bspVersion: 21,
     mapRevision: 1,
     positions: [0, 0, -1, 2, 0, 3, 0, 4, 1],

@@ -11,7 +11,7 @@
 
 Contract (verbatim): **deterministically turn heterogeneous CEDAPug archives into validated player/tick observations, or make a documented parser pivot.**
 
-The telemetry path failed honestly and triggered the second outcome. WitchWatch now safely acquires archives, deterministically frames current L4D2 demos, reports telemetry availability, and has an approved narrow-decoder plan. It does not claim to recover player telemetry and blocks scoring.
+The telemetry path failed honestly and triggered the second outcome. L4DStats now safely acquires archives, deterministically frames current L4D2 demos, reports telemetry availability, and has an approved narrow-decoder plan. It does not claim to recover player telemetry and blocks scoring.
 
 ## Exit-gate matrix
 
@@ -60,7 +60,7 @@ Real fixtures falsified the initial generic protocol-4 framing model. L4D2 uses 
 
 | Gate              | Exact command                                                                                                                           | Exit | Evidence/fixture                                                                                              | Result                                                   |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---: | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| G1–G5, G9         | `pnpm --filter @witchwatch/cli dev corpus /workspace/data/sprint-1-corpus/extracted`                                                    |    0 | `sprint-1-protocol-coverage.json`, SHA-256 `01fd1d27a6f7bb4c298905ac9ca5ffd7b910d66d946491734cabb3b1d468e0dc` | Required player telemetry explicitly unavailable         |
+| G1–G5, G9         | `pnpm --filter @l4dstats/cli dev corpus /workspace/data/sprint-1-corpus/extracted`                                                      |    0 | `sprint-1-protocol-coverage.json`, SHA-256 `01fd1d27a6f7bb4c298905ac9ca5ffd7b910d66d946491734cabb3b1d468e0dc` | Required player telemetry explicitly unavailable         |
 | G6                | `@nekz/sdp` real-fixture smoke plus UntitledParser capability inspection                                                                |  n/a | ADR 0003; DEM `370f61da…`                                                                                     | No equivalent player-state reference; remains unverified |
 | G7                | Run the exact corpus CLI twice directly, then `cmp docs/sprints/sprint-1-protocol-coverage.json /tmp/sprint-1-protocol-coverage-2.json` |    0 | Both SHA-256 `01fd1d27a…`; no timing/sensitive/local fields                                                   | Byte-identical                                           |
 | G8                | `pnpm test`                                                                                                                             |    0 | Synthetic hostile cases plus hashes in `sprint-1-corpus.json`                                                 | 33 tests passed: acquisition 13, decoder 14, other 6     |

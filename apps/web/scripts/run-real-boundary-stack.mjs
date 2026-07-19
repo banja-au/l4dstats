@@ -1,30 +1,30 @@
 import { spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
-const root = process.env.WITCHWATCH_E2E_ROOT;
-if (!root) throw new Error("WITCHWATCH_E2E_ROOT is required");
+const root = process.env.L4DSTATS_E2E_ROOT;
+if (!root) throw new Error("L4DSTATS_E2E_ROOT is required");
 process.once("exit", () => rmSync(root, { recursive: true, force: true }));
 const database = `${root}/workbench.sqlite`;
 const artifacts = `${root}/artifacts`;
 const localGeometryRoot = [
-  process.env.WITCHWATCH_GEOMETRY_ROOT,
+  process.env.L4DSTATS_GEOMETRY_ROOT,
   "/tmp/l4d2-geometry-all",
   "/tmp/l4d2-geometry",
 ].find((candidate) => candidate && existsSync(`${candidate}/catalog.json`));
 
 const common = {
   ...process.env,
-  WITCHWATCH_DB: database,
-  WITCHWATCH_ARTIFACT_ROOT: artifacts,
-  WITCHWATCH_WORKER_HEARTBEAT: `${root}/worker-heartbeat.json`,
-  WITCHWATCH_LOCAL_ROOTS: "/workspace/data",
-  WITCHWATCH_PSEUDONYM_KEY: "playwright-stable-integration-key",
-  ...(localGeometryRoot ? { WITCHWATCH_GEOMETRY_ROOT: localGeometryRoot } : {}),
+  L4DSTATS_DB: database,
+  L4DSTATS_ARTIFACT_ROOT: artifacts,
+  L4DSTATS_WORKER_HEARTBEAT: `${root}/worker-heartbeat.json`,
+  L4DSTATS_LOCAL_ROOTS: "/workspace/data",
+  L4DSTATS_PSEUDONYM_KEY: "playwright-stable-integration-key",
+  ...(localGeometryRoot ? { L4DSTATS_GEOMETRY_ROOT: localGeometryRoot } : {}),
 };
 const children = [];
 children.push(
   spawn("./apps/api/node_modules/.bin/tsx", ["apps/api/src/main.ts"], {
     cwd: "/workspace",
-    env: { ...common, WITCHWATCH_SEED_EXAMPLE: "false" },
+    env: { ...common, L4DSTATS_SEED_EXAMPLE: "false" },
     stdio: "inherit",
   }),
 );

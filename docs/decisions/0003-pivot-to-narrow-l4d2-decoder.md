@@ -12,7 +12,7 @@ Empirical parser spikes found:
 - `saul/demofile` has useful generic concepts but its packet protocol, generated messages, entity model, and high-level projections target CS:GO. It is not an L4D2 drop-in.
 - `@nekz/sdp` is smaller, MIT licensed, dependency-free at runtime, and architecturally adaptable. Its header-only mode parses an L4D2 fixture, but every message-enabled configuration tested fails at the first command. It has no L4D2 engine profile or branch tables.
 - `UncraftedName/UntitledParser` independently advertises L4D2 2000–2220 basic support and documents relevant branch differences. It does not support L4D2 entity parsing. Its released Linux binary is x86_64 while this development container is arm64.
-- WitchWatch's dependency-free decoder can parse the common header, but real fixtures falsified its first protocol-4 command-framing assumption. Synthetic success is insufficient.
+- L4DStats's dependency-free decoder can parse the common header, but real fixtures falsified its first protocol-4 command-framing assumption. Synthetic success is insufficient.
 
 SourceTV packet command-info angles describe the TV recorder. They are not individual player gaze. Direct per-player user commands are not present in this corpus. Player telemetry must come from networked entity state and be labeled with its actual fidelity.
 

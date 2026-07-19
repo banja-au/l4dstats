@@ -1,6 +1,6 @@
 import { createHash, type Hash } from "node:crypto";
-import type { AvailableValue, PlayerObservation } from "@witchwatch/contracts";
-import type { ProjectedPlayerObservation } from "@witchwatch/contracts";
+import type { AvailableValue, PlayerObservation } from "@l4dstats/contracts";
+import type { ProjectedPlayerObservation } from "@l4dstats/contracts";
 import { createAimDetector, defaultAimConfig, type AimConfig } from "./aim.js";
 import type { DetectorResult, Sample, Vector3 } from "./types.js";
 

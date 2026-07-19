@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { numberHitsByObservedRounds } from "./story-timeline";
+import { numberHitsByObservedRounds, pairObservedPins } from "./story-timeline";
 
 describe("numberHitsByObservedRounds", () => {
   it("restarts hit numbering at each observed round start", () => {
@@ -42,5 +42,40 @@ describe("numberHitsByObservedRounds", () => {
       hit: 1,
       observedBoundary: true,
     });
+  });
+});
+
+describe("pairObservedPins", () => {
+  it("pairs concurrent pins without rescanning future events", () => {
+    const pairs = pairObservedPins([
+      {
+        type: "pin_start",
+        actorPlayerId: "hunter",
+        victimPlayerId: "survivor-a",
+        infectedClass: "Hunter",
+      },
+      {
+        type: "pin_start",
+        actorPlayerId: "charger",
+        victimPlayerId: "survivor-b",
+        infectedClass: "Charger",
+      },
+      {
+        type: "pin_end",
+        actorPlayerId: "hunter",
+        victimPlayerId: "survivor-a",
+        infectedClass: "Hunter",
+      },
+      {
+        type: "death",
+        victimPlayerId: "charger",
+        infectedClass: "Charger",
+      },
+    ]);
+
+    expect(pairs).toEqual([
+      { startIndex: 0, endIndex: 2 },
+      { startIndex: 1, endIndex: 3 },
+    ]);
   });
 });

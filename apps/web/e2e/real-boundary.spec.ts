@@ -19,7 +19,7 @@ const hardRainDemos = [
 ];
 const hasHardRain = hardRainDemos.every(existsSync);
 const geometryRoot = [
-  process.env.WITCHWATCH_GEOMETRY_ROOT,
+  process.env.L4DSTATS_GEOMETRY_ROOT,
   "/tmp/l4d2-geometry-all",
   "/tmp/l4d2-geometry",
 ].find((candidate) => candidate && existsSync(`${candidate}/catalog.json`));

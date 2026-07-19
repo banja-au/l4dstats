@@ -56,7 +56,7 @@ assert.deepEqual(summarize([1, 2, 3, 4]), {
 assert.throws(
   () =>
     parseArguments([], {
-      WITCHWATCH_BENCH_DEMOS: "not-json",
+      L4DSTATS_BENCH_DEMOS: "not-json",
     }),
   SyntaxError,
 );

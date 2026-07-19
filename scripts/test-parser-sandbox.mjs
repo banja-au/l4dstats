@@ -23,7 +23,7 @@ const { stdout } = await execute(invocation.command, invocation.args, {
     NODE_ENV: "production",
     NODE_OPTIONS: "--conditions=production",
     PATH: process.env.PATH,
-    WITCHWATCH_PSEUDONYM_KEY: "parser-sandbox-integration-key",
+    L4DSTATS_PSEUDONYM_KEY: "parser-sandbox-integration-key",
   },
   maxBuffer: 16 * 1024 * 1024,
   timeout: 5 * 60_000,

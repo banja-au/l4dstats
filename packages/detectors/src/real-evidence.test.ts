@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type {
   PlayerObservation,
   ProjectedPlayerObservation,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 import { describe, expect, it } from "vitest";
 import {
   buildRealAimEvidence,

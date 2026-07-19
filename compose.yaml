@@ -3,22 +3,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: bash -lc "pnpm install --frozen-lockfile && pnpm --filter @witchwatch/api dev"
+    command: bash -lc "pnpm install --frozen-lockfile && pnpm --filter @l4dstats/api dev"
     environment: &workbench-environment
       CI: "true"
       TURBO_TELEMETRY_DISABLED: "1"
-      WITCHWATCH_DB: /var/lib/witchwatch/workbench.sqlite
-      WITCHWATCH_UPLOAD_ROOT: /var/lib/witchwatch/uploads
-      WITCHWATCH_GEOMETRY_ROOT: /var/lib/witchwatch/geometry
-      WITCHWATCH_GEOMETRY_ROOTS: /var/lib/witchwatch/geometry:/workspace/map-geometry
-      WITCHWATCH_LOCAL_ROOTS: /data/inbox
-      WITCHWATCH_ALLOWED_HOSTS: cedapug.com
-      WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}
-      WITCHWATCH_AUTH_FAILURE_LIMIT: "20"
-      WITCHWATCH_AUTH_FAILURE_WINDOW_MS: "300000"
-      WITCHWATCH_MUTATION_RATE_LIMIT: "120"
-      WITCHWATCH_MUTATION_RATE_WINDOW_MS: "60000"
-      WITCHWATCH_SEED_EXAMPLE: "false"
+      L4DSTATS_DB: /var/lib/l4dstats/workbench.sqlite
+      L4DSTATS_UPLOAD_ROOT: /var/lib/l4dstats/uploads
+      L4DSTATS_GEOMETRY_ROOT: /var/lib/l4dstats/geometry
+      L4DSTATS_GEOMETRY_ROOTS: /var/lib/l4dstats/geometry:/workspace/map-geometry
+      L4DSTATS_LOCAL_ROOTS: /data/inbox
+      L4DSTATS_ALLOWED_HOSTS: cedapug.com
+      L4DSTATS_API_TOKEN: ${L4DSTATS_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}
+      L4DSTATS_AUTH_FAILURE_LIMIT: "20"
+      L4DSTATS_AUTH_FAILURE_WINDOW_MS: "300000"
+      L4DSTATS_MUTATION_RATE_LIMIT: "120"
+      L4DSTATS_MUTATION_RATE_WINDOW_MS: "60000"
+      L4DSTATS_SEED_EXAMPLE: "false"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8787/health"]
       interval: 3s
@@ -42,7 +42,7 @@ services:
       - map-source1-node-modules:/workspace/packages/map-source1/node_modules
       - scoring-node-modules:/workspace/packages/scoring/node_modules
       - storage-node-modules:/workspace/packages/storage/node_modules
-      - workbench-data:/var/lib/witchwatch
+      - workbench-data:/var/lib/l4dstats
       - l4d2-server-assets:/opt/l4d2
       - ./data/sprint-1-corpus/extracted:/data/inbox:ro
 
@@ -50,13 +50,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    command: bash -lc "pnpm native:prepare && pnpm --filter @witchwatch/worker dev"
+    command: bash -lc "pnpm native:prepare && pnpm --filter @l4dstats/worker dev"
     depends_on:
       api:
         condition: service_healthy
     environment:
       <<: *workbench-environment
-      WITCHWATCH_PSEUDONYM_KEY: ${WITCHWATCH_PSEUDONYM_KEY:-witchwatch-dev-only-local-key-v1}
+      L4DSTATS_PSEUDONYM_KEY: ${L4DSTATS_PSEUDONYM_KEY:-l4dstats-dev-only-local-key-v1}
     init: true
     volumes: *workspace-volumes
 
@@ -73,10 +73,10 @@ services:
       CI: "true"
       TURBO_TELEMETRY_DISABLED: "1"
       CHOKIDAR_USEPOLLING: "true"
-      WITCHWATCH_API_URL: http://api:8787
-      WITCHWATCH_API_TOKEN: ${WITCHWATCH_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}
-      WITCHWATCH_WEB_USERNAME: ${WITCHWATCH_WEB_USERNAME:-}
-      WITCHWATCH_WEB_PASSWORD: ${WITCHWATCH_WEB_PASSWORD:-}
+      L4DSTATS_API_URL: http://api:8787
+      L4DSTATS_API_TOKEN: ${L4DSTATS_API_TOKEN:-l4dstats-dev-api-token-change-before-sharing}
+      L4DSTATS_WEB_USERNAME: ${L4DSTATS_WEB_USERNAME:-}
+      L4DSTATS_WEB_PASSWORD: ${L4DSTATS_WEB_PASSWORD:-}
     init: true
     ports:
       - "0.0.0.0:5173:5173"
@@ -122,7 +122,7 @@ services:
       [
         "bash",
         "-lc",
-        'pnpm install --frozen-lockfile && manifest=/opt/l4d2/steamapps/appmanifest_222860.acf; args=(/opt/l4d2 /var/lib/witchwatch/geometry); [[ ! -f "$$manifest" ]] || args+=("$$manifest"); pnpm --filter @witchwatch/map-source1 extract-installation "$${args[@]}"',
+        'pnpm install --frozen-lockfile && manifest=/opt/l4d2/steamapps/appmanifest_222860.acf; args=(/opt/l4d2 /var/lib/l4dstats/geometry); [[ ! -f "$$manifest" ]] || args+=("$$manifest"); pnpm --filter @l4dstats/map-source1 extract-installation "$${args[@]}"',
       ]
     environment:
       CI: "true"

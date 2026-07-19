@@ -46,7 +46,7 @@ pub fn binding_metadata() -> BindingMetadata {
         project_config_version: PROJECT_CONFIG_VERSION,
         compact_artifact_wire_version: COMPACT_ARTIFACT_WIRE_VERSION,
         parser_config_id: PARSER_CONFIG_ID.to_owned(),
-        build_sha256: env!("WITCHWATCH_NATIVE_BUILD_SHA256").to_owned(),
+        build_sha256: env!("L4DSTATS_NATIVE_BUILD_SHA256").to_owned(),
         binding_crate_version: env!("CARGO_PKG_VERSION").to_owned(),
         core_crate_version: env!("CARGO_PKG_VERSION").to_owned(),
         node_api_version: 8,

@@ -1,0 +1,5 @@
+environment = "production"
+r2_location = "wnam"
+
+# Passed by CI as TF_VAR_cloudflare_account_id. Do not commit account IDs or
+# credentials in a real tfvars file.

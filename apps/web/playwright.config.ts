@@ -6,7 +6,7 @@ export default defineConfig({
   testDir: "./e2e",
   testIgnore: "**/real-boundary.spec.ts",
   outputDir: "./test-results",
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
@@ -38,13 +38,13 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "WITCHWATCH_DB=:memory: WITCHWATCH_SEED_EXAMPLE=true pnpm --filter @witchwatch/api dev",
+        "L4DSTATS_DB=:memory: L4DSTATS_SEED_EXAMPLE=true pnpm --filter @l4dstats/api dev",
       url: "http://127.0.0.1:8787/health",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
     {
-      command: `pnpm exec vite --host 127.0.0.1 --port ${port}`,
+      command: `pnpm build && pnpm exec vite preview --host 127.0.0.1 --port ${port}`,
       url: `http://127.0.0.1:${port}`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

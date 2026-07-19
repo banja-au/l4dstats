@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type {
   L4d2MatchState,
   ProjectedPlayerObservation,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 import {
   buildBoundedContextWindow,
   buildEvidenceBundle,

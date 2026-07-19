@@ -6,7 +6,7 @@ import {
   hashBytes,
   trainAndEvaluate,
   type ModelRow,
-} from "@witchwatch/scoring";
+} from "@l4dstats/scoring";
 
 interface ControlledDataset {
   readonly schemaVersion: 1;
@@ -42,7 +42,7 @@ export const parseControlledDataset = (value: unknown): ControlledDataset => {
 export const evaluateControlledDataset = (dataset: ControlledDataset) => {
   const datasetManifestSha256 = hashBytes(canonicalJson(dataset));
   return trainAndEvaluate({
-    id: "witchwatch-controlled-review-priority",
+    id: "l4dstats-controlled-review-priority",
     version: "1.0.0",
     rows: dataset.rows,
     features: [

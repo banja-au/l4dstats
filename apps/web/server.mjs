@@ -6,25 +6,25 @@ import { fileURLToPath } from "node:url";
 
 const distRoot = resolve(fileURLToPath(new URL("./dist/", import.meta.url)));
 const port = positiveInteger(process.env.PORT ?? "5173", "PORT");
-const api = new URL(process.env.WITCHWATCH_API_URL ?? "http://127.0.0.1:8787");
-const apiToken = process.env.WITCHWATCH_API_TOKEN;
-const username = process.env.WITCHWATCH_WEB_USERNAME;
-const password = process.env.WITCHWATCH_WEB_PASSWORD;
-const usersJson = process.env.WITCHWATCH_WEB_USERS_JSON;
-const requireAuth = process.env.WITCHWATCH_REQUIRE_AUTH === "true";
+const api = new URL(process.env.L4DSTATS_API_URL ?? "http://127.0.0.1:8787");
+const apiToken = process.env.L4DSTATS_API_TOKEN;
+const username = process.env.L4DSTATS_WEB_USERNAME;
+const password = process.env.L4DSTATS_WEB_PASSWORD;
+const usersJson = process.env.L4DSTATS_WEB_USERS_JSON;
+const requireAuth = process.env.L4DSTATS_REQUIRE_AUTH === "true";
 
 if (usersJson && (username || password))
   throw new Error(
-    "WITCHWATCH_WEB_USERS_JSON cannot be combined with single-user credentials",
+    "L4DSTATS_WEB_USERS_JSON cannot be combined with single-user credentials",
   );
 if (Boolean(username) !== Boolean(password))
   throw new Error(
-    "WITCHWATCH_WEB_USERNAME and WITCHWATCH_WEB_PASSWORD must be set together",
+    "L4DSTATS_WEB_USERNAME and L4DSTATS_WEB_PASSWORD must be set together",
   );
 if (password && Buffer.byteLength(password, "utf8") < 16)
-  throw new Error("WITCHWATCH_WEB_PASSWORD must contain at least 16 bytes");
+  throw new Error("L4DSTATS_WEB_PASSWORD must contain at least 16 bytes");
 if (apiToken && Buffer.byteLength(apiToken, "utf8") < 32)
-  throw new Error("WITCHWATCH_API_TOKEN must contain at least 32 bytes");
+  throw new Error("L4DSTATS_API_TOKEN must contain at least 32 bytes");
 const configuredUsers = usersJson
   ? parseUsers(usersJson)
   : username && password
@@ -32,7 +32,7 @@ const configuredUsers = usersJson
     : [];
 if (requireAuth && (configuredUsers.length === 0 || !apiToken))
   throw new Error(
-    "Production mode requires web credentials and WITCHWATCH_API_TOKEN",
+    "Production mode requires web credentials and L4DSTATS_API_TOKEN",
   );
 
 const expectedUsers = configuredUsers.map((user) => ({
@@ -71,10 +71,10 @@ function parseUsers(value) {
   try {
     parsed = JSON.parse(value);
   } catch {
-    throw new Error("WITCHWATCH_WEB_USERS_JSON must be valid JSON");
+    throw new Error("L4DSTATS_WEB_USERS_JSON must be valid JSON");
   }
   if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 100)
-    throw new Error("WITCHWATCH_WEB_USERS_JSON must contain 1 to 100 users");
+    throw new Error("L4DSTATS_WEB_USERS_JSON must contain 1 to 100 users");
   const names = new Set();
   return parsed.map((user) => {
     if (!user || typeof user !== "object")
@@ -154,11 +154,11 @@ function authenticate(request, response) {
 
 function proxy(request, response) {
   const headers = { ...request.headers, host: api.host };
-  delete headers["x-witchwatch-user"];
-  delete headers["x-witchwatch-role"];
+  delete headers["x-l4dstats-user"];
+  delete headers["x-l4dstats-role"];
   if (apiToken) headers.authorization = `Bearer ${apiToken}`;
-  headers["x-witchwatch-user"] = request.authenticatedIdentity.username;
-  headers["x-witchwatch-role"] = request.authenticatedIdentity.role;
+  headers["x-l4dstats-user"] = request.authenticatedIdentity.username;
+  headers["x-l4dstats-role"] = request.authenticatedIdentity.role;
   const upstream = proxyRequest(
     new URL(request.url ?? "/", api),
     { method: request.method, headers },

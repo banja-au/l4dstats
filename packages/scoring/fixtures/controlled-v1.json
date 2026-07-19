@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "metadata": {
-    "id": "witchwatch-synthetic-controlled-v1",
+    "id": "l4dstats-synthetic-controlled-v1",
     "generator": "generate-controlled-fixtures.mjs@1.0.0",
     "seed": "closed-form-v1",
     "scenarioLibraryVersion": "controlled-scenarios-v1",
@@ -21,7 +21,7 @@
       }
     },
     "createdAt": "2026-07-17T00:00:00.000Z",
-    "owner": "WitchWatch maintainers",
+    "owner": "L4DStats maintainers",
     "retention": "tracked synthetic fixture; no personal data",
     "artifactDigests": {
       "splitManifestSha256": "466246533a57f17aa1ee0f565a7dd6aea455671e226e3dc68de15dc75456b14b"

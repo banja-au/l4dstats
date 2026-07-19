@@ -7,7 +7,7 @@
 
 ## Purpose and scope
 
-This dataset exists to test whether WitchWatch can train, calibrate, evaluate, and
+This dataset exists to test whether L4DStats can train, calibrate, evaluate, and
 withhold a review-priority estimate reproducibly. It is a governed synthetic or
 controlled fixture, not a sample of the L4D2 player population. It may demonstrate
 software behavior and policy gates; it cannot establish real-world accuracy,

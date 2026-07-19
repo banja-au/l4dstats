@@ -1,11 +1,11 @@
 import process from "node:process";
 
-const baseUrl = process.env.WITCHWATCH_HEALTH_URL ?? "http://127.0.0.1:5173";
-const username = process.env.WITCHWATCH_WEB_USERNAME;
-const password = process.env.WITCHWATCH_WEB_PASSWORD;
+const baseUrl = process.env.L4DSTATS_HEALTH_URL ?? "http://127.0.0.1:5173";
+const username = process.env.L4DSTATS_WEB_USERNAME;
+const password = process.env.L4DSTATS_WEB_PASSWORD;
 if (!username || !password) {
   process.stderr.write(
-    "WITCHWATCH_WEB_USERNAME and WITCHWATCH_WEB_PASSWORD are required.\n",
+    "L4DSTATS_WEB_USERNAME and L4DSTATS_WEB_PASSWORD are required.\n",
   );
   process.exitCode = 2;
 } else {

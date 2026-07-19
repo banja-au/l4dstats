@@ -110,7 +110,7 @@ function compressLump(bytes: Uint8Array, lump: number): Uint8Array {
 describe("Source BSP world mesh", () => {
   it("triangulates a generated world face without proprietary fixtures", () => {
     expect(parseSourceBspWorldMesh(fixture())).toMatchObject({
-      format: "witchwatch-map-mesh-v1",
+      format: "l4dstats-map-mesh-v1",
       bspVersion: 21,
       mapRevision: 7,
       indices: [0, 1, 2, 0, 2, 3],

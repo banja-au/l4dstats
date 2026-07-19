@@ -1,4 +1,4 @@
-import type { WorkbenchRepository } from "@witchwatch/storage";
+import type { WorkbenchRepository } from "@l4dstats/storage";
 
 /**
  * Seeds an explicitly controlled, invented case for local UI evaluation.

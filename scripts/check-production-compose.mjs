@@ -3,10 +3,10 @@ import process from "node:process";
 
 const environment = {
   ...process.env,
-  WITCHWATCH_API_TOKEN: "compose-check-api-token-0123456789",
-  WITCHWATCH_PSEUDONYM_KEY: "compose-check-pseudonym-key-0123456789",
-  WITCHWATCH_WEB_USERNAME: "compose-check",
-  WITCHWATCH_WEB_PASSWORD: "compose-check-password",
+  L4DSTATS_API_TOKEN: "compose-check-api-token-0123456789",
+  L4DSTATS_PSEUDONYM_KEY: "compose-check-pseudonym-key-0123456789",
+  L4DSTATS_WEB_USERNAME: "compose-check",
+  L4DSTATS_WEB_PASSWORD: "compose-check-password",
 };
 
 function render() {

@@ -10,8 +10,8 @@ import {
   ContentAddressedStore,
   WorkbenchRepository,
   sha256,
-} from "@witchwatch/storage";
-import { createApi } from "@witchwatch/api";
+} from "@l4dstats/storage";
+import { createApi } from "@l4dstats/api";
 import {
   createEngineJobHandler,
   engineCommand,
@@ -327,7 +327,7 @@ describe("LocalWorker", () => {
   );
 
   it("persists a controlled production-shaped analysis with complete lineage", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-worker-"));
     cleanup.push(root);
     const sourcePath = join(root, "controlled.dem"),
       bytes = Buffer.from("HL2DEMO-controlled-worker-fixture");
@@ -477,7 +477,7 @@ describe("LocalWorker", () => {
   });
 
   it("streams remote acquisition through persistence and API retrieval", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-remote-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-remote-worker-"));
     cleanup.push(root);
     const remoteBytes = Buffer.from("HL2DEMO-controlled-remote-fixture");
     const origin = createServer((_request, response) => {
@@ -646,7 +646,7 @@ describe("LocalWorker", () => {
   });
 
   it("merges only matching privacy-stable tokens across independent ingests", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-association-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-association-"));
     cleanup.push(root);
     const repo = new WorkbenchRepository();
     const stableToken = "hmac-sha256:controlled-player-token";
@@ -794,7 +794,7 @@ describe("LocalWorker", () => {
   });
 
   it("atomically corroborates independently ingested demos only by privacy-stable token", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-association-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-association-"));
     cleanup.push(root);
     const repo = new WorkbenchRepository();
     const token = `hmac-sha256:${"a".repeat(64)}`;
@@ -960,7 +960,7 @@ describe("LocalWorker", () => {
   });
 
   it("terminates an active engine subprocess when the reviewer cancels", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-cancel-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-cancel-worker-"));
     cleanup.push(root);
     const sourcePath = join(root, "cancel.dem"),
       bytes = Buffer.from("HL2DEMO-controlled-cancellation-fixture");
@@ -992,7 +992,7 @@ describe("LocalWorker", () => {
   });
 
   it("force-kills an engine that ignores the time-limit termination signal", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-timeout-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-timeout-worker-"));
     cleanup.push(root);
     const sourcePath = join(root, "timeout.dem"),
       pidPath = join(root, "engine.pid"),
@@ -1031,7 +1031,7 @@ describe("LocalWorker", () => {
   });
 
   it("kills an engine before an output flood can be retained", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-output-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-output-worker-"));
     cleanup.push(root);
     const sourcePath = join(root, "output.dem"),
       bytes = Buffer.from("HL2DEMO-controlled-output-fixture");
@@ -1067,7 +1067,7 @@ describe("LocalWorker", () => {
   });
 
   it("does not expose service credentials to the parser process", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-env-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-env-worker-"));
     cleanup.push(root);
     const sourcePath = join(root, "environment.dem"),
       bytes = Buffer.from("HL2DEMO-controlled-environment-fixture"),
@@ -1102,10 +1102,10 @@ describe("LocalWorker", () => {
       },
       cases: [],
     };
-    const priorToken = process.env.WITCHWATCH_API_TOKEN;
-    const priorPassword = process.env.WITCHWATCH_WEB_PASSWORD;
-    process.env.WITCHWATCH_API_TOKEN = "must-not-reach-parser";
-    process.env.WITCHWATCH_WEB_PASSWORD = "must-not-reach-parser";
+    const priorToken = process.env.L4DSTATS_API_TOKEN;
+    const priorPassword = process.env.L4DSTATS_WEB_PASSWORD;
+    process.env.L4DSTATS_API_TOKEN = "must-not-reach-parser";
+    process.env.L4DSTATS_WEB_PASSWORD = "must-not-reach-parser";
     try {
       const handler = createEngineJobHandler(repo, {
         artifactRoot: root,
@@ -1114,18 +1114,17 @@ describe("LocalWorker", () => {
           command: process.execPath,
           args: [
             "-e",
-            `if(process.env.WITCHWATCH_API_TOKEN||process.env.WITCHWATCH_WEB_PASSWORD)process.exit(42);process.stdout.write(${JSON.stringify(JSON.stringify(result))})`,
+            `if(process.env.L4DSTATS_API_TOKEN||process.env.L4DSTATS_WEB_PASSWORD)process.exit(42);process.stdout.write(${JSON.stringify(JSON.stringify(result))})`,
           ],
         }),
       });
       await new LocalWorker(repo, handler).runOnce();
       expect(repo.getJob(job.id)?.state).toBe("succeeded");
     } finally {
-      if (priorToken === undefined) delete process.env.WITCHWATCH_API_TOKEN;
-      else process.env.WITCHWATCH_API_TOKEN = priorToken;
-      if (priorPassword === undefined)
-        delete process.env.WITCHWATCH_WEB_PASSWORD;
-      else process.env.WITCHWATCH_WEB_PASSWORD = priorPassword;
+      if (priorToken === undefined) delete process.env.L4DSTATS_API_TOKEN;
+      else process.env.L4DSTATS_API_TOKEN = priorToken;
+      if (priorPassword === undefined) delete process.env.L4DSTATS_WEB_PASSWORD;
+      else process.env.L4DSTATS_WEB_PASSWORD = priorPassword;
       repo.close();
     }
   });
@@ -1156,13 +1155,13 @@ describe.runIf(
     corroboratingCorpusDemos.every((path) => existsSync(path)),
 )("real-corpus worker integration", () => {
   it("merges a real positive default bundle with a same-player zero-evidence demo", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-real-worker-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-real-worker-"));
     cleanup.push(root);
     const repo = new WorkbenchRepository();
     const handler = createEngineJobHandler(repo, {
       artifactRoot: root,
       allowedHosts: ["cedapug.com"],
-      pseudonymKey: "witchwatch-dev-only-local-key-v1",
+      pseudonymKey: "l4dstats-dev-only-local-key-v1",
     });
     const jobs = [];
     for (const [index, path] of corroboratingCorpusDemos.entries()) {
@@ -1213,7 +1212,7 @@ describe.runIf(
     ).toHaveLength(2);
     const serializedLineage = JSON.stringify(repo.getCaseLineage(positive!.id));
     expect(serializedLineage).not.toContain("/workspace/");
-    expect(serializedLineage).not.toContain("witchwatch-dev-only-local-key-v1");
+    expect(serializedLineage).not.toContain("l4dstats-dev-only-local-key-v1");
     for (const job of jobs)
       expect(serializedLineage).toContain(
         (repo.getJobAnalysis(job.id) as { demoSha256: string }).demoSha256,

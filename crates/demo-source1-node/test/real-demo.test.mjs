@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.mjs";
 
-const demoPath = process.env.WITCHWATCH_NODE_REAL_DEMO;
+const demoPath = process.env.L4DSTATS_NODE_REAL_DEMO;
 if (!demoPath) {
   process.stdout.write(
     "demo-source1-node real demo: skipped (no explicit path)\n",

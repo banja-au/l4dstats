@@ -1,5 +1,5 @@
 {
-  "name": "@witchwatch/storage",
+  "name": "@l4dstats/storage",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,5 +17,8 @@
   "devDependencies": {
     "@types/node": "24.10.1",
     "vitest": "3.2.6"
+  },
+  "dependencies": {
+    "@libsql/client": "0.17.0"
   }
 }

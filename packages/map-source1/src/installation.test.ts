@@ -39,7 +39,7 @@ describe("installed L4D2 campaign BSP discovery", () => {
   );
 
   it("merges content roots with Source override precedence", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-map-install-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-map-install-"));
     temporaryRoots.push(root);
     await fixtureFile(root, "left4dead2", "c1m1_hotel.bsp");
     await fixtureFile(root, "left4dead2", "c6m1_riverbank.bsp");

@@ -23,7 +23,7 @@ export interface MapMeshCoverage {
 }
 
 export interface SourceMapMesh {
-  readonly format: "witchwatch-map-mesh-v1";
+  readonly format: "l4dstats-map-mesh-v1";
   readonly bspVersion: number;
   readonly mapRevision: number;
   readonly positions: readonly number[];
@@ -497,7 +497,7 @@ export function parseSourceBspWorldMesh(
     triangleZ.push(Math.round((height / 3) * 16) / 16);
   }
   return {
-    format: "witchwatch-map-mesh-v1",
+    format: "l4dstats-map-mesh-v1",
     bspVersion,
     mapRevision: sourceView.getInt32(8 + 64 * 16, true),
     positions,

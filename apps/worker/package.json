@@ -1,5 +1,5 @@
 {
-  "name": "@witchwatch/worker",
+  "name": "@l4dstats/worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "test": "node ../../scripts/build-parser-sandbox.mjs && vitest run"
   },
   "dependencies": {
-    "@witchwatch/acquisition": "workspace:*",
-    "@witchwatch/api": "workspace:*",
-    "@witchwatch/storage": "workspace:*"
+    "@l4dstats/acquisition": "workspace:*",
+    "@l4dstats/api": "workspace:*",
+    "@l4dstats/storage": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

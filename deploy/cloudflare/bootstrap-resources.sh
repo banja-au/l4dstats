@@ -15,13 +15,13 @@ command -v pnpm >/dev/null 2>&1 || {
   exit 69
 }
 
-temporary_bucket="witchwatch-$environment-temporary"
-artifact_bucket="witchwatch-$environment-artifacts"
-analysis_queue="witchwatch-$environment-analysis"
-dead_letter_queue="witchwatch-$environment-analysis-dlq"
+temporary_bucket="l4dstats-$environment-temporary"
+artifact_bucket="l4dstats-$environment-artifacts"
+analysis_queue="l4dstats-$environment-analysis"
+dead_letter_queue="l4dstats-$environment-analysis-dlq"
 
-if [ "${WITCHWATCH_APPLY_CLOUDFLARE:-}" != "yes" ]; then
-  printf '%s\n' "Dry run. Set WITCHWATCH_APPLY_CLOUDFLARE=yes to create these resources:"
+if [ "${L4DSTATS_APPLY_CLOUDFLARE:-}" != "yes" ]; then
+  printf '%s\n' "Dry run. Set L4DSTATS_APPLY_CLOUDFLARE=yes to create these resources:"
   printf '  R2 bucket: %s (private, one-day expiry)\n' "$temporary_bucket"
   printf '  R2 bucket: %s (private)\n' "$artifact_bucket"
   printf '  Queue: %s\n' "$analysis_queue"

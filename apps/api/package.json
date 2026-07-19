@@ -1,5 +1,5 @@
 {
-  "name": "@witchwatch/api",
+  "name": "@l4dstats/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@witchwatch/storage": "workspace:*"
+    "@l4dstats/storage": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

@@ -89,7 +89,7 @@ mesh artifact, so the API uses the mesh artifact hash as its ETag and exposes
 the source BSP hash separately. Content-addressed retention is required before
 an analysis can claim durable map-asset lineage.
 
-The extractor also writes a local `witchwatch-map-catalog-v1` inventory. Source
+The extractor also writes a local `l4dstats-map-catalog-v1` inventory. Source
 search paths are resolved in engine precedence, with `update` overriding DLC
 and base directories when a canonical map name occurs more than once. Each
 entry records the canonical map, selected logical content root, BSP hash and

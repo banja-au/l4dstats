@@ -20,7 +20,7 @@ for (const script of ["dev", "dev:cli"])
     `${script} must prepare the native parser before startup`,
   );
 requireCondition(
-  /worker:[\s\S]*?command: bash -lc "pnpm native:prepare && pnpm --filter @witchwatch\/worker dev"/.test(
+  /worker:[\s\S]*?command: bash -lc "pnpm native:prepare && pnpm --filter @l4dstats\/worker dev"/.test(
     compose,
   ),
   "development worker must prepare the native parser before startup",

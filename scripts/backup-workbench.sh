@@ -29,7 +29,7 @@ fi
 docker compose run --rm --no-deps \
   -v "$backup_root:/backup" \
   api bash -euo pipefail -c \
-  'test -f /var/lib/witchwatch/workbench.sqlite && tar -C /var/lib/witchwatch -czf "/backup/$1" .' \
+  'test -f /var/lib/l4dstats/workbench.sqlite && tar -C /var/lib/l4dstats -czf "/backup/$1" .' \
   backup "$archive"
 
 docker compose run --rm --no-deps \

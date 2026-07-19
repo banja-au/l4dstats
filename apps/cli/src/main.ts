@@ -54,7 +54,7 @@ const findDemos = async (root: string): Promise<string[]> => {
 
 const usage = (): never => {
   throw new Error(
-    "Usage: witchwatch inspect <demo.dem> | evidence-bundle <demo.dem> | corpus <directory> | features <request.json> | detectors | calibrate <dataset.json> <output-directory> | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
+    "Usage: l4dstats inspect <demo.dem> | evidence-bundle <demo.dem> | corpus <directory> | features <request.json> | detectors | calibrate <dataset.json> <output-directory> | playback-export <demo.dem> <request.json> | playback-compare <export.json> <reference.json>",
   );
 };
 
@@ -88,7 +88,7 @@ const main = async (): Promise<void> => {
       stableJson(
         exportPlaybackCheckpoints(
           await prepareNativeDemoProjection(await readFile(resolve(target)), {
-            pseudonymKey: "witchwatch-playback-validation-v1",
+            pseudonymKey: "l4dstats-playback-validation-v1",
           }),
           request,
         ),
@@ -123,18 +123,16 @@ const main = async (): Promise<void> => {
     return;
   }
   if (commandName === "evidence-bundle") {
-    const pseudonymKey = process.env.WITCHWATCH_PSEUDONYM_KEY;
+    const pseudonymKey = process.env.L4DSTATS_PSEUDONYM_KEY;
     if (!pseudonymKey)
-      throw new Error(
-        "WITCHWATCH_PSEUDONYM_KEY is required for evidence-bundle",
-      );
+      throw new Error("L4DSTATS_PSEUDONYM_KEY is required for evidence-bundle");
     process.stdout.write(
       stableJson(
         await buildEvidenceBundle(await readFile(resolve(target)), {
           pseudonymKey,
           onProgress: (progress, message) =>
             process.stderr.write(
-              `WITCHWATCH_PROGRESS ${JSON.stringify({ progress, message })}\n`,
+              `L4DSTATS_PROGRESS ${JSON.stringify({ progress, message })}\n`,
             ),
         }),
       ),

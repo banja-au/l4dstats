@@ -31,7 +31,7 @@ export async function validateMapArtifact(
   } catch {
     invalid("JSON cannot be decoded");
   }
-  if (artifact.format !== "witchwatch-map-mesh-v1")
+  if (artifact.format !== "l4dstats-map-mesh-v1")
     invalid("format is unsupported");
   if (expectedMap && artifact.provenance.map !== expectedMap)
     invalid("canonical map name does not match the source selection");

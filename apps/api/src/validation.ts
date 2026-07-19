@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { open, realpath, stat } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
-import type { IngestSource } from "@witchwatch/storage";
+import type { IngestSource } from "@l4dstats/storage";
 
 export interface IngestionPolicy {
   allowedHosts: readonly string[];

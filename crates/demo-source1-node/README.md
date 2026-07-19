@@ -28,7 +28,7 @@ limit failures reject with `PROJECT_ERROR:` followed by deterministic ProjectErr
 v1 JSON. No demo path, key, or payload excerpt is included.
 
 `bindingMetadata().buildSha256` is compiled from
-`WITCHWATCH_NATIVE_BUILD_SHA256`. The build script rejects malformed values;
+`L4DSTATS_NATIVE_BUILD_SHA256`. The build script rejects malformed values;
 local builds without the variable use an explicit 64-zero development marker.
 Production computes a nonzero hash over the pinned Cargo manifests, lockfile,
 toolchain, and Rust crate sources before compiling both the stage executable and

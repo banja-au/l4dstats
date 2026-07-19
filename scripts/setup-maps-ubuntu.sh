@@ -92,7 +92,7 @@ docker compose --profile maps run --rm maps-extract
 echo "Checking the local geometry catalog..."
 docker compose --profile maps run --rm maps-extract bash -lc '
   set -euo pipefail
-  geometry=/var/lib/witchwatch/geometry
+  geometry=/var/lib/l4dstats/geometry
   test -s "$geometry/catalog.json"
   artifact_count="$(find "$geometry" -maxdepth 1 -type f -name "*.json" | wc -l)"
   if [[ "$artifact_count" -ne 58 ]]; then

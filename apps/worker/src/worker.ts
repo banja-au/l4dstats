@@ -1,4 +1,4 @@
-import type { Job, WorkbenchRepository } from "@witchwatch/storage";
+import type { Job, WorkbenchRepository } from "@l4dstats/storage";
 
 export type JobHandler = (
   job: Job,

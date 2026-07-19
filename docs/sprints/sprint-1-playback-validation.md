@@ -16,7 +16,7 @@ With Docker Desktop, no host SDK is needed:
 docker compose --profile tools run --rm reference
 ```
 
-The helper pins commit `c7bd376e68cbf693071a652847eccb1d9d76eca7`, builds from source for the current machine, runs recursive demo dumps, emits WitchWatch's deterministic corpus report, and fails unless the automated comparison passes. Outputs remain untracked beneath `data/reference-validation/`. This check validates basic header/outer framing only: UntitledParser documents partial L4D2 network parsing and no L4D2 entity parsing.
+The helper pins commit `c7bd376e68cbf693071a652847eccb1d9d76eca7`, builds from source for the current machine, runs recursive demo dumps, emits L4DStats's deterministic corpus report, and fails unless the automated comparison passes. Outputs remain untracked beneath `data/reference-validation/`. This check validates basic header/outer framing only: UntitledParser documents partial L4D2 network parsing and no L4D2 entity parsing.
 
 ### Completed framing result
 
@@ -41,13 +41,13 @@ Raw demos, player names, and platform identifiers must remain outside Git. Recor
 ## Acceptance procedure
 
 1. Verify every demo SHA-256 and record all tool versions.
-2. Run UntitledParser over the complete corpus and compare header values, outer command counts/order, every command tick, and stop position with WitchWatch. Record its exact commit, command, output hash, and every explained branch-support difference. Any unexplained framing disagreement fails the gate; UntitledParser is not an entity-state oracle. This step passed for all 22 current demos on 2026-07-18.
+2. Run UntitledParser over the complete corpus and compare header values, outer command counts/order, every command tick, and stop position with L4DStats. Record its exact commit, command, output hash, and every explained branch-support difference. Any unexplained framing disagreement fails the gate; UntitledParser is not an entity-state oracle. This step passed for all 22 current demos on 2026-07-18.
 3. Before licensed playback, record the game/build/map identifiers.
 4. Select at least three ticks from each of three demos: an entity-enter tick, an ordinary delta tick, and a leave/delete or lifetime-change tick. Include survivor and infected entities where present.
 5. At every selected tick, capture entity slot/lifetime, team, class, origin XYZ, eye pitch/yaw, and active weapon from licensed playback/reference instrumentation. Never substitute the spectator camera pose.
-6. Export the same fields from WitchWatch for the exact demo SHA and ticks. Compare discrete values exactly; compare quantized floats at the decoded send-property resolution and document the tolerance.
+6. Export the same fields from L4DStats for the exact demo SHA and ticks. Compare discrete values exactly; compare quantized floats at the decoded send-property resolution and document the tolerance.
 7. Require zero unexplained slot/lifetime/team/class/weapon disagreements and zero position/angle disagreements outside the declared quantization tolerance.
-8. Repeat the WitchWatch export and comparison. The report bytes and SHA-256 must be identical.
+8. Repeat the L4DStats export and comparison. The report bytes and SHA-256 must be identical.
 
 ## Executable workflow
 
@@ -58,19 +58,19 @@ exact ticks and revision under test:
 {
   "schemaVersion": 1,
   "ticks": [12345, 12360, 12410],
-  "witchwatchRevision": "<git-commit>"
+  "l4dstatsRevision": "<git-commit>"
 }
 ```
 
-Export the redacted WitchWatch checkpoints. The command emits no names or raw
+Export the redacted L4DStats checkpoints. The command emits no names or raw
 platform identifiers; its player epoch consists only of the demo hash, entity
 slot, and network lifetime:
 
 ```bash
-pnpm --filter @witchwatch/cli dev playback-export \
+pnpm --filter @l4dstats/cli dev playback-export \
   ../../data/corpus/example.dem ../../data/playback/request.json \
-  > data/playback/witchwatch.json
-sha256sum data/playback/witchwatch.json
+  > data/playback/l4dstats.json
+sha256sum data/playback/l4dstats.json
 ```
 
 On licensed infrastructure, capture the same checkpoints and create
@@ -88,14 +88,14 @@ On licensed infrastructure, capture the same checkpoints and create
 }
 ```
 
-Keep every other top-level field and checkpoint key from the WitchWatch export.
+Keep every other top-level field and checkpoint key from the L4DStats export.
 Replace checkpoint values with the independently captured playback values;
 represent genuinely unavailable fields explicitly instead of zero-filling them.
 Then compare and retain the report:
 
 ```bash
-pnpm --filter @witchwatch/cli dev playback-compare \
-  ../../data/playback/witchwatch.json ../../data/playback/reference.json \
+pnpm --filter @l4dstats/cli dev playback-compare \
+  ../../data/playback/l4dstats.json ../../data/playback/reference.json \
   > data/playback/report.json
 sha256sum data/playback/report.json
 ```
@@ -108,7 +108,7 @@ redacted differences. Run export and comparison twice and require identical
 bytes and hashes before recording the gate as passed. `data/` remains ignored;
 do not add requests, exports, references, reports, demos, or identities to Git.
 
-The report must include demo hashes, UntitledParser commit/results, selected ticks, redacted comparisons, tolerances, game/build/map identifiers, instrumentation version, WitchWatch revision, and final report SHA-256. Any unexplained disagreement fails the pre-release gate and becomes a focused decoder fixture.
+The report must include demo hashes, UntitledParser commit/results, selected ticks, redacted comparisons, tolerances, game/build/map identifiers, instrumentation version, L4DStats revision, and final report SHA-256. Any unexplained disagreement fails the pre-release gate and becomes a focused decoder fixture.
 
 ## Environment limitation
 

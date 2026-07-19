@@ -8,11 +8,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
 log() {
-  printf '\n\033[1;32m[witchwatch:init]\033[0m %s\n' "$*"
+  printf '\n\033[1;32m[l4dstats:init]\033[0m %s\n' "$*"
 }
 
 die() {
-  printf '\n\033[1;31m[witchwatch:init]\033[0m %s\n' "$*" >&2
+  printf '\n\033[1;31m[l4dstats:init]\033[0m %s\n' "$*" >&2
   exit 1
 }
 
@@ -94,7 +94,7 @@ install_workspace() {
   cd "${SCRIPT_DIR}"
   pnpm install --frozen-lockfile
   log "Installing the pinned Chromium browser used by Playwright"
-  pnpm --filter @witchwatch/web exec playwright install chromium
+  pnpm --filter @l4dstats/web exec playwright install chromium
 }
 
 verify_workspace() {

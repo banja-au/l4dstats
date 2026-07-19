@@ -1,12 +1,11 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import { applyApiProxyHeaders } from "./src/dev-proxy";
 
-const apiToken = process.env.WITCHWATCH_API_TOKEN;
+const apiToken = process.env.L4DSTATS_API_TOKEN;
 const authenticatedProxy: ProxyOptions = {
-  target: process.env.WITCHWATCH_API_URL ?? "http://127.0.0.1:8787",
+  target: process.env.L4DSTATS_API_URL ?? "http://127.0.0.1:8787",
   changeOrigin: true,
   ...(apiToken ? { headers: { authorization: `Bearer ${apiToken}` } } : {}),
   configure(proxy) {
@@ -22,7 +21,7 @@ function apiAuthenticationGate(): Plugin {
     async configureServer(server) {
       if (!apiToken) return;
       const api = new URL(
-        process.env.WITCHWATCH_API_URL ?? "http://127.0.0.1:8787",
+        process.env.L4DSTATS_API_URL ?? "http://127.0.0.1:8787",
       );
       let lastError = "API unavailable";
       for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -39,13 +38,13 @@ function apiAuthenticationGate(): Plugin {
           }
           if (response.status === 401 || response.status === 429)
             throw new Error(
-              "The web and API containers have different WITCHWATCH_API_TOKEN values. Recreate the complete Compose stack so both services receive the same token.",
+              "The web and API containers have different L4DSTATS_API_TOKEN values. Recreate the complete Compose stack so both services receive the same token.",
             );
           lastError = `API authentication preflight returned HTTP ${response.status}`;
         } catch (error) {
           if (
             error instanceof Error &&
-            error.message.includes("different WITCHWATCH_API_TOKEN")
+            error.message.includes("different L4DSTATS_API_TOKEN")
           )
             throw error;
           lastError = error instanceof Error ? error.message : lastError;
@@ -60,14 +59,14 @@ function apiAuthenticationGate(): Plugin {
 }
 
 function webAccessGate(): Plugin {
-  const username = process.env.WITCHWATCH_WEB_USERNAME;
-  const password = process.env.WITCHWATCH_WEB_PASSWORD;
+  const username = process.env.L4DSTATS_WEB_USERNAME;
+  const password = process.env.L4DSTATS_WEB_PASSWORD;
   if (Boolean(username) !== Boolean(password))
     throw new Error(
-      "WITCHWATCH_WEB_USERNAME and WITCHWATCH_WEB_PASSWORD must be set together",
+      "L4DSTATS_WEB_USERNAME and L4DSTATS_WEB_PASSWORD must be set together",
     );
   if (password && Buffer.byteLength(password, "utf8") < 16)
-    throw new Error("WITCHWATCH_WEB_PASSWORD must contain at least 16 bytes");
+    throw new Error("L4DSTATS_WEB_PASSWORD must contain at least 16 bytes");
   const expected =
     username && password
       ? createHash("sha256")
@@ -131,7 +130,14 @@ function webAccessGate(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [apiAuthenticationGate(), webAccessGate(), react(), tailwindcss()],
+  plugins: [apiAuthenticationGate(), webAccessGate(), react()],
+  build: {
+    minify: "terser",
+    terserOptions: {
+      compress: { passes: 2 },
+      format: { comments: false },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,
@@ -142,7 +148,7 @@ export default defineConfig({
         ...authenticatedProxy,
       },
       "/health": {
-        target: process.env.WITCHWATCH_API_URL ?? "http://127.0.0.1:8787",
+        target: process.env.L4DSTATS_API_URL ?? "http://127.0.0.1:8787",
         changeOrigin: true,
       },
     },

@@ -138,6 +138,12 @@ order and ticks. Licensed selected-tick player-state playback remains open.
 - **Security/reliability:** parser fuzz campaign, SSRF/archive regression suite, resource isolation, auth/RBAC, rate limits/quotas, backup/restore, retention/deletion, audit integrity, dependency/SBOM/license review.
 - **Shadow evaluation:** prospective, blinded review with no enforcement; disagreement adjudication, alert volume, reviewer time, drift/calibration monitoring, false-positive incident playbook.
 - **Scale:** profile representative workloads; add PostgreSQL/S3 and only then a multi-worker queue if measured demand requires it; preserve idempotency and local mode.
+- **Hosted scale slice:** ADR 0010 proposes Turso metadata, private R2 temporary
+  and derived objects, Cloudflare Queues and bounded native Containers. Initial
+  async job/R2/Turso adapters and fail-closed deployment templates exist, but
+  hosted readiness remains withheld until the full analysis transaction is
+  externalized, source deletion is proven under every failure ordering, and
+  1,000/10,000-demo production-shaped capacity gates pass.
 - **Optional rendering spike:** licensed L4D2 worker generates short clips with game/build/map/config/render hashes. Compare observer/POV semantics. Kill the feature if automation, rights, or fidelity is inadequate.
 
 ### Deliverables

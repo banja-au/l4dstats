@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { extname, resolve } from "node:path";
-import { acquire, extractEntry, inspectZip } from "@witchwatch/acquisition";
+import { acquire, extractEntry, inspectZip } from "@l4dstats/acquisition";
 import {
   type CasePresentationV1,
   ContentAddressedStore,
@@ -11,7 +11,7 @@ import {
   type Job,
   type ReviewStatus,
   type WorkbenchRepository,
-} from "@witchwatch/storage";
+} from "@l4dstats/storage";
 import type { JobHandler } from "./worker.js";
 
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
@@ -161,7 +161,7 @@ export function engineCommand(
   // with the native addon inside the stricter OS limits below.
   if (production && process.platform === "linux") {
     const sandbox =
-      process.env.WITCHWATCH_PARSER_SANDBOX ??
+      process.env.L4DSTATS_PARSER_SANDBOX ??
       "/workspace/apps/worker/dist/parser-no-network";
     if (!existsSync(sandbox))
       throw new Error(`Production parser sandbox is unavailable: ${sandbox}`);
@@ -278,7 +278,7 @@ async function analyzeWithCli(
     progress(value: number, message: string): void;
   },
   commandForDemo: EngineDependencies["commandForDemo"] = engineCommand,
-  pseudonymKey = "witchwatch-dev-only-local-key-v1",
+  pseudonymKey = "l4dstats-dev-only-local-key-v1",
   limits: NonNullable<EngineDependencies["processLimits"]> = {},
 ): Promise<EngineAnalysisResult> {
   const invocation = commandForDemo(demo.path);
@@ -303,7 +303,7 @@ async function analyzeWithCli(
                 NODE_OPTIONS: "--conditions=production",
               }
             : {}),
-          WITCHWATCH_PSEUDONYM_KEY: pseudonymKey,
+          L4DSTATS_PSEUDONYM_KEY: pseudonymKey,
         },
         detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "pipe"],
@@ -379,7 +379,7 @@ async function analyzeWithCli(
         const lines = stderrBuffer.split("\n");
         stderrBuffer = lines.pop() ?? "";
         for (const line of lines) {
-          if (!line.startsWith("WITCHWATCH_PROGRESS ")) continue;
+          if (!line.startsWith("L4DSTATS_PROGRESS ")) continue;
           try {
             const update = JSON.parse(line.slice(20)) as {
               progress: number;

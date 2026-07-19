@@ -106,7 +106,7 @@ export interface MatchTimelineEvent {
 }
 
 export interface MapGeometry {
-  format: "witchwatch-map-mesh-v1";
+  format: "l4dstats-map-mesh-v1";
   bspVersion: number;
   mapRevision: number;
   positions: number[];

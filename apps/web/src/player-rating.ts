@@ -2,7 +2,7 @@ import {
   rateL4d2Match,
   type RatingMetricKey,
   type RatingPlayerInput,
-} from "@witchwatch/l4d2-rating";
+} from "@l4dstats/l4d2-rating";
 import type { DemoStats, PlayerStats } from "./api";
 
 interface Accumulator {

@@ -301,7 +301,7 @@ function substitute(command, demoPath) {
 
 function requireNativeArtifact(mode, path) {
   if (typeof path !== "string" || path.length === 0)
-    throw new Error("WITCHWATCH_NATIVE_BENCH_ARTIFACT is required");
+    throw new Error("L4DSTATS_NATIVE_BENCH_ARTIFACT is required");
   const absolute = resolve(path);
   let metadata;
   try {
@@ -403,8 +403,8 @@ export function parseArguments(argv, env = process.env) {
       thresholds.minMedianThroughputBytesPerSecond = Number(argv[++index]);
     else throw new Error(`unknown argument ${value}`);
   }
-  if (demos.length === 0 && env.WITCHWATCH_BENCH_DEMOS)
-    demos.push(...JSON.parse(env.WITCHWATCH_BENCH_DEMOS));
+  if (demos.length === 0 && env.L4DSTATS_BENCH_DEMOS)
+    demos.push(...JSON.parse(env.L4DSTATS_BENCH_DEMOS));
   return {
     demos,
     mode,
@@ -412,10 +412,10 @@ export function parseArguments(argv, env = process.env) {
     repetitions,
     timeoutMilliseconds,
     outputCapBytes,
-    nativeCommand: env.WITCHWATCH_NATIVE_BENCH_COMMAND,
-    nativeArtifact: env.WITCHWATCH_NATIVE_BENCH_ARTIFACT,
-    nativeVersion: env.WITCHWATCH_NATIVE_BENCH_VERSION,
-    nativeBuildSha256: env.WITCHWATCH_NATIVE_BENCH_BUILD_SHA256,
+    nativeCommand: env.L4DSTATS_NATIVE_BENCH_COMMAND,
+    nativeArtifact: env.L4DSTATS_NATIVE_BENCH_ARTIFACT,
+    nativeVersion: env.L4DSTATS_NATIVE_BENCH_VERSION,
+    nativeBuildSha256: env.L4DSTATS_NATIVE_BENCH_BUILD_SHA256,
     thresholds,
   };
 }

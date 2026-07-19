@@ -1,7 +1,4 @@
-import type {
-  L4d2CounterName,
-  L4d2WeaponIdentity,
-} from "@witchwatch/contracts";
+import type { L4d2CounterName, L4d2WeaponIdentity } from "@l4dstats/contracts";
 
 export const l4d2CounterNames = [
   "m_checkpointSurvivorDamage",

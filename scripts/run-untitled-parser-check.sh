@@ -41,14 +41,14 @@ dotnet run \
   --output-folder "$DUMP_PATH" \
   | tee "$OUTPUT_PATH/untitled-parser.log"
 
-pnpm --dir "$REPOSITORY_ROOT" --filter @witchwatch/cli dev corpus "$CORPUS_PATH" \
-  >"$OUTPUT_PATH/witchwatch-corpus.json"
+pnpm --dir "$REPOSITORY_ROOT" --filter @l4dstats/cli dev corpus "$CORPUS_PATH" \
+  >"$OUTPUT_PATH/l4dstats-corpus.json"
 
 git -C "$TOOL_PATH" rev-parse HEAD >"$OUTPUT_PATH/untitled-parser.commit"
 
 node "$REPOSITORY_ROOT/scripts/compare-untitled-framing.mjs" \
   "$DUMP_PATH" \
-  "$OUTPUT_PATH/witchwatch-corpus.json" \
+  "$OUTPUT_PATH/l4dstats-corpus.json" \
   "$OUTPUT_PATH/untitled-parser.commit" \
   >"$OUTPUT_PATH/untitled-framing-report.json"
 

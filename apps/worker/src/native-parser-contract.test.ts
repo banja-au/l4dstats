@@ -56,7 +56,7 @@ afterEach(async () => {
 async function fixture(body: string) {
   const root = await mkdtemp(join(tmpdir(), "native-parser-contract-"));
   cleanup.push(root);
-  const executable = join(root, "witchwatch-demo-source1-native");
+  const executable = join(root, "l4dstats-demo-source1-native");
   await writeFile(executable, `#!/bin/sh\n${body}\n`);
   await chmod(executable, 0o755);
   return { root, executable };
@@ -99,7 +99,7 @@ describe("native parser executable contract", () => {
     const metadata = {
       artifactSchemaVersion: 1,
       buildSha256: "a".repeat(64),
-      parser: "witchwatch-demo-source1-native",
+      parser: "l4dstats-demo-source1-native",
       projectionSchema: "demo-projection/v1",
       protocol: "source1-l4d2-2100",
       version: "0.1.0",
@@ -149,7 +149,7 @@ describe("native parser executable contract", () => {
     const metadata = {
       artifactSchemaVersion: 1,
       buildSha256: "b".repeat(64),
-      parser: "witchwatch-demo-source1-native",
+      parser: "l4dstats-demo-source1-native",
       projectionSchema: "demo-projection/v1",
       protocol: "source1-l4d2-2100",
       version: "0.1.0",

@@ -1,8 +1,4 @@
-import type {
-  EvidenceKind,
-  ReviewScore,
-  TickRange,
-} from "@witchwatch/contracts";
+import type { EvidenceKind, ReviewScore, TickRange } from "@l4dstats/contracts";
 
 export const mandatoryLimitations = [
   "research-only",

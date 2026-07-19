@@ -4,13 +4,13 @@ import type {
   ProjectedPlayerObservation,
   Vector3,
   ViewAngles,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 import type { PreparedDemoProjection } from "./evidence-bundle.js";
 
 export interface PlaybackExportRequest {
   readonly schemaVersion: 1;
   readonly ticks: readonly number[];
-  readonly witchwatchRevision: string;
+  readonly l4dstatsRevision: string;
   readonly tickIntervalSeconds?: number;
 }
 
@@ -32,10 +32,10 @@ export interface PlaybackCheckpoint {
 
 export interface PlaybackCheckpointExport {
   readonly schemaVersion: 1;
-  readonly producer: "witchwatch";
+  readonly producer: "l4dstats";
   readonly demoSha256: string;
   readonly mapName: string;
-  readonly witchwatchRevision: string;
+  readonly l4dstatsRevision: string;
   readonly selectedTicks: readonly number[];
   readonly checkpoints: readonly PlaybackCheckpoint[];
 }
@@ -65,13 +65,13 @@ export interface PlaybackComparisonReport {
   readonly schemaVersion: 1;
   readonly passed: boolean;
   readonly demoSha256: string;
-  readonly witchwatchExportSha256: string;
+  readonly l4dstatsExportSha256: string;
   readonly referenceSha256: string;
   readonly tolerances: PlaybackReference["tolerances"];
   readonly gameBuildId: string;
   readonly mapAssetId: string;
   readonly instrumentationVersion: string;
-  readonly witchwatchRevision: string;
+  readonly l4dstatsRevision: string;
   readonly differences: readonly PlaybackDifference[];
 }
 
@@ -93,10 +93,10 @@ export function parsePlaybackExportRequest(
   )
     throw new TypeError("ticks must contain unique non-negative safe integers");
   if (
-    typeof value.witchwatchRevision !== "string" ||
-    value.witchwatchRevision.trim() === ""
+    typeof value.l4dstatsRevision !== "string" ||
+    value.l4dstatsRevision.trim() === ""
   )
-    throw new TypeError("witchwatchRevision is required");
+    throw new TypeError("l4dstatsRevision is required");
   if (
     value.tickIntervalSeconds !== undefined &&
     (typeof value.tickIntervalSeconds !== "number" ||
@@ -107,7 +107,7 @@ export function parsePlaybackExportRequest(
   return {
     schemaVersion: 1,
     ticks: ticks as number[],
-    witchwatchRevision: value.witchwatchRevision,
+    l4dstatsRevision: value.l4dstatsRevision,
     ...(value.tickIntervalSeconds === undefined
       ? {}
       : { tickIntervalSeconds: value.tickIntervalSeconds }),
@@ -131,10 +131,10 @@ export function exportPlaybackCheckpoints(
   );
   return {
     schemaVersion: 1,
-    producer: "witchwatch",
+    producer: "l4dstats",
     demoSha256: prepared.demoSha256,
     mapName: prepared.header.mapName,
-    witchwatchRevision: request.witchwatchRevision,
+    l4dstatsRevision: request.l4dstatsRevision,
     selectedTicks: request.ticks,
     checkpoints: request.ticks.map((tick) => ({
       tick,
@@ -283,13 +283,13 @@ export function comparePlaybackCheckpoints(
     schemaVersion: 1,
     passed: differences.length === 0,
     demoSha256: observed.demoSha256,
-    witchwatchExportSha256: sha256(observedBytes),
+    l4dstatsExportSha256: sha256(observedBytes),
     referenceSha256: sha256(referenceBytes),
     tolerances: reference.tolerances,
     gameBuildId: reference.gameBuildId,
     mapAssetId: reference.mapAssetId,
     instrumentationVersion: reference.instrumentationVersion,
-    witchwatchRevision: observed.witchwatchRevision,
+    l4dstatsRevision: observed.l4dstatsRevision,
     differences,
   };
 }
@@ -301,30 +301,30 @@ function validateComparisonInputs(
   if (observed.schemaVersion !== 1 || reference.schemaVersion !== 1)
     throw new TypeError("comparison inputs must use schemaVersion 1");
   if (
-    observed.producer !== "witchwatch" ||
+    observed.producer !== "l4dstats" ||
     reference.producer !== "licensed-playback-reference"
   )
     throw new TypeError(
-      "comparison requires WitchWatch and licensed-playback-reference producers",
+      "comparison requires L4DStats and licensed-playback-reference producers",
     );
   if (observed.demoSha256 !== reference.demoSha256)
     throw new TypeError("demo hashes do not match");
   if (observed.mapName !== reference.mapName)
     throw new TypeError("map names do not match");
-  if (observed.witchwatchRevision !== reference.witchwatchRevision)
-    throw new TypeError("WitchWatch revisions do not match");
+  if (observed.l4dstatsRevision !== reference.l4dstatsRevision)
+    throw new TypeError("L4DStats revisions do not match");
   if (!/^[a-f\d]{64}$/i.test(observed.demoSha256))
     throw new TypeError("demo SHA-256 is invalid");
   for (const [name, value] of [
     ["mapName", observed.mapName],
-    ["witchwatchRevision", observed.witchwatchRevision],
+    ["l4dstatsRevision", observed.l4dstatsRevision],
     ["gameBuildId", reference.gameBuildId],
     ["mapAssetId", reference.mapAssetId],
     ["instrumentationVersion", reference.instrumentationVersion],
   ] as const)
     if (typeof value !== "string" || value.trim() === "")
       throw new TypeError(`${name} must be non-empty`);
-  validateTickStructure(observed, "WitchWatch export");
+  validateTickStructure(observed, "L4DStats export");
   validateTickStructure(reference, "playback reference");
   if (
     observed.selectedTicks.length !== reference.selectedTicks.length ||

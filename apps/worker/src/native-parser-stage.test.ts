@@ -15,7 +15,7 @@ const contract = (await import(
 
 // An explicit path marks a native build as integration-ready. Merely finding a
 // developer's partial target artifact must not silently opt it into this gate.
-const configuredStage = process.env.WITCHWATCH_NATIVE_STAGE;
+const configuredStage = process.env.L4DSTATS_NATIVE_STAGE;
 
 describe("built Rust stage metadata", () => {
   it.skipIf(!configuredStage)(
@@ -23,11 +23,11 @@ describe("built Rust stage metadata", () => {
     async () => {
       expect(existsSync(configuredStage!)).toBe(true);
       const result = await contract.probeNativeParser(configuredStage!, {
-        allowedRoot: process.env.WITCHWATCH_NATIVE_ALLOWED_ROOT ?? "/workspace",
+        allowedRoot: process.env.L4DSTATS_NATIVE_ALLOWED_ROOT ?? "/workspace",
       });
       expect(result.version).toMatchObject({
         artifactSchemaVersion: 1,
-        parser: "witchwatch-demo-source1-native",
+        parser: "l4dstats-demo-source1-native",
         projectionSchema: "demo-projection/v1",
         protocol: "source1-l4d2-2100",
       });

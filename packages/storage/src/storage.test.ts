@@ -483,7 +483,7 @@ describe("WorkbenchRepository", () => {
 
 describe("ContentAddressedStore", () => {
   it("deduplicates and reads bounded ranges", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-store-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-store-"));
     cleanup.push(root);
     const store = new ContentAddressedStore(root),
       data = new TextEncoder().encode("telemetry");

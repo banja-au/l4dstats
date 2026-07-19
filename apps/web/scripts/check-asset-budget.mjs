@@ -1,14 +1,21 @@
-import { readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const webRoot = fileURLToPath(new URL("..", import.meta.url));
 const distRoot = join(webRoot, "dist");
 const kib = 1024;
+// Keep roughly 10% headroom above the July 2026 production baseline. This is
+// intentionally wide enough for normal product work but still fails material
+// first-load regressions in both parse bytes and compressed transfer bytes.
 const budgets = {
-  total: 1240 * kib,
-  javascript: 320 * kib,
-  css: 86 * kib,
+  total: 1370 * kib,
+  javascript: 385 * kib,
+  css: 99 * kib,
+  transferTotal: 1025 * kib,
+  transferJavascript: 116 * kib,
+  transferCss: 21 * kib,
   hero: 230 * kib,
   backdrop: 150 * kib,
   brand: 75 * kib,
@@ -33,6 +40,7 @@ const measured = await Promise.all(
     path: relative(distRoot, path),
     bytes: (await stat(path)).size,
     extension: extname(path),
+    gzipBytes: gzipSync(await readFile(path)).byteLength,
   })),
 );
 const sizeOf = (predicate) =>
@@ -41,6 +49,13 @@ const totals = {
   total: sizeOf(() => true),
   javascript: sizeOf((file) => file.extension === ".js"),
   css: sizeOf((file) => file.extension === ".css"),
+  transferTotal: measured.reduce((total, file) => total + file.gzipBytes, 0),
+  transferJavascript: measured
+    .filter((file) => file.extension === ".js")
+    .reduce((total, file) => total + file.gzipBytes, 0),
+  transferCss: measured
+    .filter((file) => file.extension === ".css")
+    .reduce((total, file) => total + file.gzipBytes, 0),
   hero: sizeOf((file) => file.path === "art/boomer-trace.webp"),
   backdrop: sizeOf((file) => file.path === "art/dark-carnival.webp"),
   brand: sizeOf((file) =>

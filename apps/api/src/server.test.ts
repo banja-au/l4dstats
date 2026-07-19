@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { sha256, WorkbenchRepository } from "@witchwatch/storage";
+import { sha256, WorkbenchRepository } from "@l4dstats/storage";
 import { createApi } from "./server.js";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -11,7 +11,7 @@ afterEach(async () => {
   await Promise.all(cleanups.splice(0).map((fn) => fn()));
 });
 async function fixture(apiOptions: Parameters<typeof createApi>[2] = {}) {
-  const root = await mkdtemp(join(tmpdir(), "witchwatch-api-")),
+  const root = await mkdtemp(join(tmpdir(), "l4dstats-api-")),
     inbox = join(root, "inbox"),
     uploads = join(root, "uploads"),
     geometry = join(root, "geometry");
@@ -115,7 +115,7 @@ async function fixture(apiOptions: Parameters<typeof createApi>[2] = {}) {
 }
 
 const geometryArtifact = (map: string, hash = "a".repeat(64)) => ({
-  format: "witchwatch-map-mesh-v1",
+  format: "l4dstats-map-mesh-v1",
   bspVersion: 21,
   mapRevision: 7,
   positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
@@ -147,7 +147,7 @@ const geometryArtifact = (map: string, hash = "a".repeat(64)) => ({
     steamAppId: 222860,
     steamBuildId: "12345678",
     contentRoot: "left4dead2",
-    extractor: "@witchwatch/map-source1@0.0.0",
+    extractor: "@l4dstats/map-source1@0.0.0",
   },
 });
 
@@ -275,7 +275,7 @@ describe("review API", () => {
         headers: {
           authorization: `Bearer ${token}`,
           "content-type": "application/json",
-          "x-witchwatch-user": user,
+          "x-l4dstats-user": user,
         },
         body: "{}",
       });
@@ -297,7 +297,7 @@ describe("review API", () => {
     expect(response.headers.get("etag")).toMatch(/^"sha256:[a-f0-9]{64}"$/);
     expect(response.headers.get("x-source-bsp-sha256")).toBe("a".repeat(64));
     expect(await response.json()).toMatchObject({
-      format: "witchwatch-map-mesh-v1",
+      format: "l4dstats-map-mesh-v1",
     });
     await writeFile(
       join(geometry, "c2m2_fairgrounds.json"),
@@ -312,7 +312,7 @@ describe("review API", () => {
     expect((await fetch(`${base}/api/maps/bad-map/geometry`)).status).toBe(416);
   });
   it("falls back to committed geometry after the writable local cache", async () => {
-    const fallback = await mkdtemp(join(tmpdir(), "witchwatch-geometry-"));
+    const fallback = await mkdtemp(join(tmpdir(), "l4dstats-geometry-"));
     cleanups.push(() => rm(fallback, { recursive: true, force: true }));
     await writeFile(
       join(fallback, "c5m1_waterfront.json"),
@@ -340,13 +340,13 @@ describe("review API", () => {
       /^[a-f0-9]{64}$/,
     );
     expect(await response.json()).toMatchObject({
-      format: "witchwatch-map-mesh-v1",
+      format: "l4dstats-map-mesh-v1",
       provenance: {
         map: "c5m1_waterfront",
         sourceKind: "steam-dedicated-server",
         steamAppId: 222860,
         steamBuildId: "23990100",
-        extractor: "@witchwatch/map-source1@0.1.0",
+        extractor: "@l4dstats/map-source1@0.1.0",
       },
     });
   });
@@ -406,11 +406,11 @@ describe("review API", () => {
       JSON.stringify(artifact),
     );
     const catalog = {
-      format: "witchwatch-map-catalog-v1",
+      format: "l4dstats-map-catalog-v1",
       sourceKind: "steam-dedicated-server",
       steamAppId: 222860,
       steamBuildId: "12345678",
-      extractor: "@witchwatch/map-source1@0.0.0",
+      extractor: "@l4dstats/map-source1@0.0.0",
       maps: [],
     };
     await writeFile(join(geometry, "catalog.json"), JSON.stringify(catalog));

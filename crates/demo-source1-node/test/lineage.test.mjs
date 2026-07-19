@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 const binding = require(resolve(root, "dist/demo-source1-node.node"));
 const embedded = binding.bindingMetadata().buildSha256;
 assert.match(embedded, /^[a-fA-F0-9]{64}$/);
-const expected = process.env.WITCHWATCH_EXPECT_NATIVE_BUILD_SHA256;
+const expected = process.env.L4DSTATS_EXPECT_NATIVE_BUILD_SHA256;
 if (expected !== undefined) {
   assert.match(expected, /^[a-f0-9]{64}$/);
   assert.notEqual(expected, "0".repeat(64));

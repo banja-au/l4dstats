@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Layers3,
   LoaderCircle,
+  Mail,
   Maximize2,
   Minimize2,
   RefreshCw,
@@ -39,7 +40,7 @@ import {
   type ScreenPointIndex,
 } from "./spatial-map";
 import { formatElapsedTime, formatTickTime } from "./time-format";
-import { numberHitsByObservedRounds } from "./story-timeline";
+import { numberHitsByObservedRounds, pairObservedPins } from "./story-timeline";
 import {
   buildNormalizedDensityGrid,
   densityDifference,
@@ -114,6 +115,34 @@ const counterLabel = (value: string) =>
 
 function BrandMark() {
   return <img src="/art/infected-mark.webp" alt="" aria-hidden="true" />;
+}
+
+function BanjaAttribution({
+  placement,
+}: {
+  placement: "homepage" | "loading" | "report";
+}) {
+  return (
+    <div className={`banja-attribution banja-attribution-${placement}`}>
+      <a
+        className="banja-signature"
+        href={`https://banja.au/?utm_source=l4dstats&utm_medium=referral&utm_campaign=l4dstats_product&utm_content=${placement}_signature`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Banja Labs (opens in a new tab)"
+      >
+        <span>by</span> Banja Labs
+      </a>
+      <a
+        className="banja-email"
+        href="mailto:labs@banja.au"
+        aria-label="Email Banja Labs at labs@banja.au"
+        title="labs@banja.au"
+      >
+        <Mail aria-hidden="true" />
+      </a>
+    </div>
+  );
 }
 
 function MvpMark() {
@@ -644,6 +673,7 @@ function App() {
               </em>
             )}
           </button>
+          <BanjaAttribution placement="homepage" />
         </main>
       )}
 
@@ -709,6 +739,7 @@ function App() {
               ))}
             </div>
           </div>
+          <BanjaAttribution placement="loading" />
         </main>
       )}
 
@@ -818,7 +849,17 @@ function App() {
                     <ChevronDown />
                   </label>
                 )}
-                <details className="map-toggle">
+                <details
+                  className="map-toggle"
+                  onToggle={(event) => {
+                    if (!event.currentTarget.open) return;
+                    for (const sibling of event.currentTarget.parentElement?.querySelectorAll(
+                      "details[open]",
+                    ) ?? [])
+                      if (sibling !== event.currentTarget)
+                        sibling.removeAttribute("open");
+                  }}
+                >
                   <summary>
                     <Layers3 /> Maps {visible.length} / {gameAnalyses.length}
                     <ChevronDown />
@@ -864,7 +905,17 @@ function App() {
                   </div>
                 </details>
                 {roundScopes.length > 1 && (
-                  <details className="map-toggle half-toggle">
+                  <details
+                    className="map-toggle half-toggle"
+                    onToggle={(event) => {
+                      if (!event.currentTarget.open) return;
+                      for (const sibling of event.currentTarget.parentElement?.querySelectorAll(
+                        "details[open]",
+                      ) ?? [])
+                        if (sibling !== event.currentTarget)
+                          sibling.removeAttribute("open");
+                    }}
+                  >
                     <summary>
                       <Layers3 /> Rounds {enabledRoundCount} /{" "}
                       {roundScopes.length}
@@ -998,6 +1049,7 @@ function App() {
               <Quality stats={stats} analyses={scopedAnalyses} />
             )}
           </section>
+          <BanjaAttribution placement="report" />
         </main>
       )}
     </div>
@@ -3520,6 +3572,8 @@ function DeathPositions({
   const viewportValue = useRef(viewport);
   const viewportFrame = useRef<number | null>(null);
   const viewportUiTimer = useRef<number | null>(null);
+  const viewportDetailTimer = useRef<number | null>(null);
+  const viewportInteracting = useRef(false);
   const drawSpatial = useRef<(() => void) | null>(null);
   const scheduleViewport = (
     update:
@@ -3532,6 +3586,14 @@ function DeathPositions({
   ) => {
     viewportValue.current =
       typeof update === "function" ? update(viewportValue.current) : update;
+    viewportInteracting.current = true;
+    if (viewportDetailTimer.current !== null)
+      window.clearTimeout(viewportDetailTimer.current);
+    viewportDetailTimer.current = window.setTimeout(() => {
+      viewportDetailTimer.current = null;
+      viewportInteracting.current = false;
+      drawSpatial.current?.();
+    }, 180);
     if (viewportFrame.current !== null) return;
     viewportFrame.current = requestAnimationFrame(() => {
       viewportFrame.current = null;
@@ -3552,6 +3614,10 @@ function DeathPositions({
     if (viewportFrame.current !== null)
       cancelAnimationFrame(viewportFrame.current);
     viewportFrame.current = null;
+    viewportInteracting.current = false;
+    if (viewportDetailTimer.current !== null)
+      window.clearTimeout(viewportDetailTimer.current);
+    viewportDetailTimer.current = null;
     viewportValue.current = next;
     setViewport(next);
     drawSpatial.current?.();
@@ -3562,6 +3628,8 @@ function DeathPositions({
         cancelAnimationFrame(viewportFrame.current);
       if (viewportUiTimer.current !== null)
         window.clearTimeout(viewportUiTimer.current);
+      if (viewportDetailTimer.current !== null)
+        window.clearTimeout(viewportDetailTimer.current);
     },
     [],
   );
@@ -3582,7 +3650,7 @@ function DeathPositions({
   const [classScope, setClassScope] = useState("all");
   const [compareTeams, setCompareTeams] = useState(false);
   const [compareDensityMode, setCompareDensityMode] = useState<
-    "difference" | "overlay"
+    "difference" | "overlay" | "split"
   >("difference");
   const [expanded, setExpanded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(() => window.innerWidth > 700);
@@ -3612,6 +3680,12 @@ function DeathPositions({
   const [hoveredSpatialIndex, setHoveredSpatialIndex] = useState<number | null>(
     null,
   );
+  const [selectedCluster, setSelectedCluster] = useState<{
+    count: number;
+    tickStart: number;
+    tickEnd: number;
+    composition: string;
+  } | null>(null);
   const drag = useRef<{
     pointerId: number;
     x: number;
@@ -3629,7 +3703,33 @@ function DeathPositions({
     [],
   );
   const canvasPointIndex = useRef<ScreenPointIndex | null>(null);
+  const canvasClusters = useRef<
+    Array<{
+      x: number;
+      y: number;
+      radius: number;
+      indices: number[];
+    }>
+  >([]);
+  const clusterKeyboardIndex = useRef(0);
   const spatialRenderCount = useRef(0);
+  const resetSpatialFilters = () => {
+    setEventScope("all");
+    setHalfScope("all");
+    setRosterScope("all");
+    setRoleScope("all");
+    setPlayerScope("all");
+    setClassScope("all");
+    setTickRange([tickMinimum, tickMaximum]);
+    setFloorMode("events");
+    setHeightRadius(256);
+    setDensityRadius(256);
+    setDisplayMode("hybrid");
+    setCompareTeams(false);
+    setCompareDensityMode("difference");
+    setSelectedSpatialIndex(null);
+    setSelectedCluster(null);
+  };
   const eventHalf = (event: MatchTimelineEvent) =>
     competitive?.halves.find(
       (half) =>
@@ -3744,6 +3844,27 @@ function DeathPositions({
       }),
     [competitive, halfScope],
   );
+  const observedExtentLandmarks = useMemo(() => {
+    const ranges = competitive?.halves.length
+      ? competitive.halves
+          .filter((half) => halfScope === "all" || half.id === halfScope)
+          .map((half) => ({ label: half.id, range: half.tickRange }))
+      : [{ label: "match", range: { start: tickMinimum, end: tickMaximum } }];
+    return ranges.flatMap(({ label, range }) => {
+      const observed = positioned
+        .filter((event) => event.tick >= range.start && event.tick <= range.end)
+        .sort((left, right) => left.tick - right.tick);
+      const first = observed[0];
+      const last = observed.at(-1);
+      if (!first) return [];
+      return [
+        { kind: "first" as const, label, event: first },
+        ...(last && last.tick !== first.tick
+          ? [{ kind: "last" as const, label, event: last }]
+          : []),
+      ];
+    });
+  }, [competitive, halfScope, positioned, tickMaximum, tickMinimum]);
   const densityGrids = useMemo(() => {
     if (!geometry) return null;
     const width = Math.max(1, geometry.bounds.max.x - geometry.bounds.min.x);
@@ -3833,6 +3954,40 @@ function DeathPositions({
     context.putImageData(pixels, 0, 0);
     return canvas;
   }, [densityGrids, compareTeams, compareDensityMode]);
+  const splitDensityRasters = useMemo(() => {
+    if (!densityGrids || typeof document === "undefined") return null;
+    const sharedMaximum = Math.max(
+      densityGrids.A.maximum,
+      densityGrids.B.maximum,
+    );
+    const raster = (id: "A" | "B") => {
+      const grid = densityGrids[id];
+      const canvas = document.createElement("canvas");
+      canvas.width = grid.columns;
+      canvas.height = grid.rows;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      const pixels = context.createImageData(canvas.width, canvas.height);
+      const color = id === "A" ? [52, 210, 255] : [236, 92, 255];
+      for (let index = 0; index < grid.values.length; index += 1) {
+        const column = index % canvas.width;
+        const row = Math.floor(index / canvas.width);
+        const pixel = ((canvas.height - 1 - row) * canvas.width + column) * 4;
+        const strength =
+          sharedMaximum > 0 ? (grid.values[index] ?? 0) / sharedMaximum : 0;
+        const alpha = strength < 0.035 ? 0 : strength ** 0.62 * 0.82;
+        pixels.data[pixel] = color[0]!;
+        pixels.data[pixel + 1] = color[1]!;
+        pixels.data[pixel + 2] = color[2]!;
+        pixels.data[pixel + 3] = Math.round(alpha * 255);
+      }
+      context.putImageData(pixels, 0, 0);
+      return canvas;
+    };
+    const A = raster("A");
+    const B = raster("B");
+    return A && B ? { A, B } : null;
+  }, [densityGrids]);
   const selectedParticipantId = selectedSpatialEvent
     ? participantId(selectedSpatialEvent)
     : undefined;
@@ -3904,6 +4059,51 @@ function DeathPositions({
     }
     return { bands, outline };
   }, [geometry, floorMode, eventFloor, heightRadius]);
+  const geometryRaster = useMemo(() => {
+    if (!geometry || !geometryLayers || typeof document === "undefined")
+      return null;
+    const worldWidth = Math.max(
+      1,
+      geometry.bounds.max.x - geometry.bounds.min.x,
+    );
+    const worldHeight = Math.max(
+      1,
+      geometry.bounds.max.y - geometry.bounds.min.y,
+    );
+    const longestSide = 2048;
+    const rasterScale = longestSide / Math.max(worldWidth, worldHeight);
+    const raster = document.createElement("canvas");
+    raster.width = Math.max(1, Math.round(worldWidth * rasterScale));
+    raster.height = Math.max(1, Math.round(worldHeight * rasterScale));
+    const context = raster.getContext("2d");
+    if (!context) return null;
+    context.setTransform(
+      rasterScale,
+      0,
+      0,
+      -rasterScale,
+      -geometry.bounds.min.x * rasterScale,
+      geometry.bounds.max.y * rasterScale,
+    );
+    const bandColors = [
+      "rgba(41, 58, 69, .18)",
+      "rgba(50, 75, 72, .24)",
+      "rgba(103, 139, 116, .38)",
+      "rgba(69, 106, 91, .28)",
+      "rgba(45, 70, 76, .2)",
+    ];
+    geometryLayers.bands.forEach((path, index) => {
+      context.fillStyle = bandColors[index]!;
+      context.fill(path);
+      context.strokeStyle = "rgba(196, 220, 202, .055)";
+      context.lineWidth = 0.45 / rasterScale;
+      context.stroke(path);
+    });
+    context.strokeStyle = "rgba(181, 228, 187, .38)";
+    context.lineWidth = 1.2 / rasterScale;
+    context.stroke(geometryLayers.outline);
+    return raster;
+  }, [geometry, geometryLayers]);
   useEffect(() => {
     setSelectedSpatialIndex(null);
     setHoveredSpatialIndex(null);
@@ -3973,6 +4173,7 @@ function DeathPositions({
     if (!geometry || !canvas.current) return;
     const element = canvas.current;
     const draw = () => {
+      const drawStartedAt = performance.now();
       spatialRenderCount.current += 1;
       element.dataset.renderCount = String(spatialRenderCount.current);
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -4001,7 +4202,129 @@ function DeathPositions({
           (width - drawnWidth) / 2 + (x - min.x) * scale + view.x,
           (height + drawnHeight) / 2 - (y - min.y) * scale + view.y,
         ] as const;
-      if (geometryLayers) {
+      if (
+        compareTeams &&
+        compareDensityMode === "split" &&
+        splitDensityRasters
+      ) {
+        const stacked = width <= 700;
+        const gap = 8;
+        const panelWidth = stacked ? width : (width - gap) / 2;
+        const panelHeight = stacked ? (height - gap) / 2 : height;
+        canvasPoints.current = [];
+        canvasClusters.current = [];
+        element.dataset.clusterCount = "0";
+        element.dataset.comparisonLayout = stacked ? "stacked" : "side-by-side";
+        const drawPanel = (id: "A" | "B", panelIndex: number) => {
+          const panelX = stacked ? 0 : panelIndex * (panelWidth + gap);
+          const panelY = stacked ? panelIndex * (panelHeight + gap) : 0;
+          const panelScale =
+            Math.min(
+              (panelWidth - 24) / Math.max(1, max.x - min.x),
+              (panelHeight - 24) / Math.max(1, max.y - min.y),
+            ) * view.zoom;
+          const mapWidth = (max.x - min.x) * panelScale;
+          const mapHeight = (max.y - min.y) * panelScale;
+          const left = panelX + (panelWidth - mapWidth) / 2 + view.x;
+          const top = panelY + (panelHeight - mapHeight) / 2 + view.y;
+          context.save();
+          context.beginPath();
+          context.rect(panelX, panelY, panelWidth, panelHeight);
+          context.clip();
+          context.fillStyle = id === "A" ? "#071116" : "#120814";
+          context.fillRect(panelX, panelY, panelWidth, panelHeight);
+          if (geometryRaster) {
+            context.globalAlpha = 0.84;
+            context.drawImage(geometryRaster, left, top, mapWidth, mapHeight);
+            context.globalAlpha = 1;
+          }
+          if (displayMode !== "events")
+            context.drawImage(
+              splitDensityRasters[id],
+              left,
+              top,
+              mapWidth,
+              mapHeight,
+            );
+          if (displayMode !== "density") {
+            for (const [index, event] of positioned.entries()) {
+              if (rosterForEvent(event)?.id !== id) continue;
+              const x = left + (event.position!.x - min.x) * panelScale;
+              const y =
+                top + mapHeight - (event.position!.y - min.y) * panelScale;
+              if (
+                x < panelX ||
+                x > panelX + panelWidth ||
+                y < panelY ||
+                y > panelY + panelHeight
+              )
+                continue;
+              canvasPoints.current.push({ x, y, index });
+              context.beginPath();
+              context.arc(
+                x,
+                y,
+                event.infectedClass === "Tank" ? 6 : 3.5,
+                0,
+                Math.PI * 2,
+              );
+              context.fillStyle = id === "A" ? "#34d2ff" : "#ec5cff";
+              context.fill();
+            }
+          }
+          context.fillStyle = "rgba(4, 8, 6, .9)";
+          context.fillRect(panelX + 10, panelY + 10, 198, 42);
+          context.fillStyle = id === "A" ? "#70ddff" : "#f29aff";
+          context.font = "800 12px ui-monospace, monospace";
+          context.fillText(
+            `TEAM ${id} · NEUTRAL ROSTER`,
+            panelX + 18,
+            panelY + 27,
+          );
+          context.fillStyle = "rgba(232, 242, 235, .72)";
+          context.font = "700 10px ui-monospace, monospace";
+          context.fillText(
+            `${comparisonCounts[id]} POSITIONED MOMENTS`,
+            panelX + 18,
+            panelY + 43,
+          );
+          context.restore();
+        };
+        drawPanel("A", 0);
+        drawPanel("B", 1);
+        canvasPointIndex.current = buildScreenPointIndex(canvasPoints.current);
+        context.fillStyle = "rgba(5, 10, 7, .9)";
+        context.fillRect(width / 2 - 110, height - 30, 220, 20);
+        context.fillStyle = "rgba(225, 239, 229, .78)";
+        context.font = "700 10px ui-monospace, monospace";
+        context.textAlign = "center";
+        context.fillText(
+          "SHARED PAN · ZOOM · FILTERS · SCALE",
+          width / 2,
+          height - 16,
+        );
+        context.textAlign = "start";
+        element.dataset.drawDuration = (
+          performance.now() - drawStartedAt
+        ).toFixed(3);
+        return;
+      }
+      element.dataset.comparisonLayout = "single";
+      if (geometryRaster && (view.zoom < 4 || viewportInteracting.current)) {
+        element.dataset.geometryDetail = "raster";
+        context.save();
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.drawImage(
+          geometryRaster,
+          (width - drawnWidth) / 2 + view.x,
+          (height - drawnHeight) / 2 + view.y,
+          drawnWidth,
+          drawnHeight,
+        );
+        context.restore();
+      } else if (geometryLayers) {
+        element.dataset.geometryDetail = "vector";
         context.save();
         context.translate(
           (width - drawnWidth) / 2 + view.x,
@@ -4036,6 +4359,10 @@ function DeathPositions({
         canvasPoints.current.push({ x, y, index });
         return { event, index, x, y };
       });
+      const visibleProjected = projected.filter(
+        ({ x, y }) =>
+          x >= -36 && x <= width + 36 && y >= -36 && y <= height + 36,
+      );
       canvasPointIndex.current = buildScreenPointIndex(canvasPoints.current);
       for (const { half, area } of openingLandmarks) {
         const [x, y] = point(area.center.x, area.center.y);
@@ -4064,6 +4391,32 @@ function DeathPositions({
         );
         context.restore();
       }
+      for (const landmark of observedExtentLandmarks) {
+        const [x, y] = point(
+          landmark.event.position!.x,
+          landmark.event.position!.y,
+        );
+        if (x < -80 || x > width + 80 || y < -40 || y > height + 40) continue;
+        const color = landmark.kind === "first" ? "#74d8ff" : "#ffba63";
+        context.save();
+        context.translate(x, y);
+        context.rotate(Math.PI / 4);
+        context.fillStyle = "rgba(5, 10, 8, .92)";
+        context.strokeStyle = color;
+        context.lineWidth = 2;
+        context.fillRect(-6, -6, 12, 12);
+        context.strokeRect(-6, -6, 12, 12);
+        context.restore();
+        context.fillStyle = "rgba(5, 10, 8, .9)";
+        context.fillRect(x + 10, y - 10, 152, 20);
+        context.fillStyle = color;
+        context.font = "700 11px ui-monospace, monospace";
+        context.fillText(
+          `${landmark.kind === "first" ? "FIRST" : "LAST"} OBSERVED · ${landmark.label.toUpperCase()}`,
+          x + 15,
+          y + 4,
+        );
+      }
       if (
         (displayMode === "density" || displayMode === "hybrid") &&
         densityRaster
@@ -4081,27 +4434,40 @@ function DeathPositions({
         context.restore();
       }
       if (displayMode === "events" || displayMode === "hybrid") {
-        if (projected.length > 500 && view.zoom < 2.2) {
+        if (visibleProjected.length > 350 && view.zoom < 4) {
           const clusters = new Map<
             string,
-            { x: number; y: number; count: number }
+            { x: number; y: number; count: number; indices: number[] }
           >();
           const clusterSize = 44;
-          for (const marker of projected) {
+          for (const marker of visibleProjected) {
             const key = `${Math.floor(marker.x / clusterSize)}:${Math.floor(marker.y / clusterSize)}`;
             const cluster = clusters.get(key);
             if (cluster) {
               cluster.x += marker.x;
               cluster.y += marker.y;
               cluster.count += 1;
+              cluster.indices.push(marker.index);
             } else {
-              clusters.set(key, { x: marker.x, y: marker.y, count: 1 });
+              clusters.set(key, {
+                x: marker.x,
+                y: marker.y,
+                count: 1,
+                indices: [marker.index],
+              });
             }
           }
+          canvasClusters.current = [];
           for (const cluster of clusters.values()) {
             const x = cluster.x / cluster.count;
             const y = cluster.y / cluster.count;
             const radius = Math.min(18, 7 + Math.log2(cluster.count + 1) * 2);
+            canvasClusters.current.push({
+              x,
+              y,
+              radius,
+              indices: cluster.indices,
+            });
             context.beginPath();
             context.arc(x, y, radius, 0, Math.PI * 2);
             context.fillStyle = "rgba(9, 18, 13, .9)";
@@ -4117,8 +4483,11 @@ function DeathPositions({
           }
           context.textAlign = "start";
           context.textBaseline = "alphabetic";
-        } else
-          for (const { event, index, x, y } of projected) {
+          element.dataset.clusterCount = String(canvasClusters.current.length);
+        } else {
+          canvasClusters.current = [];
+          element.dataset.clusterCount = "0";
+          for (const { event, index, x, y } of visibleProjected) {
             const infectedIcon = event.infectedClass
               ? infectedIconImages.current.get(
                   event.infectedClass.toLowerCase(),
@@ -4189,7 +4558,55 @@ function DeathPositions({
               context.stroke();
             }
           }
+        }
+      } else {
+        canvasClusters.current = [];
+        element.dataset.clusterCount = "0";
       }
+      const targetScalePixels = 84;
+      const rawScaleUnits = targetScalePixels / Math.max(scale, 0.000001);
+      const magnitude = 10 ** Math.floor(Math.log10(rawScaleUnits));
+      const normalizedScale = rawScaleUnits / magnitude;
+      const scaleUnits =
+        (normalizedScale >= 5 ? 5 : normalizedScale >= 2 ? 2 : 1) * magnitude;
+      const scalePixels = Math.min(130, scaleUnits * scale);
+      element.dataset.scaleUnits = String(scaleUnits);
+      const scaleX = 18;
+      const scaleY = height - 18;
+      context.save();
+      context.strokeStyle = "rgba(218, 235, 222, .78)";
+      context.fillStyle = "rgba(218, 235, 222, .72)";
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.moveTo(scaleX, scaleY - 5);
+      context.lineTo(scaleX, scaleY);
+      context.lineTo(scaleX + scalePixels, scaleY);
+      context.lineTo(scaleX + scalePixels, scaleY - 5);
+      context.stroke();
+      context.font = "700 11px ui-monospace, monospace";
+      context.fillText(
+        `${whole.format(scaleUnits)} SOURCE UNITS`,
+        scaleX,
+        scaleY - 9,
+      );
+      const orientationX = width - 24;
+      const orientationY = 30;
+      context.beginPath();
+      context.moveTo(orientationX, orientationY + 18);
+      context.lineTo(orientationX, orientationY - 5);
+      context.lineTo(orientationX - 4, orientationY + 2);
+      context.moveTo(orientationX, orientationY - 5);
+      context.lineTo(orientationX + 4, orientationY + 2);
+      context.stroke();
+      context.textAlign = "center";
+      context.fillText("+Y", orientationX, orientationY - 10);
+      context.restore();
+      const drawDuration = performance.now() - drawStartedAt;
+      element.dataset.drawDuration = drawDuration.toFixed(3);
+      element.dataset.maxDrawDuration = Math.max(
+        Number(element.dataset.maxDrawDuration ?? 0),
+        drawDuration,
+      ).toFixed(3);
     };
     drawSpatial.current = draw;
     draw();
@@ -4210,12 +4627,46 @@ function DeathPositions({
     selectedSpatialIndex,
     compareTeams,
     geometryLayers,
+    geometryRaster,
     densityRaster,
+    splitDensityRasters,
     compareDensityMode,
     infectedIconRevision,
     openingLandmarks,
+    observedExtentLandmarks,
   ]);
-  if (!positioned.length) return null;
+  const exploreCluster = (
+    cluster: (typeof canvasClusters.current)[number],
+    width: number,
+    height: number,
+  ) => {
+    const members = cluster.indices.map((index) => positioned[index]!);
+    const classCounts = new Map<string, number>();
+    for (const member of members) {
+      const label = member.infectedClass ?? member.type.replaceAll("_", " ");
+      classCounts.set(label, (classCounts.get(label) ?? 0) + 1);
+    }
+    setSelectedCluster({
+      count: members.length,
+      tickStart: Math.min(...members.map((member) => member.tick)),
+      tickEnd: Math.max(...members.map((member) => member.tick)),
+      composition: [...classCounts.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 3)
+        .map(([label, count]) => `${label} ${count}`)
+        .join(" · "),
+    });
+    setSelectedSpatialIndex(null);
+    scheduleViewport((current) => {
+      const nextZoom = Math.min(8, current.zoom * 1.8);
+      const ratio = nextZoom / current.zoom;
+      return {
+        zoom: nextZoom,
+        x: (current.x + width / 2 - cluster.x) * ratio,
+        y: (current.y + height / 2 - cluster.y) * ratio,
+      };
+    });
+  };
   if (geometry)
     return (
       <article
@@ -4282,6 +4733,58 @@ function DeathPositions({
               {expanded ? "Close" : "Expand"}
             </button>
           </span>
+        </div>
+        <div className="spatial-presets" aria-label="Map review presets">
+          <span>Presets</span>
+          <button
+            type="button"
+            className={
+              eventScope === "all" && displayMode === "hybrid" && !compareTeams
+                ? "active"
+                : ""
+            }
+            onClick={() => {
+              resetSpatialFilters();
+            }}
+          >
+            Review
+          </button>
+          <button
+            type="button"
+            className={eventScope === "critical" ? "active" : ""}
+            onClick={() => {
+              resetSpatialFilters();
+              setEventScope("critical");
+              setDisplayMode("events");
+            }}
+          >
+            Critical outcomes
+          </button>
+          <button
+            type="button"
+            className={eventScope === "pins" ? "active" : ""}
+            onClick={() => {
+              resetSpatialFilters();
+              setEventScope("pins");
+              setDisplayMode("events");
+            }}
+          >
+            Pins & clears
+          </button>
+          {competitive?.rosters?.length === 2 && (
+            <button
+              type="button"
+              className={compareTeams ? "active" : ""}
+              onClick={() => {
+                resetSpatialFilters();
+                setDisplayMode("density");
+                setCompareTeams(true);
+                setCompareDensityMode("split");
+              }}
+            >
+              Team comparison
+            </button>
+          )}
         </div>
         <details
           className="spatial-filter-drawer"
@@ -4408,7 +4911,7 @@ function DeathPositions({
             <div className="spatial-compare-actions">
               {compareTeams && (
                 <span aria-label="Team density comparison mode">
-                  {(["difference", "overlay"] as const).map((mode) => (
+                  {(["difference", "overlay", "split"] as const).map((mode) => (
                     <button
                       key={mode}
                       type="button"
@@ -4435,11 +4938,24 @@ function DeathPositions({
             </div>
           </div>
         )}
-        <div className="spatial-canvas-shell">
+        {!positioned.length && (
+          <div className="spatial-zero-state" role="status">
+            <div>
+              <strong>No positioned moments match these filters</strong>
+              <span>The map and shared controls remain available.</span>
+            </div>
+            <button type="button" onClick={resetSpatialFilters}>
+              Clear filters
+            </button>
+          </div>
+        )}
+        <div
+          className={`spatial-canvas-shell${compareTeams && compareDensityMode === "split" ? " is-split" : ""}`}
+        >
           <canvas
             ref={canvas}
             tabIndex={0}
-            aria-label={`Interactive top-down ${mapName} world geometry with ${positioned.length} positioned combat events. Drag to pan and scroll to zoom.`}
+            aria-label={`Interactive top-down ${mapName} world geometry with ${positioned.length} positioned combat events, a Source-unit scale, and +Y orientation. Drag to pan, scroll to zoom, press Enter to explore the largest visible cluster, or comma and period to traverse visible clusters.`}
             onWheel={(wheelEvent) => {
               wheelEvent.preventDefault();
               wheelEvent.stopPropagation();
@@ -4589,8 +5105,20 @@ function DeathPositions({
               const rect = pointerEvent.currentTarget.getBoundingClientRect();
               const x = pointerEvent.clientX - rect.left;
               const y = pointerEvent.clientY - rect.top;
+              const cluster = canvasClusters.current.find(
+                (candidate) =>
+                  Math.hypot(candidate.x - x, candidate.y - y) <=
+                  candidate.radius + 8,
+              );
+              if (cluster) {
+                exploreCluster(cluster, rect.width, rect.height);
+                return;
+              }
               const nearest = canvasPointIndex.current?.nearest(x, y, 18);
-              if (nearest) setSelectedSpatialIndex(nearest.index);
+              if (nearest) {
+                setSelectedCluster(null);
+                setSelectedSpatialIndex(nearest.index);
+              }
             }}
             onPointerCancel={(pointerEvent) => {
               pointers.current.delete(pointerEvent.pointerId);
@@ -4605,8 +5133,36 @@ function DeathPositions({
             }
             onKeyDown={(event) => {
               const step = event.shiftKey ? 80 : 32;
+              if (event.key === "Enter" && canvasClusters.current.length) {
+                event.preventDefault();
+                const largest = [...canvasClusters.current].sort(
+                  (left, right) => right.indices.length - left.indices.length,
+                )[0]!;
+                exploreCluster(
+                  largest,
+                  event.currentTarget.clientWidth,
+                  event.currentTarget.clientHeight,
+                );
+              }
+              if (
+                (event.key === "," || event.key === ".") &&
+                canvasClusters.current.length
+              ) {
+                event.preventDefault();
+                clusterKeyboardIndex.current =
+                  (clusterKeyboardIndex.current +
+                    (event.key === "." ? 1 : -1) +
+                    canvasClusters.current.length) %
+                  canvasClusters.current.length;
+                exploreCluster(
+                  canvasClusters.current[clusterKeyboardIndex.current]!,
+                  event.currentTarget.clientWidth,
+                  event.currentTarget.clientHeight,
+                );
+              }
               if (event.key === "Escape") {
                 setSelectedSpatialIndex(null);
+                setSelectedCluster(null);
                 setExpanded(false);
               }
               if (event.key === "0")
@@ -4660,7 +5216,7 @@ function DeathPositions({
             <span>{viewport.zoom.toFixed(2)}×</span>
             <span>
               {positioned.length} positioned moments
-              {positioned.length > 500 && viewport.zoom < 2.2
+              {positioned.length > 350 && viewport.zoom < 4
                 ? " · clustered"
                 : ""}
             </span>
@@ -4676,6 +5232,25 @@ function DeathPositions({
             </div>
           )}
         </div>
+        {selectedCluster && (
+          <article
+            className="spatial-selection spatial-cluster-selection"
+            aria-live="polite"
+          >
+            <div>
+              <span>
+                Explored cluster · ticks{" "}
+                {whole.format(selectedCluster.tickStart)}–
+                {whole.format(selectedCluster.tickEnd)}
+              </span>
+              <strong>{selectedCluster.count} positioned moments</strong>
+              <small>{selectedCluster.composition}</small>
+            </div>
+            <button type="button" onClick={() => setSelectedCluster(null)}>
+              Dismiss
+            </button>
+          </article>
+        )}
         <details className="spatial-advanced-controls">
           <summary>Layers & height</summary>
           <div>
@@ -4816,6 +5391,9 @@ function DeathPositions({
               <i /> Observed opening
             </span>
           )}
+          <span className="extent">
+            <i /> First/last observed
+          </span>
         </div>
         {displayMode !== "events" && densityGrids && (
           <div className="spatial-density-legend">
@@ -4856,6 +5434,14 @@ function DeathPositions({
             </span>
           </div>
         )}
+        <div className="spatial-landmark-notice extent-notice">
+          <strong>Observed progression anchors</strong>
+          <span>
+            First and last positioned event in each visible half · demo-derived
+            orientation aids, not authored saferoom boundaries or movement
+            routes
+          </span>
+        </div>
         <SpatialEventLinks
           events={positioned}
           demoSha256={demoSha256}
@@ -5020,18 +5606,59 @@ function Timeline({
   stats: DemoStats[];
   analyses: JobAnalysis[];
 }) {
-  const [filter, setFilter] = useState("all");
-  const [mapScope, setMapScope] = useState(analyses[0]?.demoSha256 ?? "");
+  const initialTimelineParameters = new URLSearchParams(window.location.search);
+  const initialFilter = initialTimelineParameters.get("storyFilter");
+  const [filter, setFilter] = useState(
+    [
+      "all",
+      "combat",
+      "pins",
+      "infected",
+      "bosses",
+      "rounds",
+      "support",
+    ].includes(initialFilter ?? "")
+      ? initialFilter!
+      : "all",
+  );
+  const [mapScope, setMapScope] = useState(
+    initialTimelineParameters.get("storyMap") ?? analyses[0]?.demoSha256 ?? "",
+  );
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedHit, setSelectedHit] = useState<string | null>(
+    initialTimelineParameters.get("hit"),
+  );
   const [hovered, setHovered] = useState<{
     key: string;
     x: number;
     y: number;
   } | null>(null);
-  const [zoom, setZoom] = useState(() => (window.innerWidth <= 700 ? 1 : 2));
+  const [zoom, setZoom] = useState(() => {
+    const requested = Number(initialTimelineParameters.get("storyDensity"));
+    return [1, 2, 4].includes(requested)
+      ? requested
+      : window.innerWidth <= 700
+        ? 1
+        : 2;
+  });
   const [fullscreen, setFullscreen] = useState(false);
-  const [timelineView, setTimelineView] = useState<"hits" | "timeline">("hits");
+  const [timelineView, setTimelineView] = useState<"hits" | "timeline">(() =>
+    initialTimelineParameters.get("storyView") === "timeline"
+      ? "timeline"
+      : "hits",
+  );
   const [storyLimit, setStoryLimit] = useState(100);
+  const [moreTimelineFilters, setMoreTimelineFilters] = useState(
+    initialTimelineParameters.get("storyMore") === "1",
+  );
+  const [timelinePresentation, setTimelinePresentation] = useState<
+    "list" | "chart"
+  >(() => {
+    const requested = initialTimelineParameters.get("storyPresentation");
+    if (requested === "list" || requested === "chart") return requested;
+    return window.innerWidth <= 700 ? "list" : "chart";
+  });
+  const [timelineListLimit, setTimelineListLimit] = useState(100);
   const storyTabId = useId();
   const timelineTabId = useId();
   const storyPanelId = useId();
@@ -5123,6 +5750,30 @@ function Timeline({
   const active = selected
     ? (visible.find((item) => item.key === selected) ?? null)
     : null;
+  useEffect(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    parameters.set("storyView", timelineView);
+    parameters.set("storyFilter", filter);
+    parameters.set("storyMap", mapScope);
+    parameters.set("storyDensity", String(zoom));
+    parameters.set("storyPresentation", timelinePresentation);
+    parameters.set("storyMore", moreTimelineFilters ? "1" : "0");
+    if (selectedHit) parameters.set("hit", selectedHit);
+    else parameters.delete("hit");
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}?${parameters.toString()}`,
+    );
+  }, [
+    filter,
+    mapScope,
+    moreTimelineFilters,
+    selectedHit,
+    timelinePresentation,
+    timelineView,
+    zoom,
+  ]);
   useEffect(() => {
     if (!selected) return;
     const frame = window.requestAnimationFrame(() => {
@@ -5234,6 +5885,11 @@ function Timeline({
       )[0];
     if (target) setSelected(target.key);
   };
+  const selectedHitSummary = selectedHit
+    ? (hitSummaries.find(
+        (summary) => `${summary.demo.sha256}:${summary.hit.id}` === selectedHit,
+      ) ?? null)
+    : null;
   const visibleHitSummaries = hitSummaries.filter((summary) => {
     if (filter === "all" || filter === "infected") return true;
     if (filter === "combat")
@@ -5302,13 +5958,32 @@ function Timeline({
     group.push(item);
     storyEventGroups.set(key, group);
   }
+  const topLevelStoryEventGroups = [...storyEventGroups.values()].filter(
+    (items) => {
+      const first = items[0];
+      if (!first) return false;
+      if (
+        items.some(
+          ({ event }) =>
+            event.type === "round_start" || event.type === "round_end",
+        )
+      )
+        return true;
+      return !visibleHitSummaries.some(
+        (summary) =>
+          summary.demo.sha256 === first.demo.sha256 &&
+          first.event.tick >= summary.hit.tickRange.start &&
+          first.event.tick <= summary.hit.tickRange.end,
+      );
+    },
+  );
   const storyItems = [
     ...visibleHitSummaries.map((summary) => ({
       kind: "hit" as const,
       tick: summary.hit.tickRange.start,
       summary,
     })),
-    ...[...storyEventGroups.values()].map((items) => ({
+    ...topLevelStoryEventGroups.map((items) => ({
       kind: "event" as const,
       tick: items[0]!.event.tick,
       items,
@@ -5323,22 +5998,37 @@ function Timeline({
         .sort((left, right) => left - right),
     ]),
   );
-  const storyRoundContext = (story: (typeof storyItems)[number]) => {
-    const demo =
-      story.kind === "hit" ? story.summary.demo : story.items[0]!.demo;
+  const roundContextForTick = (
+    demo: (typeof scopedDemos)[number],
+    tick: number,
+  ) => {
     const starts = storyRoundStarts.get(demo.sha256) ?? [];
     const observedRound = starts.reduce(
-      (found, tick, index) => (tick <= story.tick ? index : found),
+      (found, start, index) => (start <= tick ? index : found),
       -1,
+    );
+    const half = demo.demo.competitive?.halves.find(
+      (candidate) =>
+        tick >= candidate.tickRange.start && tick <= candidate.tickRange.end,
+    );
+    const survivorRoster = demo.demo.competitive?.rosters?.find((roster) =>
+      half?.survivorPlayerIds.some((playerId) =>
+        roster.playerIds.includes(playerId),
+      ),
     );
     return {
       key: `${demo.sha256}:${observedRound}`,
       label: observedRound >= 0 ? `Round ${observedRound + 1}` : "Unsegmented",
       detail:
         observedRound >= 0
-          ? `Observed boundary · ${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
+          ? `${survivorRoster ? `Team ${survivorRoster.id} Survivors · ` : ""}Observed boundary · ${formatTickTime(starts[observedRound]!, demo.demo.tickRate)}`
           : "Boundary unavailable",
     };
+  };
+  const storyRoundContext = (story: (typeof storyItems)[number]) => {
+    const demo =
+      story.kind === "hit" ? story.summary.demo : story.items[0]!.demo;
+    return roundContextForTick(demo, story.tick);
   };
   const storyEventLabel = (event: MatchTimelineEvent) => {
     if (event.type === "tank_control") return "Tank entered play";
@@ -5377,7 +6067,10 @@ function Timeline({
           </button>
         </div>
       </div>
-      <div className="timeline-filters" aria-label="Timeline filters">
+      <div
+        className={`timeline-filters ${moreTimelineFilters || ["pins", "infected", "rounds", "support"].includes(filter) ? "show-secondary" : ""}`}
+        aria-label="Timeline filters"
+      >
         <span className="timeline-map-filter" aria-label="Timeline map">
           {demos.map((demo) => (
             <button
@@ -5388,6 +6081,7 @@ function Timeline({
               onClick={() => {
                 setMapScope(demo.sha256);
                 setSelected(null);
+                setSelectedHit(null);
               }}
             >
               {demo.mapName}
@@ -5397,19 +6091,33 @@ function Timeline({
         {["all", ...Object.keys(groups)].map((value) => (
           <button
             type="button"
-            className={filter === value ? "active" : ""}
+            className={`${filter === value ? "active" : ""} ${["pins", "infected", "rounds", "support"].includes(value) ? "timeline-filter-secondary" : ""}`}
             aria-pressed={filter === value}
             aria-label={value}
             key={value}
             onClick={() => {
               setFilter(value);
               setSelected(null);
+              setSelectedHit(null);
             }}
           >
             {value} <span aria-hidden="true">{filterCounts[value]}</span>
           </button>
         ))}
-        <span className="timeline-zoom" aria-label="Timeline zoom">
+        <button
+          type="button"
+          className="timeline-more-toggle"
+          aria-expanded={moreTimelineFilters}
+          onClick={() => setMoreTimelineFilters((current) => !current)}
+        >
+          {moreTimelineFilters ? "Less" : "More"}
+        </button>
+        <span
+          className="timeline-zoom"
+          aria-label={
+            timelineView === "hits" ? "Story density" : "Timeline zoom"
+          }
+        >
           {[1, 2, 4].map((value) => (
             <button
               key={value}
@@ -5417,7 +6125,17 @@ function Timeline({
               aria-pressed={zoom === value}
               onClick={() => setZoom(value)}
             >
-              {value === 1 ? "full match" : value === 2 ? "inspect" : "detail"}
+              {timelineView === "hits"
+                ? value === 1
+                  ? "compact"
+                  : value === 2
+                    ? "comfortable"
+                    : "spacious"
+                : value === 1
+                  ? "full match"
+                  : value === 2
+                    ? "inspect"
+                    : "detail"}
             </button>
           ))}
         </span>
@@ -5474,7 +6192,9 @@ function Timeline({
           className={`hit-roundup hit-density-${zoom}`}
         >
           <header>
-            <strong>{storyItems.length} filtered major moments</strong>
+            <strong>
+              {storyItems.length} story moments · {visible.length} source events
+            </strong>
             <span>Select a moment, then open Timeline for full evidence</span>
           </header>
           <p className="story-availability-note">
@@ -5508,8 +6228,16 @@ function Timeline({
                         type="button"
                         className={`hit-summary-card story-event-row ${story.items
                           .map(({ event }) => `story-event-${event.type}`)
-                          .join(" ")}`}
-                        onClick={() => setSelected(story.items[0]!.key)}
+                          .join(
+                            " ",
+                          )} ${story.items.some((item) => item.key === selected) ? "is-selected" : ""}`}
+                        aria-pressed={story.items.some(
+                          (item) => item.key === selected,
+                        )}
+                        onClick={() => {
+                          setSelected(story.items[0]!.key);
+                          setSelectedHit(null);
+                        }}
                       >
                         <span className="story-event-context">
                           {story.items[0]!.event.infectedClass && (
@@ -5530,6 +6258,15 @@ function Timeline({
                             <small>
                               {story.items[0]!.event.infectedClass ??
                                 "match state"}
+                            </small>
+                            <small className="story-event-mobile-meta">
+                              {story.items.length > 1
+                                ? `${story.items.length} linked moments`
+                                : storyEventLabel(story.items[0]!.event)}{" "}
+                              ·{" "}
+                              {formatElapsedTime(
+                                story.items[0]!.event.timeSeconds,
+                              )}
                             </small>
                           </span>
                         </span>
@@ -5579,8 +6316,17 @@ function Timeline({
                     ) : (
                       <button
                         type="button"
-                        className="hit-summary-card"
-                        onClick={() => openHit(story.summary)}
+                        className={`hit-summary-card ${selectedHit === `${story.summary.demo.sha256}:${story.summary.hit.id}` ? "is-selected" : ""}`}
+                        aria-pressed={
+                          selectedHit ===
+                          `${story.summary.demo.sha256}:${story.summary.hit.id}`
+                        }
+                        onClick={() => {
+                          setSelectedHit(
+                            `${story.summary.demo.sha256}:${story.summary.hit.id}`,
+                          );
+                          setSelected(null);
+                        }}
                       >
                         <span className="hit-summary-core">
                           <small>
@@ -5716,7 +6462,54 @@ function Timeline({
               No major story moments match the current map and category filters.
             </p>
           )}
-          {active && (
+          {selectedHitSummary && (
+            <article
+              className="story-inspector hit-inspector"
+              aria-live="polite"
+            >
+              <div>
+                <span>
+                  Hit {hitRoundContext(selectedHitSummary).hit} ·{" "}
+                  {formatTickTime(
+                    selectedHitSummary.hit.tickRange.start,
+                    selectedHitSummary.demo.demo.tickRate,
+                  )}
+                  –
+                  {formatTickTime(
+                    selectedHitSummary.hit.tickRange.end,
+                    selectedHitSummary.demo.demo.tickRate,
+                  )}
+                </span>
+                <strong>
+                  {whole.format(
+                    selectedHitSummary.hit.observedSurvivorHealthLoss,
+                  )}{" "}
+                  observed HP loss · {selectedHitSummary.hit.controls} controls
+                  · peak {selectedHitSummary.hit.peakSimultaneousPins} pins
+                </strong>
+                <small>
+                  {
+                    selectedHitSummary.demo.events.filter(
+                      ({ event }) =>
+                        event.tick >= selectedHitSummary.hit.tickRange.start &&
+                        event.tick <= selectedHitSummary.hit.tickRange.end,
+                    ).length
+                  }{" "}
+                  constituent retained events · spawn-gap-v1 grouping
+                </small>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  openHit(selectedHitSummary);
+                  setTimelineView("timeline");
+                }}
+              >
+                Inspect hit range
+              </button>
+            </article>
+          )}
+          {active && !selectedHitSummary && (
             <article className="story-inspector" aria-live="polite">
               <div>
                 <span>
@@ -5743,312 +6536,373 @@ function Timeline({
             aria-labelledby={timelineTabId}
             className="timeline-demo-stack"
           >
-            <p className="timeline-hint">
-              Select a map, then scroll from tick 0 to its playback end. Select
-              a marker for full event evidence. Rows expand when moments
-              collide.
-            </p>
-            {visibleDemos.map((source) => {
-              const maximumTick = Math.max(1, source.demo.playbackTicks);
-              const baseCanvasWidth = Math.max(
-                1260,
-                Math.round(source.demo.durationSeconds * 3),
-              );
-              const canvasWidth = baseCanvasWidth * zoom;
-              const guideCount = Math.max(
-                2,
-                Math.ceil(source.demo.durationSeconds / 60),
-              );
-              const pinBands = source.events.flatMap((item, index) => {
-                if (item.event.type !== "pin_start") return [];
-                const end = source.events.slice(index + 1).find((candidate) => {
-                  if (
-                    candidate.event.type !== "pin_end" &&
-                    candidate.event.type !== "death"
-                  )
-                    return false;
-                  const sameActor =
-                    item.event.actorPlayerId &&
-                    (candidate.event.type === "death"
-                      ? candidate.event.victimPlayerId
-                      : candidate.event.actorPlayerId)
-                      ? item.event.actorPlayerId ===
-                        (candidate.event.type === "death"
-                          ? candidate.event.victimPlayerId
-                          : candidate.event.actorPlayerId)
-                      : candidate.event.type === "death"
-                        ? item.event.actor === candidate.event.victim
-                        : item.event.actor === candidate.event.actor;
-                  if (candidate.event.type === "death")
-                    return (
-                      sameActor &&
-                      item.event.infectedClass === candidate.event.infectedClass
-                    );
-                  const sameVictim =
-                    item.event.victimPlayerId && candidate.event.victimPlayerId
-                      ? item.event.victimPlayerId ===
-                        candidate.event.victimPlayerId
-                      : item.event.victim === candidate.event.victim;
+            <div
+              className="timeline-presentation-switch"
+              aria-label="Timeline presentation"
+            >
+              <button
+                type="button"
+                className={timelinePresentation === "list" ? "active" : ""}
+                aria-pressed={timelinePresentation === "list"}
+                onClick={() => setTimelinePresentation("list")}
+              >
+                Event list
+              </button>
+              <button
+                type="button"
+                className={timelinePresentation === "chart" ? "active" : ""}
+                aria-pressed={timelinePresentation === "chart"}
+                onClick={() => setTimelinePresentation("chart")}
+              >
+                Lane chart
+              </button>
+            </div>
+            {timelinePresentation === "chart" && (
+              <p className="timeline-hint">
+                Scroll through playback time and select a marker for full event
+                evidence. Rows expand when moments collide.
+              </p>
+            )}
+            {timelinePresentation === "list" && (
+              <div className="mobile-timeline-list">
+                {visible.slice(0, timelineListLimit).map((item, index) => {
+                  const round = roundContextForTick(item.demo, item.event.tick);
+                  const previousRound =
+                    index > 0
+                      ? roundContextForTick(
+                          visible[index - 1]!.demo,
+                          visible[index - 1]!.event.tick,
+                        )
+                      : undefined;
                   return (
-                    sameActor &&
-                    sameVictim &&
-                    item.event.infectedClass === candidate.event.infectedClass
+                    <Fragment key={`list:${item.key}`}>
+                      {previousRound?.key !== round.key && (
+                        <div className="story-round-divider">
+                          <strong>{round.label}</strong>
+                          <span>{round.detail}</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className={`mobile-timeline-event ${active?.key === item.key ? "is-selected" : ""}`}
+                        aria-pressed={active?.key === item.key}
+                        onClick={() => setSelected(item.key)}
+                      >
+                        {item.event.infectedClass ? (
+                          <InfectedIcon
+                            infectedClass={item.event.infectedClass}
+                            label={item.event.infectedClass}
+                          />
+                        ) : (
+                          <span className="mobile-timeline-glyph">•</span>
+                        )}
+                        <span>
+                          <strong>{item.event.detail}</strong>
+                          <small>
+                            {item.event.actor ?? item.event.subject ?? "Match"}
+                            {item.event.infectedClass
+                              ? ` · ${item.event.infectedClass}`
+                              : ` · ${item.event.type.replaceAll("_", " ")}`}
+                          </small>
+                        </span>
+                        <time>{formatElapsedTime(item.event.timeSeconds)}</time>
+                      </button>
+                    </Fragment>
                   );
-                });
-                if (!end) return [];
-                return [
-                  {
+                })}
+                {timelineListLimit < visible.length && (
+                  <button
+                    type="button"
+                    className="story-show-more"
+                    onClick={() =>
+                      setTimelineListLimit((current) => current + 100)
+                    }
+                  >
+                    Show next{" "}
+                    {Math.min(100, visible.length - timelineListLimit)} of{" "}
+                    {visible.length} events
+                  </button>
+                )}
+              </div>
+            )}
+            {timelinePresentation === "chart" &&
+              visibleDemos.map((source) => {
+                const maximumTick = Math.max(1, source.demo.playbackTicks);
+                const baseCanvasWidth = Math.max(
+                  1260,
+                  Math.round(source.demo.durationSeconds * 3),
+                );
+                const canvasWidth = baseCanvasWidth * zoom;
+                const guideCount = Math.max(
+                  2,
+                  Math.ceil(source.demo.durationSeconds / 60),
+                );
+                const pinBands = pairObservedPins(
+                  source.events.map(({ event }) => event),
+                ).map(({ startIndex, endIndex }) => {
+                  const item = source.events[startIndex]!;
+                  const end = source.events[endIndex]!;
+                  return {
                     id: `pin:${item.key}`,
                     kind: "pin" as const,
                     start: item.event.tick,
                     end: end.event.tick,
                     label: `${item.event.infectedClass ?? "SI"} pin`,
                     detail: `${item.event.actor ?? "Special Infected"} controlled ${item.event.victim ?? "a Survivor"}`,
-                  },
-                ];
-              });
-              const hitBands = (source.demo.competitive?.hits ?? []).map(
-                (hit) => ({
-                  id: hit.id,
-                  kind: "hit" as const,
-                  start: hit.tickRange.start,
-                  end: hit.tickRange.end,
-                  label: `${hit.infectedClasses.join(" + ") || "SI"} hit`,
-                  detail: `${hit.playerIds.length} players, ${hit.controls} controls, peak ${hit.peakSimultaneousPins} simultaneous pins`,
-                }),
-              );
-              const tankBands = (
-                source.demo.competitive?.tankEncounters ?? []
-              ).map((tank) => ({
-                id: tank.id,
-                kind: "tank" as const,
-                start: tank.tickRange.start,
-                end: tank.tickRange.end,
-                label: `Tank · ${tank.controllerAlias}`,
-                detail: `${duration(tank.durationSeconds)}, ${tank.punches} punches, ${tank.registeredRockThrows} registered throws`,
-              }));
-              return (
-                <section className="match-timeline" key={source.demoIndex}>
-                  <header className="timeline-demo-head">
-                    <div>
-                      <span className="eyebrow">
-                        Demo {source.demoIndex + 1}
+                  };
+                });
+                const hitBands = (source.demo.competitive?.hits ?? []).map(
+                  (hit) => ({
+                    id: hit.id,
+                    kind: "hit" as const,
+                    start: hit.tickRange.start,
+                    end: hit.tickRange.end,
+                    label: `${hit.infectedClasses.join(" + ") || "SI"} hit`,
+                    detail: `${hit.playerIds.length} players, ${hit.controls} controls, peak ${hit.peakSimultaneousPins} simultaneous pins`,
+                  }),
+                );
+                const tankBands = (
+                  source.demo.competitive?.tankEncounters ?? []
+                ).map((tank) => ({
+                  id: tank.id,
+                  kind: "tank" as const,
+                  start: tank.tickRange.start,
+                  end: tank.tickRange.end,
+                  label: `Tank · ${tank.controllerAlias}`,
+                  detail: `${duration(tank.durationSeconds)}, ${tank.punches} punches, ${tank.registeredRockThrows} registered throws`,
+                }));
+                return (
+                  <section className="match-timeline" key={source.demoIndex}>
+                    <header className="timeline-demo-head">
+                      <div>
+                        <span className="eyebrow">
+                          Demo {source.demoIndex + 1}
+                        </span>
+                        <h3>{source.mapName}</h3>
+                      </div>
+                      <span>
+                        {source.sha256.slice(0, 12)} ·{" "}
+                        {whole.format(source.demo.playbackTicks)} ticks ·{" "}
+                        {source.demo.tickRate === null
+                          ? "time unavailable"
+                          : duration(source.demo.durationSeconds)}
                       </span>
-                      <h3>{source.mapName}</h3>
-                    </div>
-                    <span>
-                      {source.sha256.slice(0, 12)} ·{" "}
-                      {whole.format(source.demo.playbackTicks)} ticks ·{" "}
-                      {source.demo.tickRate === null
-                        ? "time unavailable"
-                        : duration(source.demo.durationSeconds)}
-                    </span>
-                  </header>
-                  <div className="timeline-scroll">
-                    <span className="timeline-scroll-cue" aria-hidden="true">
-                      Scroll horizontally
-                    </span>
-                    <div
-                      className="timeline-canvas"
-                      style={{ width: canvasWidth }}
-                    >
-                      <div className="timeline-axis">
-                        <strong>Playback time</strong>
-                        <div>
-                          {Array.from(
-                            { length: guideCount + 1 },
-                            (_, index) => (
-                              <span
-                                key={index}
-                                style={{
-                                  left: `${(index / guideCount) * 100}%`,
-                                }}
+                    </header>
+                    <div className="timeline-scroll">
+                      <span className="timeline-scroll-cue" aria-hidden="true">
+                        Scroll horizontally
+                      </span>
+                      <div
+                        className="timeline-canvas"
+                        style={{ width: canvasWidth }}
+                      >
+                        <div className="timeline-axis">
+                          <strong>Playback time</strong>
+                          <div>
+                            {Array.from(
+                              { length: guideCount + 1 },
+                              (_, index) => (
+                                <span
+                                  key={index}
+                                  style={{
+                                    left: `${(index / guideCount) * 100}%`,
+                                  }}
+                                >
+                                  {duration(
+                                    (source.demo.durationSeconds * index) /
+                                      guideCount,
+                                  )}
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                        <div
+                          className="timeline-lanes"
+                          aria-label={`Interactive ${source.mapName} timeline`}
+                        >
+                          {lanes.map((lane) => {
+                            const laneEvents = source.events.filter(
+                              ({ event }) => lane.types.includes(event.type),
+                            );
+                            const occupiedRows: number[] = [];
+                            const minimumGap = (86 / canvasWidth) * 100;
+                            const packed = laneEvents.map((item) => {
+                              const position = Math.min(
+                                99.5,
+                                Math.max(
+                                  0.5,
+                                  (item.event.tick / maximumTick) * 100,
+                                ),
+                              );
+                              let row = occupiedRows.findIndex(
+                                (last) => position - last >= minimumGap,
+                              );
+                              if (row < 0) row = occupiedRows.length;
+                              occupiedRows[row] = position;
+                              return { ...item, position, row };
+                            });
+                            const laneBands =
+                              lane.name === "SI actions"
+                                ? hitBands
+                                : lane.name === "Pins + clears"
+                                  ? pinBands
+                                  : lane.name === "Bosses"
+                                    ? tankBands
+                                    : [];
+                            const bandRows: number[] = [];
+                            const packedBands = laneBands.map((band) => {
+                              const left = Math.max(
+                                0.2,
+                                (band.start / maximumTick) * 100,
+                              );
+                              const right = Math.min(
+                                99.8,
+                                (Math.max(band.start + 1, band.end) /
+                                  maximumTick) *
+                                  100,
+                              );
+                              let row = bandRows.findIndex(
+                                (lastRight) => left - lastRight >= 0.35,
+                              );
+                              if (row < 0) row = bandRows.length;
+                              bandRows[row] = right;
+                              return {
+                                ...band,
+                                left,
+                                width: Math.max(0.55, right - left),
+                                row,
+                              };
+                            });
+                            const bandArea = packedBands.length
+                              ? 16 + bandRows.length * 26
+                              : 0;
+                            const laneHeight = Math.max(
+                              laneEvents.length === 0 ? 76 : 132,
+                              34 + bandArea + occupiedRows.length * 42,
+                            );
+                            return (
+                              <div
+                                className="timeline-lane"
+                                key={lane.name}
+                                style={{ minHeight: laneHeight }}
                               >
-                                {duration(
-                                  (source.demo.durationSeconds * index) /
-                                    guideCount,
-                                )}
-                              </span>
-                            ),
-                          )}
+                                <strong>
+                                  <span>{lane.name}</span>
+                                  <small>{laneEvents.length} events</small>
+                                </strong>
+                                <div style={{ minHeight: laneHeight }}>
+                                  <i />
+                                  {packedBands.map((band) => (
+                                    <span
+                                      key={band.id}
+                                      className={`timeline-band ${band.kind}`}
+                                      style={{
+                                        left: `${band.left}%`,
+                                        width: `${band.width}%`,
+                                        top: `${12 + band.row * 26}px`,
+                                      }}
+                                      title={`${band.label}. ${band.detail}`}
+                                    >
+                                      <b>{band.label}</b>
+                                    </span>
+                                  ))}
+                                  {packed.map(
+                                    ({ event, key, position, row }) => {
+                                      const infectedMarker = hasInfectedIcon(
+                                        event.infectedClass,
+                                      );
+                                      const time =
+                                        source.demo.tickRate === null
+                                          ? "time unavailable"
+                                          : formatElapsedTime(
+                                              event.timeSeconds,
+                                            );
+                                      return (
+                                        <button
+                                          key={key}
+                                          className={`${event.type} ${active?.key === key ? "active" : ""} ${infectedMarker ? "infected-marker" : ""}`}
+                                          style={{
+                                            left: `${position}%`,
+                                            top: `${17 + bandArea + row * 42}px`,
+                                          }}
+                                          onClick={() => setSelected(key)}
+                                          onPointerDown={() => setSelected(key)}
+                                          onPointerEnter={(event) => {
+                                            const rect =
+                                              event.currentTarget.getBoundingClientRect();
+                                            const above =
+                                              rect.bottom + 170 >
+                                              window.innerHeight;
+                                            setHovered({
+                                              key,
+                                              x: Math.min(
+                                                window.innerWidth - 332,
+                                                Math.max(12, rect.left - 24),
+                                              ),
+                                              y: above
+                                                ? Math.max(12, rect.top - 156)
+                                                : rect.bottom + 10,
+                                            });
+                                          }}
+                                          onPointerLeave={() =>
+                                            setHovered(null)
+                                          }
+                                          onFocus={(event) => {
+                                            const rect =
+                                              event.currentTarget.getBoundingClientRect();
+                                            setHovered({
+                                              key,
+                                              x: Math.min(
+                                                window.innerWidth - 332,
+                                                Math.max(12, rect.left - 24),
+                                              ),
+                                              y: Math.min(
+                                                window.innerHeight - 156,
+                                                rect.bottom + 10,
+                                              ),
+                                            });
+                                          }}
+                                          onBlur={() => setHovered(null)}
+                                          aria-pressed={active?.key === key}
+                                          data-timeline-active={
+                                            active?.key === key
+                                              ? "true"
+                                              : undefined
+                                          }
+                                          aria-label={`${source.mapName}, tick ${event.tick}, ${event.type.replaceAll("_", " ")}: ${event.detail}`}
+                                        >
+                                          <b>
+                                            {infectedMarker &&
+                                            event.infectedClass ? (
+                                              <InfectedIcon
+                                                infectedClass={
+                                                  event.infectedClass
+                                                }
+                                              />
+                                            ) : (
+                                              event.type.replaceAll("_", " ")
+                                            )}
+                                          </b>
+                                          {(event.actor || event.subject) && (
+                                            <small>
+                                              {event.actor ?? event.subject}
+                                            </small>
+                                          )}
+                                        </button>
+                                      );
+                                    },
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      <div
-                        className="timeline-lanes"
-                        aria-label={`Interactive ${source.mapName} timeline`}
-                      >
-                        {lanes.map((lane) => {
-                          const laneEvents = source.events.filter(({ event }) =>
-                            lane.types.includes(event.type),
-                          );
-                          const occupiedRows: number[] = [];
-                          const minimumGap = (86 / canvasWidth) * 100;
-                          const packed = laneEvents.map((item) => {
-                            const position = Math.min(
-                              99.5,
-                              Math.max(
-                                0.5,
-                                (item.event.tick / maximumTick) * 100,
-                              ),
-                            );
-                            let row = occupiedRows.findIndex(
-                              (last) => position - last >= minimumGap,
-                            );
-                            if (row < 0) row = occupiedRows.length;
-                            occupiedRows[row] = position;
-                            return { ...item, position, row };
-                          });
-                          const laneBands =
-                            lane.name === "SI actions"
-                              ? hitBands
-                              : lane.name === "Pins + clears"
-                                ? pinBands
-                                : lane.name === "Bosses"
-                                  ? tankBands
-                                  : [];
-                          const bandRows: number[] = [];
-                          const packedBands = laneBands.map((band) => {
-                            const left = Math.max(
-                              0.2,
-                              (band.start / maximumTick) * 100,
-                            );
-                            const right = Math.min(
-                              99.8,
-                              (Math.max(band.start + 1, band.end) /
-                                maximumTick) *
-                                100,
-                            );
-                            let row = bandRows.findIndex(
-                              (lastRight) => left - lastRight >= 0.35,
-                            );
-                            if (row < 0) row = bandRows.length;
-                            bandRows[row] = right;
-                            return {
-                              ...band,
-                              left,
-                              width: Math.max(0.55, right - left),
-                              row,
-                            };
-                          });
-                          const bandArea = packedBands.length
-                            ? 16 + bandRows.length * 26
-                            : 0;
-                          const laneHeight = Math.max(
-                            laneEvents.length === 0 ? 76 : 132,
-                            34 + bandArea + occupiedRows.length * 42,
-                          );
-                          return (
-                            <div
-                              className="timeline-lane"
-                              key={lane.name}
-                              style={{ minHeight: laneHeight }}
-                            >
-                              <strong>
-                                <span>{lane.name}</span>
-                                <small>{laneEvents.length} events</small>
-                              </strong>
-                              <div style={{ minHeight: laneHeight }}>
-                                <i />
-                                {packedBands.map((band) => (
-                                  <span
-                                    key={band.id}
-                                    className={`timeline-band ${band.kind}`}
-                                    style={{
-                                      left: `${band.left}%`,
-                                      width: `${band.width}%`,
-                                      top: `${12 + band.row * 26}px`,
-                                    }}
-                                    title={`${band.label}. ${band.detail}`}
-                                  >
-                                    <b>{band.label}</b>
-                                  </span>
-                                ))}
-                                {packed.map(({ event, key, position, row }) => {
-                                  const infectedMarker = hasInfectedIcon(
-                                    event.infectedClass,
-                                  );
-                                  const time =
-                                    source.demo.tickRate === null
-                                      ? "time unavailable"
-                                      : formatElapsedTime(event.timeSeconds);
-                                  return (
-                                    <button
-                                      key={key}
-                                      className={`${event.type} ${active?.key === key ? "active" : ""} ${infectedMarker ? "infected-marker" : ""}`}
-                                      style={{
-                                        left: `${position}%`,
-                                        top: `${17 + bandArea + row * 42}px`,
-                                      }}
-                                      onClick={() => setSelected(key)}
-                                      onPointerDown={() => setSelected(key)}
-                                      onPointerEnter={(event) => {
-                                        const rect =
-                                          event.currentTarget.getBoundingClientRect();
-                                        const above =
-                                          rect.bottom + 170 >
-                                          window.innerHeight;
-                                        setHovered({
-                                          key,
-                                          x: Math.min(
-                                            window.innerWidth - 332,
-                                            Math.max(12, rect.left - 24),
-                                          ),
-                                          y: above
-                                            ? Math.max(12, rect.top - 156)
-                                            : rect.bottom + 10,
-                                        });
-                                      }}
-                                      onPointerLeave={() => setHovered(null)}
-                                      onFocus={(event) => {
-                                        const rect =
-                                          event.currentTarget.getBoundingClientRect();
-                                        setHovered({
-                                          key,
-                                          x: Math.min(
-                                            window.innerWidth - 332,
-                                            Math.max(12, rect.left - 24),
-                                          ),
-                                          y: Math.min(
-                                            window.innerHeight - 156,
-                                            rect.bottom + 10,
-                                          ),
-                                        });
-                                      }}
-                                      onBlur={() => setHovered(null)}
-                                      aria-pressed={active?.key === key}
-                                      data-timeline-active={
-                                        active?.key === key ? "true" : undefined
-                                      }
-                                      aria-label={`${source.mapName}, tick ${event.tick}, ${event.type.replaceAll("_", " ")}: ${event.detail}`}
-                                    >
-                                      <b>
-                                        {infectedMarker &&
-                                        event.infectedClass ? (
-                                          <InfectedIcon
-                                            infectedClass={event.infectedClass}
-                                          />
-                                        ) : (
-                                          event.type.replaceAll("_", " ")
-                                        )}
-                                      </b>
-                                      {(event.actor || event.subject) && (
-                                        <small>
-                                          {event.actor ?? event.subject}
-                                        </small>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
                     </div>
-                  </div>
-                </section>
-              );
-            })}
+                  </section>
+                );
+              })}
             {active && (
               <article className={`timeline-focus ${active.event.type}`}>
                 <div>

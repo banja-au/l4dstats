@@ -5,7 +5,7 @@ import {
   type DetectorEvidence,
   type DetectorSkip,
   type FeatureValue,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 
 export type Field<T> = AvailableValue<T>;
 

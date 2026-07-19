@@ -6,9 +6,9 @@ import {
   resolveNativeParserForBuild,
 } from "./native-parser-contract.mjs";
 
-const configuredPath = process.env.WITCHWATCH_NATIVE_STAGE;
-const required = process.env.WITCHWATCH_REQUIRE_NATIVE_PARSER === "true";
-const allowedRoot = process.env.WITCHWATCH_NATIVE_ALLOWED_ROOT ?? "/workspace";
+const configuredPath = process.env.L4DSTATS_NATIVE_STAGE;
+const required = process.env.L4DSTATS_REQUIRE_NATIVE_PARSER === "true";
+const allowedRoot = process.env.L4DSTATS_NATIVE_ALLOWED_ROOT ?? "/workspace";
 
 const direct = await resolveNativeParserForBuild({
   configuredPath,
@@ -30,7 +30,7 @@ if (process.platform !== "linux") {
 }
 
 const launcher =
-  process.env.WITCHWATCH_PARSER_SANDBOX ??
+  process.env.L4DSTATS_PARSER_SANDBOX ??
   resolve("apps/worker/dist/parser-no-network");
 const sandboxed = await probeNativeParserThroughLauncher(
   direct.executable,
@@ -38,7 +38,7 @@ const sandboxed = await probeNativeParserThroughLauncher(
   {
     allowedRoot,
     launcherAllowedRoot:
-      process.env.WITCHWATCH_SANDBOX_ALLOWED_ROOT ?? "/workspace",
+      process.env.L4DSTATS_SANDBOX_ALLOWED_ROOT ?? "/workspace",
   },
 );
 process.stdout.write(

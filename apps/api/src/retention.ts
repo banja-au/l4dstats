@@ -5,7 +5,7 @@ import {
   ContentAddressedStore,
   WorkbenchRepository,
   type RetentionPurgeResult,
-} from "@witchwatch/storage";
+} from "@l4dstats/storage";
 
 const [mode, daysValue, confirmation, ...extra] = process.argv.slice(2);
 if (
@@ -24,7 +24,7 @@ if (
     throw new RangeError("retention days must be an integer from 1 to 3650");
   const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
   const repo = new WorkbenchRepository(
-    process.env.WITCHWATCH_DB ?? "data/workbench.sqlite",
+    process.env.L4DSTATS_DB ?? "data/workbench.sqlite",
   );
   try {
     const preview = repo.purgeTerminalJobsBefore(cutoff, true);
@@ -32,10 +32,10 @@ if (
       process.stdout.write(`${JSON.stringify(preview, null, 2)}\n`);
     } else {
       const uploadRoot = resolve(
-        process.env.WITCHWATCH_UPLOAD_ROOT ?? "data/uploads",
+        process.env.L4DSTATS_UPLOAD_ROOT ?? "data/uploads",
       );
       const artifactStore = new ContentAddressedStore(
-        resolve(process.env.WITCHWATCH_ARTIFACT_ROOT ?? "/var/lib/witchwatch"),
+        resolve(process.env.L4DSTATS_ARTIFACT_ROOT ?? "/var/lib/l4dstats"),
       );
       const targets = [
         ...preview.localPaths

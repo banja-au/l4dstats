@@ -1,0 +1,333 @@
+import { createClient } from "@libsql/client/web";
+import {
+  HostedJobRepository,
+  TursoSqlClient,
+  type HostedSource,
+} from "@l4dstats/storage";
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const SHA256 = /^[a-f0-9]{64}$/;
+const UPLOAD_ID = /^[a-f0-9-]{16,64}$/;
+
+interface QueueMessage<T> {
+  body: T;
+  ack(): void;
+  retry(options?: { delaySeconds?: number }): void;
+}
+
+interface MessageBatch<T> {
+  messages: Array<QueueMessage<T>>;
+}
+
+interface QueueBinding<T> {
+  send(body: T): Promise<void>;
+}
+
+interface R2Object {
+  size: number;
+}
+
+interface R2ObjectBody extends R2Object {
+  body: ReadableStream;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+interface R2BucketBinding {
+  head(key: string): Promise<R2Object | null>;
+  get(key: string): Promise<R2ObjectBody | null>;
+  put(
+    key: string,
+    value: ReadableStream | Uint8Array,
+    options: {
+      customMetadata: Record<string, string>;
+      httpMetadata: { contentType: string };
+    },
+  ): Promise<R2Object | null>;
+  delete(key: string): Promise<void>;
+}
+
+interface ContainerStub {
+  fetch(request: Request): Promise<Response>;
+}
+
+interface ContainerNamespace {
+  getByName(name: string): ContainerStub;
+}
+
+export interface EdgeEnvironment {
+  TEMPORARY_DEMOS: R2BucketBinding;
+  DERIVED_ARTIFACTS: R2BucketBinding;
+  ANALYSIS_QUEUE: QueueBinding<{ jobId: string }>;
+  ANALYSIS_CONTAINER: ContainerNamespace;
+  TURSO_DATABASE_URL: string;
+  TURSO_AUTH_TOKEN: string;
+  L4DSTATS_PSEUDONYM_KEY: string;
+  L4DSTATS_ENVIRONMENT: string;
+}
+
+function json(status: number, value: unknown): Response {
+  return Response.json(value, {
+    status,
+    headers: { "cache-control": "no-store" },
+  });
+}
+
+function repository(environment: EdgeEnvironment): HostedJobRepository {
+  return new HostedJobRepository(
+    new TursoSqlClient(
+      createClient({
+        url: environment.TURSO_DATABASE_URL,
+        authToken: environment.TURSO_AUTH_TOKEN,
+      }),
+    ),
+  );
+}
+
+async function upload(
+  request: Request,
+  environment: EdgeEnvironment,
+  uploadId: string,
+): Promise<Response> {
+  if (!UPLOAD_ID.test(uploadId))
+    return json(400, { error: "invalid upload ID" });
+  const url = new URL(request.url);
+  const filename = url.searchParams.get("filename") ?? "";
+  if (!filename.toLowerCase().endsWith(".dem") || /[/\\]/.test(filename))
+    return json(400, { error: "filename must be a basename ending in .dem" });
+  const sha256 = request.headers.get("x-content-sha256") ?? "";
+  if (!SHA256.test(sha256))
+    return json(400, { error: "x-content-sha256 is required" });
+  const contentLength = Number(request.headers.get("content-length"));
+  if (
+    !Number.isSafeInteger(contentLength) ||
+    contentLength < 1 ||
+    contentLength > MAX_UPLOAD_BYTES
+  )
+    return json(413, { error: "demo upload size is invalid" });
+  if (!request.body) return json(400, { error: "demo body is required" });
+  const key = `uploads/${uploadId}`;
+  const stored = await environment.TEMPORARY_DEMOS.put(key, request.body, {
+    customMetadata: { sha256, filename },
+    httpMetadata: { contentType: "application/octet-stream" },
+  });
+  if (!stored || stored.size !== contentLength) {
+    await environment.TEMPORARY_DEMOS.delete(key);
+    return json(400, { error: "incomplete demo upload" });
+  }
+  const source: HostedSource = {
+    kind: "object",
+    bucket: `l4dstats-${environment.L4DSTATS_ENVIRONMENT}-temporary`,
+    key,
+    sha256,
+    bytes: contentLength,
+    filename,
+  };
+  const repo = repository(environment);
+  await repo.migrate();
+  const job = await repo.enqueue(source, `upload:${sha256}`);
+  if (job.source.key !== key) {
+    await environment.TEMPORARY_DEMOS.delete(key);
+    return json(job.state === "succeeded" ? 200 : 202, {
+      job,
+      duplicate: true,
+      sourceRetention: "delete-after-extraction",
+    });
+  }
+  try {
+    await environment.ANALYSIS_QUEUE.send({ jobId: job.id });
+  } catch (error) {
+    await environment.TEMPORARY_DEMOS.delete(key).catch(() => undefined);
+    throw error;
+  }
+  return json(202, {
+    job,
+    upload: { filename, bytes: contentLength, sha256 },
+    sourceRetention: "delete-after-extraction",
+  });
+}
+
+async function compatibleUpload(
+  request: Request,
+  environment: EdgeEnvironment,
+): Promise<Response> {
+  const length = Number(request.headers.get("content-length"));
+  if (!Number.isSafeInteger(length) || length < 1 || length > MAX_UPLOAD_BYTES)
+    return json(413, { error: "demo upload size is invalid" });
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.byteLength !== length)
+    return json(400, { error: "incomplete demo upload" });
+  const forwarded = new Request(request.url, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/octet-stream",
+      "content-length": String(bytes.byteLength),
+      "x-content-sha256": await digest(bytes),
+    },
+    body: bytes,
+  });
+  return upload(forwarded, environment, crypto.randomUUID());
+}
+
+export async function fetchHandler(
+  request: Request,
+  environment: EdgeEnvironment,
+): Promise<Response> {
+  const url = new URL(request.url);
+  if (request.method === "GET" && url.pathname === "/health")
+    return json(200, {
+      status: "ok",
+      environment: environment.L4DSTATS_ENVIRONMENT,
+    });
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (request.method === "POST" && url.pathname === "/api/uploads")
+    return compatibleUpload(request, environment);
+  if (
+    request.method === "PUT" &&
+    parts[0] === "api" &&
+    parts[1] === "uploads" &&
+    parts[2] &&
+    parts.length === 3
+  )
+    return upload(request, environment, parts[2]);
+  if (
+    request.method === "GET" &&
+    parts[0] === "api" &&
+    parts[1] === "jobs" &&
+    parts[2] &&
+    parts.length === 3
+  ) {
+    const repo = repository(environment);
+    await repo.migrate();
+    const job = await repo.getJob(parts[2]);
+    if (!job) return json(404, { error: "job not found" });
+    const reference =
+      job.state === "succeeded" ? await repo.getAnalysis(job.id) : undefined;
+    if (!reference) return json(200, job);
+    const object = await environment.DERIVED_ARTIFACTS.get(reference.resultKey);
+    if (!object || object.size !== reference.resultBytes)
+      return json(503, { error: "derived analysis is unavailable" });
+    const engineResult = JSON.parse(
+      new TextDecoder().decode(await object.arrayBuffer()),
+    );
+    return json(200, {
+      ...job,
+      analysis: {
+        jobId: job.id,
+        demoSha256: reference.demoSha256,
+        sourceManifest: {
+          kind: "hosted-upload",
+          sha256: reference.demoSha256,
+          bytes: job.source.bytes,
+          availability: "deleted-after-extraction",
+        },
+        engineResult,
+        engineResultSha256: reference.resultSha256,
+        gameId: null,
+        createdAt: reference.createdAt,
+      },
+    });
+  }
+  return json(404, { error: "not found" });
+}
+
+async function queueHandler(
+  batch: MessageBatch<{ jobId: string }>,
+  environment: EdgeEnvironment,
+): Promise<void> {
+  for (const message of batch.messages) {
+    const owner = crypto.randomUUID();
+    const repo = repository(environment);
+    try {
+      await repo.migrate();
+      const job = await repo.claim({
+        id: message.body.jobId,
+        owner,
+        leaseMs: 10 * 60 * 1_000,
+      });
+      if (!job) {
+        const current = await repo.getJob(message.body.jobId);
+        if (current?.state === "succeeded") {
+          message.ack();
+          continue;
+        }
+        throw new Error("job is not currently claimable");
+      }
+      const source = await environment.TEMPORARY_DEMOS.get(job.source.key);
+      if (!source || source.size !== job.source.bytes)
+        throw new Error("temporary source object is unavailable or incomplete");
+      const container = environment.ANALYSIS_CONTAINER.getByName(
+        message.body.jobId,
+      );
+      const response = await container.fetch(
+        new Request(`http://container/jobs/${message.body.jobId}`, {
+          method: "POST",
+          headers: {
+            "content-length": String(job.source.bytes),
+            "x-content-sha256": job.source.sha256,
+            "x-source-filename": job.source.filename,
+          },
+          body: source.body,
+        }),
+      );
+      if (!response.ok)
+        throw new Error(`container returned ${response.status}`);
+      const resultBytes = new Uint8Array(await response.arrayBuffer());
+      if (
+        resultBytes.byteLength < 2 ||
+        resultBytes.byteLength > 16 * 1024 * 1024
+      )
+        throw new Error("container result size is invalid");
+      const result = JSON.parse(new TextDecoder().decode(resultBytes)) as {
+        schemaVersion?: unknown;
+        demo?: { sha256?: unknown };
+      };
+      if (
+        result.schemaVersion !== 1 ||
+        result.demo?.sha256 !== job.source.sha256
+      )
+        throw new Error("container result does not match the source demo");
+      const resultSha256 = await digest(resultBytes);
+      const resultKey = `sha256/${resultSha256.slice(0, 2)}/${resultSha256}`;
+      const stored = await environment.DERIVED_ARTIFACTS.put(
+        resultKey,
+        resultBytes,
+        {
+          customMetadata: {
+            sha256: resultSha256,
+            demoSha256: job.source.sha256,
+          },
+          httpMetadata: { contentType: "application/json" },
+        },
+      );
+      if (!stored || stored.size !== resultBytes.byteLength)
+        throw new Error("derived artifact write was not confirmed");
+      await repo.recordAnalysis({
+        jobId: job.id,
+        demoSha256: job.source.sha256,
+        resultKey,
+        resultSha256,
+        resultBytes: resultBytes.byteLength,
+      });
+      await environment.TEMPORARY_DEMOS.delete(job.source.key);
+      if (await environment.TEMPORARY_DEMOS.head(job.source.key))
+        throw new Error("source demo deletion was not confirmed");
+      await repo.finish({ id: job.id, owner, state: "succeeded" });
+      message.ack();
+    } catch {
+      message.retry({ delaySeconds: 600 });
+    }
+  }
+}
+
+async function digest(bytes: Uint8Array): Promise<string> {
+  const copy = Uint8Array.from(bytes);
+  const value = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", copy.buffer),
+  );
+  return [...value].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export default {
+  fetch: fetchHandler,
+  queue: queueHandler,
+};

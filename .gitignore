@@ -9,6 +9,7 @@ playwright-report/
 .env
 .env.*
 !.env.example
+.envrc
 data/
 artifacts/
 tmp/
@@ -21,3 +22,7 @@ tmp/
 backups/
 *.cpuprofile
 *.profraw
+*.tfplan
+.terraform/
+deploy/cloudflare/wrangler.*.jsonc
+!deploy/cloudflare/wrangler.template.jsonc

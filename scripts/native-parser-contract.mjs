@@ -49,7 +49,7 @@ export function validateNativeParserVersion(value) {
   if (
     Object.keys(value).sort().join("\n") !== expectedKeys.join("\n") ||
     value.artifactSchemaVersion !== 1 ||
-    value.parser !== "witchwatch-demo-source1-native" ||
+    value.parser !== "l4dstats-demo-source1-native" ||
     !VERSION.test(value.version) ||
     value.protocol !== "source1-l4d2-2100" ||
     value.projectionSchema !== "demo-projection/v1" ||

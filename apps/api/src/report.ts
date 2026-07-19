@@ -1,4 +1,4 @@
-import { sha256, type WorkbenchRepository } from "@witchwatch/storage";
+import { sha256, type WorkbenchRepository } from "@l4dstats/storage";
 
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);

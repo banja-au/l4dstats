@@ -1,36 +1,44 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "witchwatch-ENVIRONMENT",
+  "name": "l4dstats-ENVIRONMENT",
   "main": "HOSTED_DISPATCHER_ENTRYPOINT",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": false,
+  "workers_dev": true,
+  "routes": [{ "pattern": "HOSTED_DOMAIN", "custom_domain": true }],
+  "vars": { "L4DSTATS_ENVIRONMENT": "ENVIRONMENT" },
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"],
+  },
   "r2_buckets": [
     {
       "binding": "TEMPORARY_DEMOS",
-      "bucket_name": "witchwatch-ENVIRONMENT-temporary"
+      "bucket_name": "l4dstats-ENVIRONMENT-temporary",
     },
     {
       "binding": "DERIVED_ARTIFACTS",
-      "bucket_name": "witchwatch-ENVIRONMENT-artifacts"
-    }
+      "bucket_name": "l4dstats-ENVIRONMENT-artifacts",
+    },
   ],
   "queues": {
     "producers": [
       {
         "binding": "ANALYSIS_QUEUE",
-        "queue": "witchwatch-ENVIRONMENT-analysis"
-      }
+        "queue": "l4dstats-ENVIRONMENT-analysis",
+      },
     ],
     "consumers": [
       {
-        "queue": "witchwatch-ENVIRONMENT-analysis",
+        "queue": "l4dstats-ENVIRONMENT-analysis",
         "max_batch_size": 1,
         "max_batch_timeout": 5,
         "max_retries": 5,
-        "dead_letter_queue": "witchwatch-ENVIRONMENT-analysis-dlq"
-      }
-    ]
+        "dead_letter_queue": "l4dstats-ENVIRONMENT-analysis-dlq",
+      },
+    ],
   },
   "containers": [
     {
@@ -38,24 +46,24 @@
       "image": "./container/Dockerfile",
       "max_instances": 1,
       "instance_type": "standard-2",
-      "name": "witchwatch-ENVIRONMENT-analysis",
+      "name": "l4dstats-ENVIRONMENT-analysis",
       "ssh": {
-        "enabled": false
-      }
-    }
+        "enabled": false,
+      },
+    },
   ],
   "durable_objects": {
     "bindings": [
       {
         "class_name": "AnalysisContainer",
-        "name": "ANALYSIS_CONTAINER"
-      }
-    ]
+        "name": "ANALYSIS_CONTAINER",
+      },
+    ],
   },
   "migrations": [
     {
       "new_sqlite_classes": ["AnalysisContainer"],
-      "tag": "v1"
-    }
-  ]
+      "tag": "v1",
+    },
+  ],
 }

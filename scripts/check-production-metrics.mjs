@@ -1,13 +1,13 @@
 import process from "node:process";
 
-const baseUrl = process.env.WITCHWATCH_METRICS_URL ?? "http://127.0.0.1:5173";
-const username = process.env.WITCHWATCH_WEB_USERNAME;
-const password = process.env.WITCHWATCH_WEB_PASSWORD;
+const baseUrl = process.env.L4DSTATS_METRICS_URL ?? "http://127.0.0.1:5173";
+const username = process.env.L4DSTATS_WEB_USERNAME;
+const password = process.env.L4DSTATS_WEB_PASSWORD;
 const maximumHeartbeatAge = Number(
-  process.env.WITCHWATCH_MAX_HEARTBEAT_AGE_SECONDS ?? 15,
+  process.env.L4DSTATS_MAX_HEARTBEAT_AGE_SECONDS ?? 15,
 );
 const maximumQueueAge = Number(
-  process.env.WITCHWATCH_MAX_QUEUE_AGE_SECONDS ?? 900,
+  process.env.L4DSTATS_MAX_QUEUE_AGE_SECONDS ?? 900,
 );
 
 function sample(body, name, labels = "") {
@@ -21,7 +21,7 @@ function sample(body, name, labels = "") {
 
 if (!username || !password) {
   process.stderr.write(
-    "WITCHWATCH_WEB_USERNAME and WITCHWATCH_WEB_PASSWORD are required.\n",
+    "L4DSTATS_WEB_USERNAME and L4DSTATS_WEB_PASSWORD are required.\n",
   );
   process.exitCode = 2;
 } else {

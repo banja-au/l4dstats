@@ -21,10 +21,10 @@ const hash = (value: Uint8Array) =>
 
 const observed: PlaybackCheckpointExport = {
   schemaVersion: 1,
-  producer: "witchwatch",
+  producer: "l4dstats",
   demoSha256: "a".repeat(64),
   mapName: "c1m1_hotel",
-  witchwatchRevision: "abc123",
+  l4dstatsRevision: "abc123",
   selectedTicks: [100],
   checkpoints: [
     {
@@ -80,13 +80,13 @@ describe("playback validation", () => {
     async () => {
       const prepared = await prepareNativeDemoProjection(
         readFileSync(corpusDemo),
-        { pseudonymKey: "witchwatch-playback-validation-v1" },
+        { pseudonymKey: "l4dstats-playback-validation-v1" },
       );
       const tick = prepared.observations[0]!.observation.tick;
       const exported = exportPlaybackCheckpoints(prepared, {
         schemaVersion: 1,
         ticks: [tick],
-        witchwatchRevision: "native-test",
+        l4dstatsRevision: "native-test",
       });
       expect(exported.demoSha256).toBe(prepared.demoSha256);
       expect(exported.mapName).toBe(prepared.header.mapName);
@@ -95,7 +95,7 @@ describe("playback validation", () => {
         exportPlaybackCheckpoints(prepared, {
           schemaVersion: 1,
           ticks: [tick],
-          witchwatchRevision: "native-test",
+          l4dstatsRevision: "native-test",
           tickIntervalSeconds: 0.01,
         }),
       ).toEqual(exported);
@@ -107,14 +107,14 @@ describe("playback validation", () => {
       parsePlaybackExportRequest({
         schemaVersion: 1,
         ticks: [9, 3, 9],
-        witchwatchRevision: "abc123",
+        l4dstatsRevision: "abc123",
       }).ticks,
     ).toEqual([3, 9]);
     expect(() =>
       parsePlaybackExportRequest({
         schemaVersion: 1,
         ticks: [],
-        witchwatchRevision: "x",
+        l4dstatsRevision: "x",
       }),
     ).toThrow(/ticks/);
   });
@@ -131,7 +131,7 @@ describe("playback validation", () => {
     );
     expect(report.passed).toBe(true);
     expect(report.differences).toEqual([]);
-    expect(report.witchwatchExportSha256).toBe(hash(observedBytes));
+    expect(report.l4dstatsExportSha256).toBe(hash(observedBytes));
     expect(report.referenceSha256).toBe(hash(referenceBytes));
   });
 

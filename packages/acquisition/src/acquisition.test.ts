@@ -82,7 +82,7 @@ describe("URL policy and discovery", () => {
 
 describe("content-addressed acquisition", () => {
   it("hashes, publishes atomically and reuses an identical artifact", async () => {
-    const store = await mkdtemp(join(tmpdir(), "witchwatch-acquire-"));
+    const store = await mkdtemp(join(tmpdir(), "l4dstats-acquire-"));
     const body = new TextEncoder().encode("archive bytes");
     const fetcher = vi.fn(
       async () =>
@@ -107,7 +107,7 @@ describe("content-addressed acquisition", () => {
   });
 
   it("removes partial files after a streamed byte-limit failure", async () => {
-    const store = await mkdtemp(join(tmpdir(), "witchwatch-limit-"));
+    const store = await mkdtemp(join(tmpdir(), "l4dstats-limit-"));
     const fetcher = vi.fn(async () => new Response(new Uint8Array(20)));
     await expect(
       acquire(new URL("https://demos.test/a.zip"), {
@@ -121,7 +121,7 @@ describe("content-addressed acquisition", () => {
   });
 
   it("cancels an in-progress body and removes its partial file", async () => {
-    const store = await mkdtemp(join(tmpdir(), "witchwatch-cancel-"));
+    const store = await mkdtemp(join(tmpdir(), "l4dstats-cancel-"));
     const controller = new AbortController();
     const fetcher = vi.fn(
       async (_url: URL | RequestInfo, init?: RequestInit) =>

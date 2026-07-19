@@ -41,4 +41,4 @@ if [[ $mode == purge ]]; then
   args+=(--confirm-purge)
 fi
 docker compose run --rm --no-deps api \
-  pnpm --filter @witchwatch/api exec tsx "${args[@]}"
+  pnpm --filter @l4dstats/api exec tsx "${args[@]}"

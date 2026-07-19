@@ -8,12 +8,12 @@ turn the research-only cheating score into moderation decision support.
 Poll the authenticated public boundary every 30 seconds:
 
 ```bash
-WITCHWATCH_WEB_USERNAME=operator \
-WITCHWATCH_WEB_PASSWORD='replace-with-production-secret' \
+L4DSTATS_WEB_USERNAME=operator \
+L4DSTATS_WEB_PASSWORD='replace-with-production-secret' \
 pnpm health:production
 
-WITCHWATCH_WEB_USERNAME=operator \
-WITCHWATCH_WEB_PASSWORD='replace-with-production-secret' \
+L4DSTATS_WEB_USERNAME=operator \
+L4DSTATS_WEB_PASSWORD='replace-with-production-secret' \
 pnpm metrics:production
 ```
 

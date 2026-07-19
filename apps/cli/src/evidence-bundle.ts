@@ -12,12 +12,12 @@ import type {
   PlayerProjectionCoverage,
   ProjectableUserInfo,
   ProjectedPlayerObservation,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 import {
   buildRealAimEvidence,
   defaultAimConfig,
   type PlayerRealEvidence,
-} from "@witchwatch/detectors";
+} from "@l4dstats/detectors";
 import { l4d2CounterNames, l4d2WeaponIdentity } from "./l4d2-domain.js";
 
 const CONTEXT_SECONDS = 8;

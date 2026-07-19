@@ -6,7 +6,7 @@ COPY crates ./crates
 RUN native_build_sha256="$(crates/demo-source1-node/scripts/compute-build-sha256.sh /workspace)" \
   && test "${#native_build_sha256}" -eq 64 \
   && test "$native_build_sha256" != "0000000000000000000000000000000000000000000000000000000000000000" \
-  && WITCHWATCH_NATIVE_BUILD_SHA256="$native_build_sha256" cargo build --locked --workspace --release \
+  && L4DSTATS_NATIVE_BUILD_SHA256="$native_build_sha256" cargo build --locked --workspace --release \
   && target/release/demo-source1-stage --version-json | grep -F "\"buildSha256\":\"$native_build_sha256\"" >/dev/null \
   && install -D target/release/demo-source1-stage /native/demo-source1-stage \
   && install -D target/release/libdemo_source1_node.so /native/demo-source1-node.node \
@@ -26,7 +26,7 @@ COPY --from=native-build /native/demo-source1-stage /workspace/native/demo-sourc
 COPY --from=native-build /native/build-sha256 /workspace/native/build-sha256
 COPY --from=native-build /native/demo-source1-node.node /workspace/crates/demo-source1-node/dist/demo-source1-node.node
 
-RUN WITCHWATCH_EXPECT_NATIVE_BUILD_SHA256="$(cat /workspace/native/build-sha256)" node crates/demo-source1-node/test/lineage.test.mjs \
+RUN L4DSTATS_EXPECT_NATIVE_BUILD_SHA256="$(cat /workspace/native/build-sha256)" node crates/demo-source1-node/test/lineage.test.mjs \
   && pnpm install --frozen-lockfile \
   && pnpm exec turbo run build \
   && pnpm prune --prod
@@ -36,15 +36,15 @@ FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9
 RUN apt-get update \
   && apt-get install --yes --no-install-recommends ca-certificates util-linux \
   && rm -rf /var/lib/apt/lists/* \
-  && install -d -o node -g node /workspace /tmp/witchwatch
+  && install -d -o node -g node /workspace /tmp/l4dstats
 
 WORKDIR /workspace
 COPY --from=build --chown=node:node /workspace /workspace
-COPY --chown=node:node deploy/cloudflare/container/entrypoint.sh /usr/local/bin/witchwatch-cloudflare-container
+COPY --chown=node:node deploy/cloudflare/container/entrypoint.sh /usr/local/bin/l4dstats-cloudflare-container
 
 USER node
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--conditions=production
-ENV WITCHWATCH_CONTAINER_WORK_ROOT=/tmp/witchwatch
+ENV L4DSTATS_CONTAINER_WORK_ROOT=/tmp/l4dstats
 
-ENTRYPOINT ["/usr/local/bin/witchwatch-cloudflare-container"]
+ENTRYPOINT ["/usr/local/bin/l4dstats-cloudflare-container"]

@@ -7,8 +7,8 @@ import {
   type SourceMapMesh,
 } from "./index.js";
 
-export const mapArtifactFormat = "witchwatch-map-mesh-v1" as const;
-export const mapExtractorVersion = "@witchwatch/map-source1@0.1.0";
+export const mapArtifactFormat = "l4dstats-map-mesh-v1" as const;
+export const mapExtractorVersion = "@l4dstats/map-source1@0.1.0";
 
 export interface MapArtifactProvenance {
   readonly map: string;
@@ -26,7 +26,7 @@ export interface SourceMapArtifact extends SourceMapMesh {
 }
 
 export interface MapCatalog {
-  readonly format: "witchwatch-map-catalog-v1";
+  readonly format: "l4dstats-map-catalog-v1";
   readonly sourceKind: "steam-dedicated-server" | "local-bsp";
   readonly steamAppId?: 222860;
   readonly steamBuildId?: string;
@@ -69,7 +69,7 @@ export function createMapCatalog(
     throw new RangeError("map catalog cannot mix Steam build IDs");
   const steamBuildId = [...steamBuildIds][0];
   return {
-    format: "witchwatch-map-catalog-v1",
+    format: "l4dstats-map-catalog-v1",
     sourceKind,
     ...(sourceKind === "steam-dedicated-server"
       ? { steamAppId: 222860 as const }

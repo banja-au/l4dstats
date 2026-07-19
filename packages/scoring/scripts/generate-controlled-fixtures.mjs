@@ -94,8 +94,8 @@ const fixture = (poor) => {
     schemaVersion: 1,
     metadata: {
       id: poor
-        ? "witchwatch-synthetic-poor-calibration-v1"
-        : "witchwatch-synthetic-controlled-v1",
+        ? "l4dstats-synthetic-poor-calibration-v1"
+        : "l4dstats-synthetic-controlled-v1",
       generator: "generate-controlled-fixtures.mjs@1.0.0",
       seed: "closed-form-v1",
       scenarioLibraryVersion: "controlled-scenarios-v1",
@@ -106,7 +106,7 @@ const fixture = (poor) => {
         test: { template: "grid-19-23", seed: "test-v1" },
       },
       createdAt: "2026-07-17T00:00:00.000Z",
-      owner: "WitchWatch maintainers",
+      owner: "L4DStats maintainers",
       retention: "tracked synthetic fixture; no personal data",
       artifactDigests: {
         splitManifestSha256: sha256(splitManifest),

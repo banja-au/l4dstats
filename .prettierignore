@@ -3,6 +3,7 @@ node_modules
 dist
 coverage
 .turbo
+.terraform
 pnpm-lock.yaml
 data
 artifacts

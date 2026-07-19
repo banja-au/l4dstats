@@ -1,5 +1,5 @@
 {
-  "name": "@witchwatch/detectors",
+  "name": "@l4dstats/detectors",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,10 +14,10 @@
     "build": "tsc -p tsconfig.json --noEmit false --outDir dist",
     "check": "tsc -p tsconfig.json --pretty false",
     "test": "vitest run --maxWorkers=1",
-    "test:real": "WITCHWATCH_REAL_CORPUS=1 vitest run src/real-evidence.test.ts --pool=forks --maxWorkers=1"
+    "test:real": "L4DSTATS_REAL_CORPUS=1 vitest run src/real-evidence.test.ts --pool=forks --maxWorkers=1"
   },
   "dependencies": {
-    "@witchwatch/contracts": "workspace:*"
+    "@l4dstats/contracts": "workspace:*"
   },
   "devDependencies": {
     "vitest": "3.2.6"

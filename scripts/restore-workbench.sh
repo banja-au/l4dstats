@@ -52,14 +52,14 @@ docker compose run --rm --no-deps \
       esac
     done < <(tar -tvzf "$1")
     safety="/tmp/l4dstats-pre-restore.tar.gz"
-    tar -C /var/lib/witchwatch -czf "$safety" .
-    find /var/lib/witchwatch -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-    if ! tar --no-same-owner --no-same-permissions -C /var/lib/witchwatch -xzf "/backup/$1"; then
-      find /var/lib/witchwatch -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-      tar -C /var/lib/witchwatch -xzf "$safety"
+    tar -C /var/lib/l4dstats -czf "$safety" .
+    find /var/lib/l4dstats -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    if ! tar --no-same-owner --no-same-permissions -C /var/lib/l4dstats -xzf "/backup/$1"; then
+      find /var/lib/l4dstats -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      tar -C /var/lib/l4dstats -xzf "$safety"
       exit 1
     fi
-    test -f /var/lib/witchwatch/workbench.sqlite
+    test -f /var/lib/l4dstats/workbench.sqlite
   ' restore "$archive_name"
 
 printf 'Restored %s\n' "$archive"

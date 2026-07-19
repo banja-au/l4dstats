@@ -7,7 +7,7 @@ import {
 } from "./artifact.js";
 
 const artifact: SourceMapArtifact = {
-  format: "witchwatch-map-mesh-v1",
+  format: "l4dstats-map-mesh-v1",
   bspVersion: 21,
   mapRevision: 12,
   positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
@@ -55,7 +55,7 @@ describe("map artifact provenance", () => {
   it("creates a compact deterministic inventory without mesh payloads", () => {
     const catalog = createMapCatalog([artifact]);
     expect(catalog).toEqual({
-      format: "witchwatch-map-catalog-v1",
+      format: "l4dstats-map-catalog-v1",
       sourceKind: "steam-dedicated-server",
       steamAppId: 222860,
       steamBuildId: "12345678",

@@ -11,8 +11,8 @@ describe("development API proxy", () => {
       "Bearer shared-api-token",
     );
     expect(removeHeader.mock.calls).toEqual([
-      ["x-witchwatch-user"],
-      ["x-witchwatch-role"],
+      ["x-l4dstats-user"],
+      ["x-l4dstats-role"],
     ]);
   });
 });

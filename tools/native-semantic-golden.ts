@@ -76,7 +76,7 @@ export async function buildManifest(
   for (const path of paths) {
     const bytes = await readFile(path);
     const prepared = await prepareNativeDemoProjection(bytes, {
-      pseudonymKey: "witchwatch-semantic-golden-v1",
+      pseudonymKey: "l4dstats-semantic-golden-v1",
     });
     demos.push({
       demoSha256: prepared.demoSha256,

@@ -473,7 +473,7 @@ function analysis(id: string, mapName: string) {
 }
 
 async function visualAudit(page: Page, name: string) {
-  const directory = process.env.WITCHWATCH_VISUAL_AUDIT_DIR;
+  const directory = process.env.L4DSTATS_VISUAL_AUDIT_DIR;
   if (!directory) return;
   mkdirSync(directory, { recursive: true });
   await page.screenshot({
@@ -549,7 +549,7 @@ async function mockAnalysis(page: Page, options: { dense?: boolean } = {}) {
     : undefined;
   await page.route("**/api/maps/*/geometry", async (route) => {
     const map = route.request().url().split("/").at(-2)!;
-    if (options.dense || process.env.WITCHWATCH_VISUAL_AUDIT_REAL_GEOMETRY) {
+    if (options.dense || process.env.L4DSTATS_VISUAL_AUDIT_REAL_GEOMETRY) {
       await route.fulfill({
         contentType: "application/json",
         body: readFileSync("../../map-geometry/c5m3_cemetery.json"),
@@ -558,7 +558,7 @@ async function mockAnalysis(page: Page, options: { dense?: boolean } = {}) {
     }
     await route.fulfill({
       json: {
-        format: "witchwatch-map-mesh-v1",
+        format: "l4dstats-map-mesh-v1",
         bspVersion: 20,
         mapRevision: 1,
         positions: [0, 0, 0, 500, 0, 0, 500, 500, 0, 0, 500, 0],
@@ -662,12 +662,82 @@ test("presents a focused, responsive upload-first landing page", async ({
     "L4DStats",
   );
   await expect(page.getByRole("button", { name: /drop demos/i })).toBeVisible();
+  const signature = page.getByRole("link", {
+    name: "Banja Labs (opens in a new tab)",
+  });
+  await expect(signature).toBeVisible();
+  await expect(signature).toHaveAttribute(
+    "href",
+    "https://banja.au/?utm_source=l4dstats&utm_medium=referral&utm_campaign=l4dstats_product&utm_content=homepage_signature",
+  );
+  await expect(signature).toHaveAttribute("target", "_blank");
+  await expect(signature).toHaveAttribute("rel", /noopener/);
+  const signatureStyle = await signature.evaluate((element) => ({
+    fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+    rect: element.getBoundingClientRect().toJSON(),
+  }));
+  expect(signatureStyle.fontSize).toBeGreaterThanOrEqual(11);
+  expect(signatureStyle.rect.x).toBeLessThan(80);
+  expect(signatureStyle.rect.bottom).toBeGreaterThan(
+    (page.viewportSize()?.height ?? 720) - 70,
+  );
+  await expect(
+    page.getByRole("link", { name: "Email Banja Labs at labs@banja.au" }),
+  ).toHaveAttribute("href", "mailto:labs@banja.au");
+  const emailIcon = page.locator(".banja-email svg");
+  const [signatureBounds, emailBounds] = await Promise.all([
+    signature.boundingBox(),
+    emailIcon.boundingBox(),
+  ]);
+  expect(signatureBounds).not.toBeNull();
+  expect(emailBounds).not.toBeNull();
+  expect(
+    emailBounds!.x - (signatureBounds!.x + signatureBounds!.width),
+  ).toBeGreaterThanOrEqual(4);
+  expect(
+    emailBounds!.x - (signatureBounds!.x + signatureBounds!.width),
+  ).toBeLessThanOrEqual(10);
   await expect(page.getByRole("navigation")).toHaveCount(0);
   const width = await page.evaluate(() => [
     document.documentElement.clientWidth,
     document.documentElement.scrollWidth,
   ]);
   expect(width[1]).toBeLessThanOrEqual(width[0] + 1);
+});
+
+test("keeps the reusable Banja contact signature on the loading state", async ({
+  page,
+}) => {
+  await mockAnalysis(page);
+  await page.route("**/api/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        id: "job1",
+        state: "running",
+        progress: 0.42,
+        message: "Reconstructing evidence",
+        source: { kind: "local" },
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "loading.dem",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("HL2DEMO-loading"),
+  });
+  const loadingAttribution = page.locator(".banja-attribution-loading");
+  await expect(loadingAttribution).toBeVisible();
+  await expect(
+    loadingAttribution.getByRole("link", {
+      name: "Banja Labs (opens in a new tab)",
+    }),
+  ).toHaveAttribute("href", /utm_content=loading_signature/);
+  await expect(
+    loadingAttribution.getByRole("link", {
+      name: "Email Banja Labs at labs@banja.au",
+    }),
+  ).toHaveAttribute("href", "mailto:labs@banja.au");
 });
 
 test("uploads multiple demos in parallel and exposes deep statistics", async ({
@@ -690,6 +760,17 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   await expect(
     page.getByRole("heading", { name: "c2m3_coaster" }),
   ).toBeVisible();
+  const reportAttribution = page.locator(".banja-attribution-report");
+  await expect(
+    reportAttribution.getByRole("link", {
+      name: "Banja Labs (opens in a new tab)",
+    }),
+  ).toHaveAttribute("href", /utm_content=report_signature/);
+  await expect(
+    reportAttribution.getByRole("link", {
+      name: "Email Banja Labs at labs@banja.au",
+    }),
+  ).toHaveAttribute("href", "mailto:labs@banja.au");
   await expect(
     page.getByText("636 : 482", { exact: false }).first(),
   ).toBeVisible();
@@ -922,7 +1003,7 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     .getByRole("button", { name: "View tick 8900 on timeline" })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/timeline\?demo=.*&tick=8900$/);
+  await expect(page).toHaveURL(/\/timeline\?demo=.*&tick=8900(?:&|$)/);
   expect(await page.evaluate(() => window.history.length)).toBe(
     combatHistoryLength,
   );
@@ -944,13 +1025,15 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   await page.getByRole("tab", { name: "Timeline" }).press("ArrowLeft");
   await expect(storyTab).toHaveAttribute("aria-selected", "true");
   const compactStoryEvents = page.locator(".story-event-row");
-  await expect(compactStoryEvents.getByText("2 linked moments")).toBeVisible();
+  await expect(
+    compactStoryEvents.filter({ hasText: "2 linked moments" }).first(),
+  ).toBeVisible();
   await expect(page.locator(".story-event-tank_control")).toBeVisible();
   await expect(page.locator(".story-event-round_end")).toBeVisible();
   const compactStoryEventHeights = await compactStoryEvents.evaluateAll(
     (rows) => rows.map((row) => row.getBoundingClientRect().height),
   );
-  expect(Math.max(...compactStoryEventHeights)).toBeLessThanOrEqual(64);
+  expect(Math.max(...compactStoryEventHeights)).toBeLessThanOrEqual(72);
   await compactStoryEvents.first().click();
   await expect(page.locator(".story-inspector")).toBeVisible();
   await expect(
@@ -963,7 +1046,16 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
   await expect(hitSummary).toContainText("Player 10BDEE");
   await expect(hitSummary).toContainText("Hunter");
   await expect(hitSummary).toContainText("observed HP loss");
+  await hitSummary.click();
+  await expect(page.locator(".hit-inspector")).toContainText(
+    "18 observed HP loss",
+  );
+  await expect(
+    page.getByRole("button", { name: "Inspect hit range" }),
+  ).toBeVisible();
   await visualAudit(page, "story");
+  if ((page.viewportSize()?.width ?? 0) <= 700)
+    await page.getByRole("button", { name: "More", exact: true }).click();
   await page
     .locator(".timeline-filters")
     .getByRole("button", { name: "support", exact: true })
@@ -979,14 +1071,35 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     .click();
   await page
     .locator(".timeline-filters")
-    .getByRole("button", { name: "detail", exact: true })
+    .getByRole("button", { name: "spacious", exact: true })
     .click();
   await expect(page.locator(".hit-roundup")).toHaveClass(/hit-density-4/);
   await page
     .locator(".timeline-view-tabs")
     .getByRole("tab", { name: "Timeline" })
     .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.fromEntries(new URLSearchParams(location.search)),
+      ),
+    )
+    .toMatchObject({
+      storyView: "timeline",
+      storyFilter: "all",
+      storyDensity: "4",
+    });
   await expect(page.getByText("One independent clock per demo")).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) <= 700) {
+    await expect(page.locator(".mobile-timeline-list")).toBeVisible();
+    await expect(page.locator(".match-timeline")).toHaveCount(0);
+    const mobileEvents = page.locator(".mobile-timeline-event");
+    expect(await mobileEvents.count()).toBeGreaterThan(0);
+    expect(await mobileEvents.count()).toBeLessThanOrEqual(100);
+    await mobileEvents.first().click();
+    await expect(page.locator(".timeline-focus")).toBeVisible();
+    await page.getByRole("button", { name: "Lane chart" }).click();
+  }
   await expect(page.getByText("SI actions", { exact: true })).toBeVisible();
   await expect(page.getByText("Pins + clears", { exact: true })).toBeVisible();
   await expect(page.getByText("Bosses", { exact: true })).toBeVisible();
@@ -1065,7 +1178,7 @@ test("uploads multiple demos in parallel and exposes deep statistics", async ({
     .getByRole("button", { name: /View tick .* on timeline/ })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/timeline\?demo=.*&tick=\d+$/);
+  await expect(page).toHaveURL(/\/timeline\?demo=.*&tick=\d+(?:&|$)/);
   expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
   await page
     .locator(".timeline-view-tabs")
@@ -1123,9 +1236,9 @@ test("bounds dense spatial interaction on the heaviest committed Parish geometry
     }).observe({ entryTypes: ["longtask"] });
     (
       window as typeof window & {
-        __witchwatchLongTasks: number[];
+        __l4dstatsLongTasks: number[];
       }
-    ).__witchwatchLongTasks = durations;
+    ).__l4dstatsLongTasks = durations;
   });
   await mockAnalysis(page, { dense: true });
   await page.goto("/");
@@ -1145,6 +1258,25 @@ test("bounds dense spatial interaction on the heaviest committed Parish geometry
   await expect(
     workspace.getByText(/71,551 world-brush triangles/),
   ).toBeVisible();
+  await expect(
+    workspace.getByText("Observed progression anchors"),
+  ).toBeVisible();
+  await expect(workspace.getByText("First/last observed")).toBeVisible();
+  await expect(
+    workspace.getByRole("button", { name: "Review", exact: true }),
+  ).toHaveClass(/active/);
+  await workspace
+    .getByRole("button", { name: "Critical outcomes", exact: true })
+    .click();
+  await expect(
+    workspace.getByRole("button", { name: "Critical outcomes", exact: true }),
+  ).toHaveClass(/active/);
+  await workspace.getByRole("button", { name: "Review", exact: true }).click();
+  const filterDrawer = workspace.locator(".spatial-filter-drawer");
+  if ((page.viewportSize()?.width ?? 0) <= 700) {
+    await expect(filterDrawer).not.toHaveAttribute("open", "");
+    expect((await filterDrawer.boundingBox())?.height).toBeLessThanOrEqual(48);
+  }
   await expect(workspace.locator(".spatial-event-links button")).toHaveCount(0);
   await visualAudit(page, "dense-events");
   await workspace.getByRole("button", { name: "density", exact: true }).click();
@@ -1155,21 +1287,47 @@ test("bounds dense spatial interaction on the heaviest committed Parish geometry
   await workspace.getByRole("button", { name: "Compare teams" }).click();
   await expect(workspace.getByText(/A \d+ · B \d+ · unassigned/)).toBeVisible();
   await visualAudit(page, "dense-difference");
+  await workspace.getByRole("button", { name: "split", exact: true }).click();
+  await expect(
+    workspace.getByRole("button", { name: "split", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const expectedSplitLayout =
+    (page.viewportSize()?.width ?? 0) <= 700 ? "stacked" : "side-by-side";
+  await expect(workspace.locator("canvas")).toHaveAttribute(
+    "data-comparison-layout",
+    expectedSplitLayout,
+  );
+  await expect(workspace.getByText(/A \d+ · B \d+ · unassigned/)).toBeVisible();
+  await visualAudit(page, "dense-split");
+  await workspace
+    .getByRole("button", { name: "difference", exact: true })
+    .click();
   await workspace.getByRole("button", { name: "hybrid", exact: true }).click();
 
   const canvas = workspace.locator("canvas");
   await expect(canvas).toHaveAttribute("data-render-count", /\d+/);
+  await expect(canvas).toHaveAttribute("data-scale-units", /[1-9]\d*/);
+  await expect(canvas).toHaveAttribute("data-cluster-count", /[1-9]\d*/);
+  await canvas.focus();
+  await canvas.press("Enter");
+  await expect(workspace.getByText(/Explored cluster/)).toBeVisible();
+  await expect(workspace.getByText(/positioned moments/).last()).toBeVisible();
+  await workspace.getByRole("button", { name: "Dismiss" }).click();
+  await workspace.getByRole("button", { name: "Fit map" }).click();
   await page.waitForTimeout(100);
   const before = Number(await canvas.getAttribute("data-render-count"));
   await page.evaluate(() => {
     (
       window as typeof window & {
-        __witchwatchLongTasks: number[];
+        __l4dstatsLongTasks: number[];
       }
-    ).__witchwatchLongTasks.length = 0;
+    ).__l4dstatsLongTasks.length = 0;
   });
-  await canvas.evaluate(async (element) => {
+  const lowZoomMetrics = await canvas.evaluate(async (element) => {
+    const drawDurations: number[] = [];
+    const inputToFrame: number[] = [];
     for (let index = 0; index < 60; index += 1) {
+      const inputAt = performance.now();
       element.dispatchEvent(
         new WheelEvent("wheel", {
           bubbles: true,
@@ -1182,20 +1340,102 @@ test("bounds dense spatial interaction on the heaviest committed Parish geometry
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => resolve()),
       );
+      inputToFrame.push(performance.now() - inputAt);
+      drawDurations.push(Number(element.dataset.drawDuration ?? 0));
     }
+    return { drawDurations, inputToFrame };
   });
   const after = Number(await canvas.getAttribute("data-render-count"));
   expect(after - before).toBeGreaterThanOrEqual(30);
   expect(after - before).toBeLessThanOrEqual(62);
+  const percentile = (values: number[], percentileValue: number) => {
+    const ordered = [...values].sort((left, right) => left - right);
+    return (
+      ordered[
+        Math.min(
+          ordered.length - 1,
+          Math.ceil(ordered.length * percentileValue) - 1,
+        )
+      ] ?? 0
+    );
+  };
+  expect(percentile(lowZoomMetrics.drawDurations, 0.95)).toBeLessThanOrEqual(
+    24,
+  );
+  expect(percentile(lowZoomMetrics.inputToFrame, 0.95)).toBeLessThanOrEqual(34);
+  const highZoomMetrics = await canvas.evaluate(async (element) => {
+    element.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 420,
+        clientY: 260,
+        deltaY: -1_200,
+      }),
+    );
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+    const drawDurations: number[] = [];
+    const inputToFrame: number[] = [];
+    for (let index = 0; index < 30; index += 1) {
+      const inputAt = performance.now();
+      element.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX: 420,
+          clientY: 260,
+          deltaY: index % 2 ? 3 : -3,
+        }),
+      );
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      inputToFrame.push(performance.now() - inputAt);
+      drawDurations.push(Number(element.dataset.drawDuration ?? 0));
+    }
+    return {
+      detail: element.dataset.geometryDetail,
+      drawDurations,
+      inputToFrame,
+    };
+  });
+  expect(highZoomMetrics.detail).toBe("raster");
+  expect(percentile(highZoomMetrics.drawDurations, 0.95)).toBeLessThanOrEqual(
+    24,
+  );
+  expect(percentile(highZoomMetrics.inputToFrame, 0.95)).toBeLessThanOrEqual(
+    34,
+  );
+  await page.waitForTimeout(240);
+  await expect(canvas).toHaveAttribute("data-geometry-detail", "vector");
+  expect(
+    Number(await canvas.getAttribute("data-draw-duration")),
+  ).toBeLessThanOrEqual(48);
   const longTasks = await page.evaluate(
     () =>
       (
         window as typeof window & {
-          __witchwatchLongTasks: number[];
+          __l4dstatsLongTasks: number[];
         }
-      ).__witchwatchLongTasks,
+      ).__l4dstatsLongTasks,
   );
   expect(longTasks.filter((duration) => duration >= 50)).toHaveLength(0);
+  if (!(await filterDrawer.evaluate((element) => element.hasAttribute("open"))))
+    await filterDrawer.locator("summary").click();
+  await workspace.getByLabel("Moments").selectOption("boss");
+  await expect(
+    workspace.getByText("No positioned moments match these filters"),
+  ).toBeVisible();
+  await expect(workspace.locator("canvas")).toBeVisible();
+  await workspace.getByRole("button", { name: "Clear filters" }).click();
+  await expect(
+    workspace.getByText("No positioned moments match these filters"),
+  ).toHaveCount(0);
+  await expect(
+    workspace.getByText("2000 positioned combat moments on c5m3_cemetery"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "timeline", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Story" })).toHaveAttribute(
     "aria-selected",
@@ -1246,7 +1486,7 @@ test("restores a persisted analysis at its dedicated URL", async ({ page }) => {
     });
   });
   await page.goto("/analysis/shared-job/timeline");
-  await expect(page).toHaveURL(/\/analysis\/shared-job\/timeline$/);
+  await expect(page).toHaveURL(/\/analysis\/shared-job\/timeline(?:\?|$)/);
   await expect(
     page.getByRole("button", { name: "timeline", exact: true }),
   ).toHaveClass(/active/);
@@ -1264,7 +1504,9 @@ test("restores a persisted analysis at its dedicated URL", async ({ page }) => {
       .getByRole("button", { name: tab, exact: true })
       .click();
     const route = tab === "data coverage" ? "quality" : tab;
-    await expect(page).toHaveURL(new RegExp(`/analysis/shared-job/${route}$`));
+    await expect(page).toHaveURL(
+      new RegExp(`/analysis/shared-job/${route}(?:\\?|$)`),
+    );
     expect(await page.evaluate(() => window.history.length)).toBe(
       historyLength,
     );
@@ -1300,7 +1542,7 @@ test("restores a complete grouped game and scopes every tab by enabled maps", as
     }),
   );
   await page.goto("/game/game-1/timeline");
-  await expect(page).toHaveURL(/\/game\/game-1\/timeline$/);
+  await expect(page).toHaveURL(/\/game\/game-1\/timeline(?:\?|$)/);
   await expect(
     page.getByRole("heading", { level: 1, name: "Hard Rain" }),
   ).toBeVisible();
@@ -1311,6 +1553,8 @@ test("restores a complete grouped game and scopes every tab by enabled maps", as
   await expect(page.getByRole("button", { name: "All maps" })).toHaveCount(0);
   await page.getByRole("button", { name: "c4m2_sugarmill_a" }).click();
   await page.getByRole("tab", { name: "Timeline" }).click();
+  if ((page.viewportSize()?.width ?? 0) <= 700)
+    await page.getByRole("button", { name: "Lane chart" }).click();
   await expect(page.locator(".match-timeline")).toHaveCount(1);
   await expect(page.locator(".match-timeline h3")).toHaveText(
     "c4m2_sugarmill_a",
@@ -1341,7 +1585,7 @@ test("restores a complete grouped game and scopes every tab by enabled maps", as
       .getByRole("button", { name: tab, exact: true })
       .click();
     const route = tab === "data coverage" ? "quality" : tab;
-    await expect(page).toHaveURL(new RegExp(`/game/game-1/${route}$`));
+    await expect(page).toHaveURL(new RegExp(`/game/game-1/${route}(?:\\?|$)`));
     expect(await page.evaluate(() => window.history.length)).toBe(
       historyLength,
     );

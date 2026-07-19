@@ -10,7 +10,7 @@
   },
   "controlledFixtureOnly": true,
   "datasetManifestSha256": "65e5e5a73192f59c5e6915c516516ab80c27f3c9427a9ec85c53f33d15c1bd77",
-  "id": "witchwatch-controlled-review-priority",
+  "id": "l4dstats-controlled-review-priority",
   "limitations": [
     "research-only",
     "reference-validation-pending",

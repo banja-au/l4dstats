@@ -15,7 +15,7 @@ import type {
   PlayerProjectionCoverage,
   ProjectableUserInfo,
   ProjectedPlayerObservation,
-} from "@witchwatch/contracts";
+} from "@l4dstats/contracts";
 import type { PreparedDemoProjection } from "./evidence-bundle.js";
 
 const limits = {

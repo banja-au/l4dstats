@@ -42,7 +42,7 @@ describe("controlled calibration CLI boundary", () => {
     expect(evaluateControlledDataset(dataset)).toEqual(
       evaluateControlledDataset(dataset),
     );
-    const directory = await mkdtemp(join(tmpdir(), "witchwatch-scoring-"));
+    const directory = await mkdtemp(join(tmpdir(), "l4dstats-scoring-"));
     directories.push(directory);
     const first = await writeCalibrationArtifacts(dataset, directory);
     const second = await writeCalibrationArtifacts(dataset, directory);

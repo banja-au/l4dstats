@@ -9,6 +9,13 @@ or statistic change. Never present an unavailable value as zero.
 - Source 1 demo protocol `4`, L4D2 network protocol `2100`.
 - SourceTV demos. Other protocols and POV demos are unsupported until an
   explicit decoder is implemented and tested.
+- In the proposed hosted deployment, a successfully parsed source demo is
+  deleted after its derived artifacts and lineage are durably verified. The
+  SHA-256, source metadata, byte size, parser/config/build versions, map lineage
+  and explicit availability remain. A stored report can still be inspected and
+  hash-verified, but parser reanalysis requires the user to upload bytes matching
+  the recorded source hash. Source deletion must be displayed explicitly and
+  must never be presented as full source reproducibility.
 - `userinfo` identity is correlated by effective tick and entity slot. Player
   names and decimal SteamID64 values are retained in the local analysis
   artifact for display and Steam profile links. Steam IDs also become keyed

@@ -16,8 +16,8 @@ const upstream = createServer((request, response) => {
     return;
   }
   if (
-    request.headers["x-witchwatch-user"] !== username ||
-    request.headers["x-witchwatch-role"] !== "reviewer"
+    request.headers["x-l4dstats-user"] !== username ||
+    request.headers["x-l4dstats-role"] !== "reviewer"
   ) {
     response.writeHead(403).end();
     return;
@@ -54,9 +54,9 @@ const child = spawn(process.execPath, ["server.mjs"], {
   env: {
     ...process.env,
     PORT: String(webPort),
-    WITCHWATCH_API_URL: `http://127.0.0.1:${upstreamAddress.port}`,
-    WITCHWATCH_API_TOKEN: apiToken,
-    WITCHWATCH_WEB_USERS_JSON: JSON.stringify([
+    L4DSTATS_API_URL: `http://127.0.0.1:${upstreamAddress.port}`,
+    L4DSTATS_API_TOKEN: apiToken,
+    L4DSTATS_WEB_USERS_JSON: JSON.stringify([
       { username, password, role: "reviewer" },
       {
         username: viewerUsername,
@@ -64,7 +64,7 @@ const child = spawn(process.execPath, ["server.mjs"], {
         role: "viewer",
       },
     ]),
-    WITCHWATCH_REQUIRE_AUTH: "true",
+    L4DSTATS_REQUIRE_AUTH: "true",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -116,8 +116,8 @@ try {
   const proxied = await fetch(`${base}/api/test?value=1`, {
     headers: {
       authorization,
-      "x-witchwatch-user": "spoofed-user",
-      "x-witchwatch-role": "admin",
+      "x-l4dstats-user": "spoofed-user",
+      "x-l4dstats-role": "admin",
     },
   });
   const proxyPayload = await proxied.json();

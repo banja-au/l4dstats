@@ -8,6 +8,6 @@ export function applyApiProxyHeaders(
   apiToken: string | undefined,
 ) {
   if (apiToken) request.setHeader("authorization", `Bearer ${apiToken}`);
-  request.removeHeader("x-witchwatch-user");
-  request.removeHeader("x-witchwatch-role");
+  request.removeHeader("x-l4dstats-user");
+  request.removeHeader("x-l4dstats-role");
 }

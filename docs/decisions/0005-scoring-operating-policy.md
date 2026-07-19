@@ -16,7 +16,7 @@ claim real-world probability, prevalence, or enforcement fitness.
 
 ## Decision
 
-WitchWatch exposes one of three mutually exclusive score states:
+L4DStats exposes one of three mutually exclusive score states:
 
 1. `insufficient-data`: required evidence, reconstruction quality, or applicability
    is absent. No numeric review priority exists.

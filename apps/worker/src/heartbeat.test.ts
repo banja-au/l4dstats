@@ -6,7 +6,7 @@ import { startWorkerHeartbeat } from "./heartbeat.js";
 
 describe("worker heartbeat", () => {
   it("writes a private, parseable liveness record immediately", async () => {
-    const root = await mkdtemp(join(tmpdir(), "witchwatch-heartbeat-"));
+    const root = await mkdtemp(join(tmpdir(), "l4dstats-heartbeat-"));
     const path = join(root, "worker", "heartbeat.json");
     const heartbeat = startWorkerHeartbeat(path, 10_000);
     try {

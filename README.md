@@ -12,6 +12,11 @@ Production operators should also keep the
 [monitoring and incident-response runbook](docs/operations/production-response.md)
 with the deployment.
 
+The proposed independently scalable Cloudflare/Turso deployment and the manual
+provider setup it requires are tracked in the
+[hosted operations runbook](docs/operations/hosted-cloudflare-turso.md). It is
+not yet a replacement for the production Compose path.
+
 </div>
 
 ![L4DStats demo deep dive](docs/assets/l4dstats-overview.jpg)
@@ -53,15 +58,15 @@ Before sharing the web port, enable its single-user access gate and replace the
 development API secret:
 
 ```bash
-export WITCHWATCH_WEB_USERNAME=l4dstats
-export WITCHWATCH_WEB_PASSWORD='use-a-long-random-password'
-export WITCHWATCH_API_TOKEN="$(openssl rand -hex 32)"
+export L4DSTATS_WEB_USERNAME=l4dstats
+export L4DSTATS_WEB_PASSWORD='use-a-long-random-password'
+export L4DSTATS_API_TOKEN="$(openssl rand -hex 32)"
 pnpm dev:docker
 ```
 
 Use the web gate only through Twingate or TLS. It protects a private single-user
 workbench. The compiled production server also supports a secret-managed
-`WITCHWATCH_WEB_USERS_JSON` array with `viewer`, `reviewer`, and `admin` roles;
+`L4DSTATS_WEB_USERS_JSON` array with `viewer`, `reviewer`, and `admin` roles;
 see [local operations](docs/operations/local-workbench.md).
 
 For the compiled application and the hardened static/proxy server, use the
@@ -151,16 +156,16 @@ DLC2, DLC1, and the base game, and fails if any official chapter is missing.
 The catalog records the selected content root, BSP hash, Steam build ID when
 SteamCMD exposes it, extractor version, triangle count, and map revision. Audit
 an existing cache against its source installation with
-`pnpm --filter @witchwatch/map-source1 validate-installation
+`pnpm --filter @l4dstats/map-source1 validate-installation
 path/to/l4d2 path/to/geometry`. Restart is unnecessary because the API reads
 the cache on demand. Custom maps can use
-the same extractor with `pnpm --filter @witchwatch/map-source1 extract
+the same extractor with `pnpm --filter @l4dstats/map-source1 extract
 path/to/map.bsp path/to/geometry/map.json`. See
 [ADR 0007](docs/decisions/0007-local-map-geometry-assets.md) for coverage,
 licensing, and correctness boundaries.
 
 To verify that parsed demo player coordinates share the extracted BSP world
-coordinate system, run `pnpm --filter @witchwatch/map-source1
+coordinate system, run `pnpm --filter @l4dstats/map-source1
 validate-demo-alignment path/to/geometry path/to/demo.dem [...]`. The command
 reports observed counts, in-bounds counts and observed coordinate bounds, and
 fails rather than inventing a rate when position telemetry is unavailable.
@@ -202,8 +207,8 @@ packages/storage/     SQLite jobs and content-addressed artifacts
 pnpm check
 pnpm test
 pnpm build
-pnpm --filter @witchwatch/web test:e2e
-pnpm --filter @witchwatch/web test:e2e:real
+pnpm --filter @l4dstats/web test:e2e
+pnpm --filter @l4dstats/web test:e2e:real
 pnpm test:production
 pnpm test:recovery
 pnpm test:sandbox

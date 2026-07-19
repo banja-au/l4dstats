@@ -50,10 +50,10 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     };
     if first == "--version-json" {
-        let hash = option_env!("WITCHWATCH_NATIVE_BUILD_SHA256")
+        let hash = option_env!("L4DSTATS_NATIVE_BUILD_SHA256")
             .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000");
         println!(
-            "{{\"artifactSchemaVersion\":1,\"buildSha256\":{:?},\"parser\":\"witchwatch-demo-source1-native\",\"projectionSchema\":\"demo-projection/v1\",\"protocol\":\"source1-l4d2-2100\",\"version\":{:?}}}",
+            "{{\"artifactSchemaVersion\":1,\"buildSha256\":{:?},\"parser\":\"l4dstats-demo-source1-native\",\"projectionSchema\":\"demo-projection/v1\",\"protocol\":\"source1-l4d2-2100\",\"version\":{:?}}}",
             hash,
             env!("CARGO_PKG_VERSION")
         );
