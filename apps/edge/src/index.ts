@@ -4,6 +4,11 @@ import {
   TursoSqlClient,
   type HostedSource,
 } from "@l4dstats/storage";
+import {
+  handleDeveloperConsole,
+  handlePublicDeveloperApi,
+  openApiDocument,
+} from "./developer-api.js";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const SUPPORTED_UPLOAD_SUFFIXES = [
@@ -140,8 +145,21 @@ async function captureOperationalEvent(
 function json(status: number, value: unknown): Response {
   return Response.json(value, {
     status,
-    headers: { "cache-control": "no-store" },
+    headers: secureHeaders({ "cache-control": "no-store" }),
   });
+}
+
+function secureHeaders(initial?: HeadersInit): Headers {
+  const headers = new Headers(initial);
+  headers.set(
+    "strict-transport-security",
+    "max-age=31536000; includeSubDomains",
+  );
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("x-frame-options", "DENY");
+  headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  headers.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  return headers;
 }
 
 const STEAM_ID64 = /^7656119\d{10}$/;
@@ -310,6 +328,37 @@ export async function fetchHandler(
   environment: EdgeEnvironment,
 ): Promise<Response> {
   const url = new URL(request.url);
+  const developerConsole = await handleDeveloperConsole(request, environment);
+  if (developerConsole) return developerConsole;
+  if (request.method === "GET" && url.pathname === "/openapi.json")
+    return Response.json(openApiDocument(url.origin), {
+      headers: secureHeaders({
+        "cache-control": "public, max-age=300",
+        "access-control-allow-origin": "*",
+      }),
+    });
+  const publicDeveloperApi = await handlePublicDeveloperApi(
+    request,
+    environment,
+    async (uploadRequest, uploadId) => {
+      const response = await upload(uploadRequest, environment, uploadId);
+      const value = (await response
+        .clone()
+        .json()
+        .catch(() => null)) as {
+        job?: { id?: unknown };
+      } | null;
+      const jobId =
+        typeof value?.job?.id === "string" ? value.job.id : undefined;
+      return jobId ? { response, jobId } : { response };
+    },
+    async (jobId) =>
+      fetchHandler(
+        new Request(`${url.origin}/api/jobs/${encodeURIComponent(jobId)}`),
+        environment,
+      ),
+  );
+  if (publicDeveloperApi) return publicDeveloperApi;
   if (request.method === "GET" && url.pathname === "/health")
     return json(200, {
       status: "ok",
@@ -367,7 +416,7 @@ export async function fetchHandler(
     const asset = await environment.ASSETS.fetch(new Request(assetUrl));
     if (!asset.ok || !asset.headers.get("content-type")?.includes("json"))
       return json(404, { error: "map geometry is unavailable" });
-    const headers = new Headers(asset.headers);
+    const headers = secureHeaders(asset.headers);
     headers.set(
       "cache-control",
       "public, max-age=3600, stale-while-revalidate=86400",
@@ -474,6 +523,36 @@ export async function fetchHandler(
       }),
     );
     return json(200, { ...game, analyses });
+  }
+  if (request.method === "GET" || request.method === "HEAD") {
+    const developerHost =
+      url.hostname === "developers.l4dstats.com" ||
+      url.hostname === "developers.l4dstats.gg";
+    const assetUrl = new URL(request.url);
+    if (developerHost) {
+      const isDeveloperAsset =
+        url.pathname.startsWith("/developers/assets/") ||
+        url.pathname === "/developers/index.html";
+      assetUrl.pathname = isDeveloperAsset
+        ? url.pathname
+        : "/developers/index.html";
+    }
+    let response = await environment.ASSETS.fetch(
+      new Request(assetUrl, request),
+    );
+    if (developerHost && response.status === 404) {
+      assetUrl.pathname = "/developers/index.html";
+      response = await environment.ASSETS.fetch(new Request(assetUrl, request));
+    }
+    if (response.status !== 404) {
+      const headers = secureHeaders(response.headers);
+      headers.set("cross-origin-opener-policy", "same-origin");
+      headers.set(
+        "content-security-policy",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://us.i.posthog.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      );
+      return new Response(response.body, { status: response.status, headers });
+    }
   }
   return json(404, { error: "not found" });
 }

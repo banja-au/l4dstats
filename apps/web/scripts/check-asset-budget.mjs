@@ -49,18 +49,21 @@ const measured = await Promise.all(
 );
 const sizeOf = (predicate) =>
   measured.filter(predicate).reduce((total, file) => total + file.bytes, 0);
+const isMainAsset = (file) =>
+  !file.path.startsWith("map-geometry/") &&
+  !file.path.startsWith("developers/");
 const totals = {
-  total: sizeOf((file) => !file.path.startsWith("map-geometry/")),
-  javascript: sizeOf((file) => file.extension === ".js"),
-  css: sizeOf((file) => file.extension === ".css"),
+  total: sizeOf(isMainAsset),
+  javascript: sizeOf((file) => isMainAsset(file) && file.extension === ".js"),
+  css: sizeOf((file) => isMainAsset(file) && file.extension === ".css"),
   transferTotal: measured
-    .filter((file) => !file.path.startsWith("map-geometry/"))
+    .filter(isMainAsset)
     .reduce((total, file) => total + file.gzipBytes, 0),
   transferJavascript: measured
-    .filter((file) => file.extension === ".js")
+    .filter((file) => isMainAsset(file) && file.extension === ".js")
     .reduce((total, file) => total + file.gzipBytes, 0),
   transferCss: measured
-    .filter((file) => file.extension === ".css")
+    .filter((file) => isMainAsset(file) && file.extension === ".css")
     .reduce((total, file) => total + file.gzipBytes, 0),
   hero: sizeOf((file) => file.path === "art/boomer-trace.webp"),
   backdrop: sizeOf((file) => file.path === "art/dark-carnival.webp"),
@@ -68,8 +71,11 @@ const totals = {
     ["art/infected-mark.webp", "favicon.png"].includes(file.path),
   ),
   infected: sizeOf((file) => file.path.startsWith("art/si/")),
-  html: sizeOf((file) => file.extension === ".html"),
+  html: sizeOf((file) => isMainAsset(file) && file.extension === ".html"),
   geometry: sizeOf((file) => file.path.startsWith("map-geometry/")),
+  developerTransfer: measured
+    .filter((file) => file.path.startsWith("developers/"))
+    .reduce((total, file) => total + file.gzipBytes, 0),
 };
 
 const failures = Object.entries(budgets).flatMap(([category, limit]) =>
@@ -93,6 +99,10 @@ if (
   failures.push("geometry: expected 57 bounded map meshes and one catalog");
 if (totals.geometry > 110 * kib * kib)
   failures.push(`geometry: ${totals.geometry} bytes exceeds 110 MiB`);
+if (totals.developerTransfer === 0 || totals.developerTransfer > 95 * kib)
+  failures.push(
+    `developer portal: ${totals.developerTransfer} compressed bytes must be between 1 and 95 KiB`,
+  );
 
 for (const category of Object.keys(budgets))
   process.stdout.write(
@@ -100,6 +110,9 @@ for (const category of Object.keys(budgets))
   );
 process.stdout.write(
   `${"geometry".padEnd(10)} ${String(totals.geometry).padStart(7)} / ${110 * kib * kib} bytes (lazy)\n`,
+);
+process.stdout.write(
+  `${"developers".padEnd(10)} ${String(totals.developerTransfer).padStart(7)} / ${95 * kib} bytes (transfer)\n`,
 );
 if (failures.length) {
   process.stderr.write(`Asset budget failed:\n- ${failures.join("\n- ")}\n`);

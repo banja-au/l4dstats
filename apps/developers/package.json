@@ -1,0 +1,27 @@
+{
+  "name": "@l4dstats/developers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "check": "tsc -b --pretty false",
+    "dev": "vite",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@fontsource-variable/space-grotesk": "5.2.8",
+    "lucide-react": "0.544.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.14",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.0.4",
+    "tailwindcss": "4.1.14",
+    "vite": "7.3.5",
+    "vitest": "3.2.6"
+  }
+}

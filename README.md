@@ -25,6 +25,11 @@ L4DStats turns up to ten SourceTV `.dem` files into a fast, privacy-conscious ma
 
 The result is statistics first. Detector output is deliberately secondary and is always presented as a review signal - not a cheating verdict.
 
+The hosted developer console at `developers.l4dstats.gg` provides account-scoped
+API keys, 100 requests per UTC day, request logs, an OpenAPI 3.1 contract and
+bounded one-to-ten-demo upload batches. API uploads reuse the same parser and
+delete-after-extraction transaction as the browser.
+
 ## What it extracts
 
 - Match duration, playback ticks, effective tick rate, map, file size, and SHA-256 provenance

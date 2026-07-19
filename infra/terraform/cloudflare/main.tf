@@ -51,3 +51,10 @@ resource "cloudflare_queue" "analysis" {
     message_retention_period = 86400
   }
 }
+
+resource "cloudflare_workers_custom_domain" "developer_portal" {
+  account_id = var.cloudflare_account_id
+  hostname   = var.developer_hostname
+  service    = "l4dstats-${var.environment}"
+  zone_name  = var.production_zone
+}

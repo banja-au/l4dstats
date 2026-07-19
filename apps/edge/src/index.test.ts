@@ -5,6 +5,7 @@ import {
   parseSteamLookup,
   type EdgeEnvironment,
 } from "./index.js";
+import { openApiDocument } from "./developer-api.js";
 
 function environment(): EdgeEnvironment {
   return {
@@ -108,6 +109,10 @@ describe("edge dispatcher", () => {
       environment(),
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("strict-transport-security")).toContain(
+      "max-age=31536000",
+    );
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     await expect(response.json()).resolves.toEqual({
       status: "ok",
       environment: "test",
@@ -142,5 +147,18 @@ describe("edge dispatcher", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("max-age=3600");
     await expect(response.json()).resolves.toEqual({ schemaVersion: 1 });
+  });
+
+  it("publishes the bounded authenticated developer contract", async () => {
+    const document = openApiDocument("https://developers.l4dstats.gg") as {
+      paths: Record<string, unknown>;
+      security: unknown[];
+    };
+    expect(Object.keys(document.paths)).toEqual([
+      "/v1/batches",
+      "/v1/uploads/{id}",
+      "/v1/jobs/{id}",
+    ]);
+    expect(document.security).toEqual([{ bearerAuth: [] }]);
   });
 });

@@ -30,3 +30,15 @@ variable "queue_delivery_paused" {
   type        = bool
   default     = false
 }
+
+variable "production_zone" {
+  description = "Cloudflare zone used for hosted custom domains."
+  type        = string
+  default     = "l4dstats.gg"
+}
+
+variable "developer_hostname" {
+  description = "Developer portal custom hostname."
+  type        = string
+  default     = "developers.l4dstats.gg"
+}

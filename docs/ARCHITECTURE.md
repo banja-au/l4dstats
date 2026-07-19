@@ -57,6 +57,13 @@ byte caps, a ratio cap and bounded decoder execution. No archive path is ever
 materialized. The uploaded-object hash and the independently calculated
 expanded-demo hash are distinct provenance fields. See ADR 0011.
 
+The hosted developer console is a separate React/Tailwind asset bundle served
+by the same Worker at `developers.l4dstats.gg`. Its API-key boundary creates up
+to ten account-owned upload grants and then reuses the exact browser R2, Queue,
+Container and delete-after-extraction transaction. Turso stores salted password
+hashes, hashed API keys, sessions, atomic UTC-day quotas and bounded request
+logs; API clients cannot address another account's jobs. See ADR 0013.
+
 ## Canonical concepts
 
 - `Demo`: hash, origin, acquisition manifest, header, protocol, map, quality.

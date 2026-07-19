@@ -40,7 +40,7 @@ import {
   type ScreenPointIndex,
 } from "./spatial-map";
 import { formatElapsedTime, formatTickTime } from "./time-format";
-import { numberHitsByObservedRounds, pairObservedPins } from "./story-timeline";
+import { numberHitsByObservedRounds } from "./story-timeline";
 import {
   buildNormalizedDensityGrid,
   densityDifference,
@@ -635,6 +635,13 @@ function App() {
       ? [{ analysis, stats: analysis.engineResult.demo.stats }]
       : [],
   );
+  useEffect(() => {
+    const canonical = document.querySelector<HTMLLinkElement>(
+      "link[rel='canonical']",
+    );
+    if (canonical)
+      canonical.href = `${window.location.origin}${window.location.pathname}`;
+  }, [selectedGame, tab, requestedPlayerProfile?.playerId]);
   useEffect(() => {
     if (!gameAnalyses.length) {
       document.title = isWorking
@@ -6568,11 +6575,6 @@ function Timeline({
   const [selectedHit, setSelectedHit] = useState<string | null>(
     initialTimelineParameters.get("hit"),
   );
-  const [hovered, setHovered] = useState<{
-    key: string;
-    x: number;
-    y: number;
-  } | null>(null);
   const [zoom, setZoom] = useState(() => {
     const requested = Number(initialTimelineParameters.get("storyDensity"));
     return [1, 2, 4].includes(requested)
@@ -6582,25 +6584,10 @@ function Timeline({
         : 2;
   });
   const [fullscreen, setFullscreen] = useState(false);
-  // Story is the canonical timeline presentation. Legacy storyView values are
-  // intentionally ignored so old links cannot reopen the retired lane view.
-  const [timelineView] = useState<"hits" | "timeline">("hits");
   const [storyLimit, setStoryLimit] = useState(100);
   const [moreTimelineFilters, setMoreTimelineFilters] = useState(
     initialTimelineParameters.get("storyMore") === "1",
   );
-  const [timelinePresentation, setTimelinePresentation] = useState<
-    "list" | "chart"
-  >(() => {
-    const requested = initialTimelineParameters.get("storyPresentation");
-    if (requested === "list" || requested === "chart") return requested;
-    return window.innerWidth <= 700 ? "list" : "chart";
-  });
-  const [timelineListLimit, setTimelineListLimit] = useState(100);
-  const storyTabId = useId();
-  const timelineTabId = useId();
-  const storyPanelId = useId();
-  const timelinePanelId = useId();
   const typeRank: Record<MatchTimelineEvent["type"], number> = {
     round_start: 0,
     team_change: 1,
@@ -6692,11 +6679,11 @@ function Timeline({
     : null;
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
-    parameters.set("storyView", timelineView);
+    parameters.delete("storyView");
     parameters.set("storyFilter", filter);
     parameters.set("storyMap", mapScope);
     parameters.set("storyDensity", String(zoom));
-    parameters.set("storyPresentation", timelinePresentation);
+    parameters.delete("storyPresentation");
     parameters.set("storyMore", moreTimelineFilters ? "1" : "0");
     if (selectedHit) parameters.set("hit", selectedHit);
     else parameters.delete("hit");
@@ -6705,15 +6692,7 @@ function Timeline({
       "",
       `${window.location.pathname}?${parameters.toString()}`,
     );
-  }, [
-    filter,
-    mapScope,
-    moreTimelineFilters,
-    selectedHit,
-    timelinePresentation,
-    timelineView,
-    zoom,
-  ]);
+  }, [filter, mapScope, moreTimelineFilters, selectedHit, zoom]);
   useEffect(() => {
     if (!selected) return;
     const frame = window.requestAnimationFrame(() => {
@@ -6775,49 +6754,6 @@ function Timeline({
       window.removeEventListener("keydown", onKey);
     };
   }, [fullscreen]);
-  const lanes: Array<{
-    id: "round" | "si" | "bosses" | "pins" | "deaths" | "support";
-    name: string;
-    types: MatchTimelineEvent["type"][];
-  }> = [
-    {
-      id: "round",
-      name: tx("Round", "Ronda"),
-      types: ["round_start", "round_end", "team_change"],
-    },
-    {
-      id: "si",
-      name: tx("SI actions", "Acciones de infectados especiales"),
-      types: ["spawn", "tank_control", "attack"],
-    },
-    {
-      id: "bosses",
-      name: tx("Bosses", "Jefes"),
-      types: ["witch_spawn", "witch_enrage", "witch_burn", "witch_end"],
-    },
-    {
-      id: "pins",
-      name: tx("Pins + clears", "Agarres y liberaciones"),
-      types: ["pin_start", "pin_end", "clear"],
-    },
-    {
-      id: "deaths",
-      name: tx("Deaths + incaps", "Muertes e incapacitados"),
-      types: ["death", "incap"],
-    },
-    { id: "support", name: tx("Support", "Apoyo"), types: ["revive"] },
-  ];
-  const hasInfectedIcon = (name?: string) =>
-    [
-      "Smoker",
-      "Boomer",
-      "Hunter",
-      "Spitter",
-      "Jockey",
-      "Charger",
-      "Tank",
-      "Witch",
-    ].includes(name ?? "");
   const hitSummaries = scopedDemos.flatMap((demo) => {
     const competitive = demo.demo.competitive;
     if (!competitive) return [];
@@ -7227,11 +7163,7 @@ function Timeline({
         </button>
         <span
           className="timeline-zoom"
-          aria-label={
-            timelineView === "hits"
-              ? tx("Story density", "Densidad de la historia")
-              : tx("Timeline zoom", "Zoom de la cronología")
-          }
+          aria-label={tx("Story density", "Densidad de la historia")}
         >
           {[1, 2, 4].map((value) => (
             <button
@@ -7240,965 +7172,398 @@ function Timeline({
               aria-pressed={zoom === value}
               onClick={() => setZoom(value)}
             >
-              {timelineView === "hits"
-                ? value === 1
-                  ? tx("compact", "compacto")
-                  : value === 2
-                    ? tx("comfortable", "cómodo")
-                    : tx("spacious", "espacioso")
-                : value === 1
-                  ? tx("full match", "partida completa")
-                  : value === 2
-                    ? tx("inspect", "inspeccionar")
-                    : tx("detail", "detalle")}
+              {value === 1
+                ? tx("compact", "compacto")
+                : value === 2
+                  ? tx("comfortable", "cómodo")
+                  : tx("spacious", "espacioso")}
             </button>
           ))}
         </span>
       </div>
-      {timelineView === "hits" && (
-        <section
-          id={storyPanelId}
-          aria-label={tx("Match story", "Historia de la partida")}
-          className={`hit-roundup hit-density-${zoom}`}
-        >
-          <header>
-            <strong>
-              {tx(
-                "{moments} story moments · {events} source events",
-                "{moments} momentos de la historia · {events} eventos de origen",
-                { moments: storyItems.length, events: visible.length },
-              )}
-            </strong>
-            <span>
-              {tx(
-                "Select a moment, then open Timeline for full evidence",
-                "Selecciona un momento y abre Cronología para ver toda la evidencia",
-              )}
-            </span>
-          </header>
-          <p className="story-availability-note">
+      <section
+        aria-label={tx("Match story", "Historia de la partida")}
+        className={`hit-roundup hit-density-${zoom}`}
+      >
+        <header>
+          <strong>
             {tx(
-              "Saferoom departure/arrival, pills taken, and Witch crowns are not available in retained demo telemetry; they are not inferred here.",
-              "La salida/llegada al refugio, las píldoras tomadas y las coronas a la Witch no están disponibles en la telemetría conservada; no se infieren aquí.",
+              "{moments} story moments · {events} source events",
+              "{moments} momentos de la historia · {events} eventos de origen",
+              { moments: storyItems.length, events: visible.length },
             )}
-          </p>
-          {storyItems.length ? (
-            <div className="hit-roundup-scroll">
-              {storyItems.slice(0, storyLimit).map((story, storyIndex) => {
-                const round = storyRoundContext(story);
-                const previousRound =
-                  storyIndex > 0
-                    ? storyRoundContext(storyItems[storyIndex - 1]!)
-                    : undefined;
-                return (
-                  <Fragment
-                    key={
-                      story.kind === "hit"
-                        ? `${story.summary.demo.sha256}:${story.summary.hit.id}`
-                        : `story:${story.items[0]!.key}`
-                    }
-                  >
-                    {previousRound?.key !== round.key && (
-                      <div className="story-round-divider">
-                        <strong>{round.label}</strong>
-                        <span>{round.detail}</span>
-                      </div>
-                    )}
-                    {story.kind === "event" ? (
-                      <button
-                        type="button"
-                        className={`hit-summary-card story-event-row ${story.items
-                          .map(({ event }) => `story-event-${event.type}`)
-                          .join(
-                            " ",
-                          )} ${story.items.some((item) => item.key === selected) ? "is-selected" : ""}`}
-                        aria-pressed={story.items.some(
-                          (item) => item.key === selected,
+          </strong>
+          <span>
+            {tx(
+              "Select a moment to inspect its source evidence",
+              "Selecciona un momento para inspeccionar su evidencia de origen",
+            )}
+          </span>
+        </header>
+        <p className="story-availability-note">
+          {tx(
+            "Saferoom departure/arrival, pills taken, and Witch crowns are not available in retained demo telemetry; they are not inferred here.",
+            "La salida/llegada al refugio, las píldoras tomadas y las coronas a la Witch no están disponibles en la telemetría conservada; no se infieren aquí.",
+          )}
+        </p>
+        {storyItems.length ? (
+          <div className="hit-roundup-scroll">
+            {storyItems.slice(0, storyLimit).map((story, storyIndex) => {
+              const round = storyRoundContext(story);
+              const previousRound =
+                storyIndex > 0
+                  ? storyRoundContext(storyItems[storyIndex - 1]!)
+                  : undefined;
+              return (
+                <Fragment
+                  key={
+                    story.kind === "hit"
+                      ? `${story.summary.demo.sha256}:${story.summary.hit.id}`
+                      : `story:${story.items[0]!.key}`
+                  }
+                >
+                  {previousRound?.key !== round.key && (
+                    <div className="story-round-divider">
+                      <strong>{round.label}</strong>
+                      <span>{round.detail}</span>
+                    </div>
+                  )}
+                  {story.kind === "event" ? (
+                    <button
+                      type="button"
+                      className={`hit-summary-card story-event-row ${story.items
+                        .map(({ event }) => `story-event-${event.type}`)
+                        .join(
+                          " ",
+                        )} ${story.items.some((item) => item.key === selected) ? "is-selected" : ""}`}
+                      aria-pressed={story.items.some(
+                        (item) => item.key === selected,
+                      )}
+                      onClick={() => {
+                        setSelected(story.items[0]!.key);
+                        setSelectedHit(null);
+                      }}
+                    >
+                      <span className="story-event-context">
+                        {story.items[0]!.event.infectedClass && (
+                          <InfectedIcon
+                            infectedClass={story.items[0]!.event.infectedClass}
+                            label={story.items[0]!.event.infectedClass}
+                          />
                         )}
-                        onClick={() => {
-                          setSelected(story.items[0]!.key);
-                          setSelectedHit(null);
-                        }}
-                      >
-                        <span className="story-event-context">
-                          {story.items[0]!.event.infectedClass && (
-                            <InfectedIcon
-                              infectedClass={
-                                story.items[0]!.event.infectedClass
-                              }
-                              label={story.items[0]!.event.infectedClass}
-                            />
-                          )}
-                          <span>
-                            <strong>
-                              {story.items[0]!.event.actor ??
-                                story.items[0]!.event.subject ??
-                                story.items[0]!.event.victim ??
-                                tx("Match", "Partida")}
-                            </strong>
-                            <small>
-                              {story.items[0]!.event.infectedClass ??
-                                "match state"}
-                            </small>
-                            <small className="story-event-mobile-meta">
-                              {story.items.length > 1
-                                ? tx(
-                                    "{count} linked moments",
-                                    "{count} momentos vinculados",
-                                    { count: story.items.length },
-                                  )
-                                : storyEventLabel(story.items[0]!.event)}{" "}
-                              ·{" "}
-                              {formatElapsedTime(
-                                story.items[0]!.event.timeSeconds,
-                              )}
-                            </small>
-                          </span>
-                        </span>
-                        <span className="story-event-core">
+                        <span>
+                          <strong>
+                            {story.items[0]!.event.actor ??
+                              story.items[0]!.event.subject ??
+                              story.items[0]!.event.victim ??
+                              tx("Match", "Partida")}
+                          </strong>
                           <small>
+                            {story.items[0]!.event.infectedClass ??
+                              "match state"}
+                          </small>
+                          <small className="story-event-mobile-meta">
                             {story.items.length > 1
                               ? tx(
                                   "{count} linked moments",
                                   "{count} momentos vinculados",
                                   { count: story.items.length },
                                 )
-                              : storyEventLabel(story.items[0]!.event)}
-                          </small>
-                          <span>
-                            <strong>
-                              {story.items.some(
-                                ({ event }) => event.type === "death",
-                              )
-                                ? "†"
-                                : story.items.some(
-                                      ({ event }) => event.type === "incap",
-                                    )
-                                  ? "!"
-                                  : story.items.some(
-                                        ({ event }) => event.type === "revive",
-                                      )
-                                    ? "+"
-                                    : "•"}
-                            </strong>
-                          </span>
-                          <small>
+                              : storyEventLabel(story.items[0]!.event)}{" "}
+                            ·{" "}
                             {formatElapsedTime(
                               story.items[0]!.event.timeSeconds,
                             )}
                           </small>
                         </span>
-                        <span className="story-event-detail">
-                          <strong>
-                            {story.items
-                              .map(({ event }) => timelineDetail(event))
-                              .join(" · ")}
-                          </strong>
-                          <small>
-                            {story.items[0]!.event.weapon ??
-                              (story.items.some(({ event }) => event.position)
-                                ? tx("position observed", "posición observada")
-                                : tx(
-                                    "position unavailable",
-                                    "posición no disponible",
-                                  ))}
-                          </small>
-                        </span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className={`hit-summary-card ${selectedHit === `${story.summary.demo.sha256}:${story.summary.hit.id}` ? "is-selected" : ""}`}
-                        aria-pressed={
-                          selectedHit ===
-                          `${story.summary.demo.sha256}:${story.summary.hit.id}`
-                        }
-                        onClick={() => {
-                          setSelectedHit(
-                            `${story.summary.demo.sha256}:${story.summary.hit.id}`,
-                          );
-                          setSelected(null);
-                        }}
-                      >
-                        <span className="hit-summary-core">
-                          <small>
-                            {tx(
-                              "{round} · Hit {hit}",
-                              "{round} · Ataque {hit}",
-                              {
-                                round: hitRoundContext(story.summary)
-                                  .observedBoundary
-                                  ? tx("Round {number}", "Ronda {number}", {
-                                      number: hitRoundContext(story.summary)
-                                        .round,
-                                    })
-                                  : tx("Round start", "Inicio de ronda"),
-                                hit: String(
-                                  hitRoundContext(story.summary).hit,
-                                ).padStart(2, "0"),
-                              },
-                            )}
-                          </small>
-                          <span>
-                            <strong>
-                              {whole.format(
-                                story.summary.hit.observedSurvivorHealthLoss,
-                              )}
-                            </strong>
-                            <small>
-                              {tx(
-                                "observed HP loss",
-                                "pérdida de PS observada",
-                              )}
-                            </small>
-                          </span>
-                          <small>
-                            {formatTickTime(
-                              story.summary.hit.tickRange.start,
-                              story.summary.demo.demo.tickRate,
-                            )}
-                            –
-                            {formatTickTime(
-                              story.summary.hit.tickRange.end,
-                              story.summary.demo.demo.tickRate,
-                            )}
-                          </small>
-                        </span>
-                        <span className="hit-summary-lineup">
-                          {story.summary.lives.map((life) => {
-                            const damageEntry = Object.entries(
-                              life.counterDeltas,
-                            ).find(
-                              ([name]) =>
-                                name.startsWith("m_checkpointPZ") &&
-                                name.endsWith("Damage"),
-                            );
-                            const damage = damageEntry?.[1];
-                            return (
-                              <span key={life.id} className="hit-life">
-                                <InfectedIcon
-                                  infectedClass={life.infectedClass}
-                                  label={life.infectedClass}
-                                />
-                                <span>
-                                  <strong>{life.playerAlias}</strong>
-                                  <small>
-                                    {life.infectedClass} ·{" "}
-                                    {damage !== undefined
-                                      ? `${whole.format(damage)} dmg`
-                                      : tx(
-                                          "damage unavailable",
-                                          "daño no disponible",
-                                        )}
-                                  </small>
-                                  <i>
-                                    <i
-                                      style={{
-                                        width: `${Math.min(100, (damage ?? 0) / 2)}%`,
-                                      }}
-                                    />
-                                  </i>
-                                </span>
-                              </span>
-                            );
-                          })}
-                        </span>
-                        <span className="hit-summary-metrics">
-                          <span>
-                            <strong>
-                              {whole.format(story.summary.hit.controls)}
-                            </strong>
-                            <small>{tx("controls", "controles")}</small>
-                            <i>
-                              <i
-                                style={{
-                                  width: `${Math.min(100, story.summary.hit.controls * 25)}%`,
-                                }}
-                              />
-                            </i>
-                          </span>
-                          <span>
-                            <strong>
-                              {whole.format(
-                                story.summary.hit.peakSimultaneousPins,
-                              )}
-                            </strong>
-                            <small>
-                              {tx("peak pins", "máximo de agarres")}
-                            </small>
-                            <i>
-                              <i
-                                style={{
-                                  width: `${Math.min(100, story.summary.hit.peakSimultaneousPins * 25)}%`,
-                                }}
-                              />
-                            </i>
-                          </span>
-                          <span>
-                            <strong>
-                              {tx("{seconds}s", "{seconds}s", {
-                                seconds:
-                                  story.summary.hit.spawnSpreadSeconds.toFixed(
-                                    1,
-                                  ),
-                              })}
-                            </strong>
-                            <small>
-                              {tx("spawn spread", "dispersión de aparición")}
-                            </small>
-                            <i>
-                              <i
-                                style={{
-                                  width: `${Math.min(100, story.summary.hit.spawnSpreadSeconds * 12.5)}%`,
-                                }}
-                              />
-                            </i>
-                          </span>
-                        </span>
-                        <span className="hit-summary-footnote">
-                          {tx(
-                            "Survivor → SI damage unavailable · spawn-gap-v1 grouping",
-                            "Daño de Superviviente → infectado especial no disponible · agrupación spawn-gap-v1",
-                          )}
-                        </span>
-                      </button>
-                    )}
-                  </Fragment>
-                );
-              })}
-              {storyLimit < storyItems.length && (
-                <button
-                  type="button"
-                  className="story-show-more"
-                  onClick={() => setStoryLimit((current) => current + 100)}
-                >
-                  {tx(
-                    "Show next {count} of {total} moments",
-                    "Mostrar los siguientes {count} de {total} momentos",
-                    {
-                      count: Math.min(100, storyItems.length - storyLimit),
-                      total: storyItems.length,
-                    },
-                  )}
-                </button>
-              )}
-            </div>
-          ) : (
-            <p className="muted">
-              {tx(
-                "No major story moments match the current map and category filters.",
-                "Ningún momento importante coincide con los filtros actuales de mapa y categoría.",
-              )}
-            </p>
-          )}
-          {selectedHitSummary && (
-            <article
-              className="story-inspector hit-inspector"
-              aria-live="polite"
-            >
-              <div>
-                <span>
-                  {tx("Hit {number}", "Ataque {number}", {
-                    number: hitRoundContext(selectedHitSummary).hit,
-                  })}{" "}
-                  ·{" "}
-                  {formatTickTime(
-                    selectedHitSummary.hit.tickRange.start,
-                    selectedHitSummary.demo.demo.tickRate,
-                  )}
-                  –
-                  {formatTickTime(
-                    selectedHitSummary.hit.tickRange.end,
-                    selectedHitSummary.demo.demo.tickRate,
-                  )}
-                </span>
-                <strong>
-                  {whole.format(
-                    selectedHitSummary.hit.observedSurvivorHealthLoss,
-                  )}{" "}
-                  {tx(
-                    "observed HP loss · {controls} controls · peak {pins} pins",
-                    "pérdida de PS observada · {controls} controles · máximo de {pins} agarres",
-                    {
-                      controls: selectedHitSummary.hit.controls,
-                      pins: selectedHitSummary.hit.peakSimultaneousPins,
-                    },
-                  )}
-                </strong>
-                <small>
-                  {
-                    selectedHitSummary.demo.events.filter(
-                      ({ event }) =>
-                        event.tick >= selectedHitSummary.hit.tickRange.start &&
-                        event.tick <= selectedHitSummary.hit.tickRange.end,
-                    ).length
-                  }{" "}
-                  {tx(
-                    "constituent retained events · spawn-gap-v1 grouping",
-                    "eventos constituyentes conservados · agrupación spawn-gap-v1",
-                  )}
-                </small>
-              </div>
-            </article>
-          )}
-          {active && !selectedHitSummary && (
-            <article className="story-inspector" aria-live="polite">
-              <div>
-                <span>
-                  {formatElapsedTime(active.event.timeSeconds)} ·{" "}
-                  {active.event.type.replaceAll("_", " ")}
-                </span>
-                <strong>{timelineDetail(active.event)}</strong>
-                <small>
-                  {tx("tick {tick} · {map}", "tick {tick} · {map}", {
-                    tick: whole.format(active.event.tick),
-                    map: active.demo.mapName,
-                  })}
-                </small>
-              </div>
-            </article>
-          )}
-        </section>
-      )}
-      {timelineView === "timeline" &&
-        (visible.length ? (
-          <div
-            id={timelinePanelId}
-            role="tabpanel"
-            aria-labelledby={timelineTabId}
-            className="timeline-demo-stack"
-          >
-            <div
-              className="timeline-presentation-switch"
-              aria-label={tx(
-                "Timeline presentation",
-                "Presentación de la cronología",
-              )}
-            >
-              <button
-                type="button"
-                className={timelinePresentation === "list" ? "active" : ""}
-                aria-pressed={timelinePresentation === "list"}
-                onClick={() => setTimelinePresentation("list")}
-              >
-                {tx("Event list", "Lista de eventos")}
-              </button>
-              <button
-                type="button"
-                className={timelinePresentation === "chart" ? "active" : ""}
-                aria-pressed={timelinePresentation === "chart"}
-                onClick={() => setTimelinePresentation("chart")}
-              >
-                {tx("Lane chart", "Gráfico por carriles")}
-              </button>
-            </div>
-            {timelinePresentation === "chart" && (
-              <p className="timeline-hint">
-                {tx(
-                  "Scroll through playback time and select a marker for full event evidence. Rows expand when moments collide.",
-                  "Desplázate por el tiempo de reproducción y selecciona un marcador para ver toda la evidencia del evento. Las filas se expanden cuando coinciden varios momentos.",
-                )}
-              </p>
-            )}
-            {timelinePresentation === "list" && (
-              <div className="mobile-timeline-list">
-                {visible.slice(0, timelineListLimit).map((item, index) => {
-                  const round = roundContextForTick(item.demo, item.event.tick);
-                  const previousRound =
-                    index > 0
-                      ? roundContextForTick(
-                          visible[index - 1]!.demo,
-                          visible[index - 1]!.event.tick,
-                        )
-                      : undefined;
-                  return (
-                    <Fragment key={`list:${item.key}`}>
-                      {previousRound?.key !== round.key && (
-                        <div className="story-round-divider">
-                          <strong>{round.label}</strong>
-                          <span>{round.detail}</span>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        className={`mobile-timeline-event ${active?.key === item.key ? "is-selected" : ""}`}
-                        aria-pressed={active?.key === item.key}
-                        onClick={() => setSelected(item.key)}
-                      >
-                        {item.event.infectedClass ? (
-                          <InfectedIcon
-                            infectedClass={item.event.infectedClass}
-                            label={item.event.infectedClass}
-                          />
-                        ) : (
-                          <span className="mobile-timeline-glyph">•</span>
-                        )}
+                      </span>
+                      <span className="story-event-core">
+                        <small>
+                          {story.items.length > 1
+                            ? tx(
+                                "{count} linked moments",
+                                "{count} momentos vinculados",
+                                { count: story.items.length },
+                              )
+                            : storyEventLabel(story.items[0]!.event)}
+                        </small>
                         <span>
-                          <strong>{timelineDetail(item.event)}</strong>
+                          <strong>
+                            {story.items.some(
+                              ({ event }) => event.type === "death",
+                            )
+                              ? "†"
+                              : story.items.some(
+                                    ({ event }) => event.type === "incap",
+                                  )
+                                ? "!"
+                                : story.items.some(
+                                      ({ event }) => event.type === "revive",
+                                    )
+                                  ? "+"
+                                  : "•"}
+                          </strong>
+                        </span>
+                        <small>
+                          {formatElapsedTime(story.items[0]!.event.timeSeconds)}
+                        </small>
+                      </span>
+                      <span className="story-event-detail">
+                        <strong>
+                          {story.items
+                            .map(({ event }) => timelineDetail(event))
+                            .join(" · ")}
+                        </strong>
+                        <small>
+                          {story.items[0]!.event.weapon ??
+                            (story.items.some(({ event }) => event.position)
+                              ? tx("position observed", "posición observada")
+                              : tx(
+                                  "position unavailable",
+                                  "posición no disponible",
+                                ))}
+                        </small>
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`hit-summary-card ${selectedHit === `${story.summary.demo.sha256}:${story.summary.hit.id}` ? "is-selected" : ""}`}
+                      aria-pressed={
+                        selectedHit ===
+                        `${story.summary.demo.sha256}:${story.summary.hit.id}`
+                      }
+                      onClick={() => {
+                        setSelectedHit(
+                          `${story.summary.demo.sha256}:${story.summary.hit.id}`,
+                        );
+                        setSelected(null);
+                      }}
+                    >
+                      <span className="hit-summary-core">
+                        <small>
+                          {tx("{round} · Hit {hit}", "{round} · Ataque {hit}", {
+                            round: hitRoundContext(story.summary)
+                              .observedBoundary
+                              ? tx("Round {number}", "Ronda {number}", {
+                                  number: hitRoundContext(story.summary).round,
+                                })
+                              : tx("Round start", "Inicio de ronda"),
+                            hit: String(
+                              hitRoundContext(story.summary).hit,
+                            ).padStart(2, "0"),
+                          })}
+                        </small>
+                        <span>
+                          <strong>
+                            {whole.format(
+                              story.summary.hit.observedSurvivorHealthLoss,
+                            )}
+                          </strong>
                           <small>
-                            {item.event.actor ??
-                              item.event.subject ??
-                              tx("Match", "Partida")}
-                            {item.event.infectedClass
-                              ? ` · ${item.event.infectedClass}`
-                              : ` · ${item.event.type.replaceAll("_", " ")}`}
+                            {tx("observed HP loss", "pérdida de PS observada")}
                           </small>
                         </span>
-                        <time>{formatElapsedTime(item.event.timeSeconds)}</time>
-                      </button>
-                    </Fragment>
-                  );
-                })}
-                {timelineListLimit < visible.length && (
-                  <button
-                    type="button"
-                    className="story-show-more"
-                    onClick={() =>
-                      setTimelineListLimit((current) => current + 100)
-                    }
-                  >
-                    {tx(
-                      "Show next {count} of {total} events",
-                      "Mostrar los siguientes {count} de {total} eventos",
-                      {
-                        count: Math.min(
-                          100,
-                          visible.length - timelineListLimit,
-                        ),
-                        total: visible.length,
-                      },
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
-            {timelinePresentation === "chart" &&
-              visibleDemos.map((source) => {
-                const maximumTick = Math.max(1, source.demo.playbackTicks);
-                const baseCanvasWidth = Math.max(
-                  1260,
-                  Math.round(source.demo.durationSeconds * 3),
-                );
-                const canvasWidth = baseCanvasWidth * zoom;
-                const guideCount = Math.max(
-                  2,
-                  Math.ceil(source.demo.durationSeconds / 60),
-                );
-                const pinBands = pairObservedPins(
-                  source.events.map(({ event }) => event),
-                ).map(({ startIndex, endIndex }) => {
-                  const item = source.events[startIndex]!;
-                  const end = source.events[endIndex]!;
-                  return {
-                    id: `pin:${item.key}`,
-                    kind: "pin" as const,
-                    start: item.event.tick,
-                    end: end.event.tick,
-                    label: tx("{class} pin", "agarre de {class}", {
-                      class: item.event.infectedClass ?? "SI",
-                    }),
-                    detail: tx(
-                      "{actor} controlled {victim}",
-                      "{actor} inmovilizó a {victim}",
-                      {
-                        actor:
-                          item.event.actor ??
-                          tx("Special Infected", "infectado especial"),
-                        victim:
-                          item.event.victim ??
-                          tx("a Survivor", "un superviviente"),
-                      },
-                    ),
-                  };
-                });
-                const hitBands = (source.demo.competitive?.hits ?? []).map(
-                  (hit) => ({
-                    id: hit.id,
-                    kind: "hit" as const,
-                    start: hit.tickRange.start,
-                    end: hit.tickRange.end,
-                    label: tx("{classes} hit", "ataque de {classes}", {
-                      classes: hit.infectedClasses.join(" + ") || "SI",
-                    }),
-                    detail: tx(
-                      "{players} players, {controls} controls, peak {pins} simultaneous pins",
-                      "{players} jugadores, {controls} controles, máximo de {pins} agarres simultáneos",
-                      {
-                        players: hit.playerIds.length,
-                        controls: hit.controls,
-                        pins: hit.peakSimultaneousPins,
-                      },
-                    ),
-                  }),
-                );
-                const tankBands = (
-                  source.demo.competitive?.tankEncounters ?? []
-                ).map((tank) => ({
-                  id: tank.id,
-                  kind: "tank" as const,
-                  start: tank.tickRange.start,
-                  end: tank.tickRange.end,
-                  label: `Tank · ${tank.controllerAlias}`,
-                  detail: tx(
-                    "{duration}, {punches} punches, {throws} registered throws",
-                    "{duration}, {punches} puñetazos, {throws} lanzamientos registrados",
-                    {
-                      duration: duration(tank.durationSeconds),
-                      punches: tank.punches,
-                      throws: tank.registeredRockThrows,
-                    },
-                  ),
-                }));
-                return (
-                  <section className="match-timeline" key={source.demoIndex}>
-                    <header className="timeline-demo-head">
-                      <div>
-                        <span className="eyebrow">
-                          {tx("Demo {number}", "Demo {number}", {
-                            number: source.demoIndex + 1,
-                          })}
-                        </span>
-                        <h3>{source.mapName}</h3>
-                      </div>
-                      <span>
-                        {source.sha256.slice(0, 12)} ·{" "}
-                        {tx("{ticks} ticks", "{ticks} ticks", {
-                          ticks: whole.format(source.demo.playbackTicks),
-                        })}{" "}
-                        ·{" "}
-                        {source.demo.tickRate === null
-                          ? tx("time unavailable", "tiempo no disponible")
-                          : duration(source.demo.durationSeconds)}
+                        <small>
+                          {formatTickTime(
+                            story.summary.hit.tickRange.start,
+                            story.summary.demo.demo.tickRate,
+                          )}
+                          –
+                          {formatTickTime(
+                            story.summary.hit.tickRange.end,
+                            story.summary.demo.demo.tickRate,
+                          )}
+                        </small>
                       </span>
-                    </header>
-                    <div className="timeline-scroll">
-                      <span className="timeline-scroll-cue" aria-hidden="true">
+                      <span className="hit-summary-lineup">
+                        {story.summary.lives.map((life) => {
+                          const damageEntry = Object.entries(
+                            life.counterDeltas,
+                          ).find(
+                            ([name]) =>
+                              name.startsWith("m_checkpointPZ") &&
+                              name.endsWith("Damage"),
+                          );
+                          const damage = damageEntry?.[1];
+                          return (
+                            <span key={life.id} className="hit-life">
+                              <InfectedIcon
+                                infectedClass={life.infectedClass}
+                                label={life.infectedClass}
+                              />
+                              <span>
+                                <strong>{life.playerAlias}</strong>
+                                <small>
+                                  {life.infectedClass} ·{" "}
+                                  {damage !== undefined
+                                    ? `${whole.format(damage)} dmg`
+                                    : tx(
+                                        "damage unavailable",
+                                        "daño no disponible",
+                                      )}
+                                </small>
+                                <i>
+                                  <i
+                                    style={{
+                                      width: `${Math.min(100, (damage ?? 0) / 2)}%`,
+                                    }}
+                                  />
+                                </i>
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </span>
+                      <span className="hit-summary-metrics">
+                        <span>
+                          <strong>
+                            {whole.format(story.summary.hit.controls)}
+                          </strong>
+                          <small>{tx("controls", "controles")}</small>
+                          <i>
+                            <i
+                              style={{
+                                width: `${Math.min(100, story.summary.hit.controls * 25)}%`,
+                              }}
+                            />
+                          </i>
+                        </span>
+                        <span>
+                          <strong>
+                            {whole.format(
+                              story.summary.hit.peakSimultaneousPins,
+                            )}
+                          </strong>
+                          <small>{tx("peak pins", "máximo de agarres")}</small>
+                          <i>
+                            <i
+                              style={{
+                                width: `${Math.min(100, story.summary.hit.peakSimultaneousPins * 25)}%`,
+                              }}
+                            />
+                          </i>
+                        </span>
+                        <span>
+                          <strong>
+                            {tx("{seconds}s", "{seconds}s", {
+                              seconds:
+                                story.summary.hit.spawnSpreadSeconds.toFixed(1),
+                            })}
+                          </strong>
+                          <small>
+                            {tx("spawn spread", "dispersión de aparición")}
+                          </small>
+                          <i>
+                            <i
+                              style={{
+                                width: `${Math.min(100, story.summary.hit.spawnSpreadSeconds * 12.5)}%`,
+                              }}
+                            />
+                          </i>
+                        </span>
+                      </span>
+                      <span className="hit-summary-footnote">
                         {tx(
-                          "Scroll horizontally",
-                          "Desplázate horizontalmente",
+                          "Survivor → SI damage unavailable · spawn-gap-v1 grouping",
+                          "Daño de Superviviente → infectado especial no disponible · agrupación spawn-gap-v1",
                         )}
                       </span>
-                      <div
-                        className="timeline-canvas"
-                        style={{ width: canvasWidth }}
-                      >
-                        <div className="timeline-axis">
-                          <strong>
-                            {tx("Playback time", "Tiempo de reproducción")}
-                          </strong>
-                          <div>
-                            {Array.from(
-                              { length: guideCount + 1 },
-                              (_, index) => (
-                                <span
-                                  key={index}
-                                  style={{
-                                    left: `${(index / guideCount) * 100}%`,
-                                  }}
-                                >
-                                  {duration(
-                                    (source.demo.durationSeconds * index) /
-                                      guideCount,
-                                  )}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                        <div
-                          className="timeline-lanes"
-                          aria-label={`Interactive ${source.mapName} timeline`}
-                        >
-                          {lanes.map((lane) => {
-                            const laneEvents = source.events.filter(
-                              ({ event }) => lane.types.includes(event.type),
-                            );
-                            const occupiedRows: number[] = [];
-                            const minimumGap = (86 / canvasWidth) * 100;
-                            const packed = laneEvents.map((item) => {
-                              const position = Math.min(
-                                99.5,
-                                Math.max(
-                                  0.5,
-                                  (item.event.tick / maximumTick) * 100,
-                                ),
-                              );
-                              let row = occupiedRows.findIndex(
-                                (last) => position - last >= minimumGap,
-                              );
-                              if (row < 0) row = occupiedRows.length;
-                              occupiedRows[row] = position;
-                              return { ...item, position, row };
-                            });
-                            const laneBands =
-                              lane.id === "si"
-                                ? hitBands
-                                : lane.id === "pins"
-                                  ? pinBands
-                                  : lane.id === "bosses"
-                                    ? tankBands
-                                    : [];
-                            const bandRows: number[] = [];
-                            const packedBands = laneBands.map((band) => {
-                              const left = Math.max(
-                                0.2,
-                                (band.start / maximumTick) * 100,
-                              );
-                              const right = Math.min(
-                                99.8,
-                                (Math.max(band.start + 1, band.end) /
-                                  maximumTick) *
-                                  100,
-                              );
-                              let row = bandRows.findIndex(
-                                (lastRight) => left - lastRight >= 0.35,
-                              );
-                              if (row < 0) row = bandRows.length;
-                              bandRows[row] = right;
-                              return {
-                                ...band,
-                                left,
-                                width: Math.max(0.55, right - left),
-                                row,
-                              };
-                            });
-                            const bandArea = packedBands.length
-                              ? 16 + bandRows.length * 26
-                              : 0;
-                            const laneHeight = Math.max(
-                              laneEvents.length === 0 ? 76 : 132,
-                              34 + bandArea + occupiedRows.length * 42,
-                            );
-                            return (
-                              <div
-                                className="timeline-lane"
-                                key={lane.name}
-                                style={{ minHeight: laneHeight }}
-                              >
-                                <strong>
-                                  <span>{lane.name}</span>
-                                  <small>
-                                    {tx("{count} events", "{count} eventos", {
-                                      count: laneEvents.length,
-                                    })}
-                                  </small>
-                                </strong>
-                                <div style={{ minHeight: laneHeight }}>
-                                  <i />
-                                  {packedBands.map((band) => (
-                                    <span
-                                      key={band.id}
-                                      className={`timeline-band ${band.kind}`}
-                                      style={{
-                                        left: `${band.left}%`,
-                                        width: `${band.width}%`,
-                                        top: `${12 + band.row * 26}px`,
-                                      }}
-                                      title={`${band.label}. ${band.detail}`}
-                                    >
-                                      <b>{band.label}</b>
-                                    </span>
-                                  ))}
-                                  {packed.map(
-                                    ({ event, key, position, row }) => {
-                                      const infectedMarker = hasInfectedIcon(
-                                        event.infectedClass,
-                                      );
-                                      const time =
-                                        source.demo.tickRate === null
-                                          ? "time unavailable"
-                                          : formatElapsedTime(
-                                              event.timeSeconds,
-                                            );
-                                      return (
-                                        <button
-                                          key={key}
-                                          className={`${event.type} ${active?.key === key ? "active" : ""} ${infectedMarker ? "infected-marker" : ""}`}
-                                          style={{
-                                            left: `${position}%`,
-                                            top: `${17 + bandArea + row * 42}px`,
-                                          }}
-                                          onClick={() => setSelected(key)}
-                                          onPointerDown={() => setSelected(key)}
-                                          onPointerEnter={(event) => {
-                                            const rect =
-                                              event.currentTarget.getBoundingClientRect();
-                                            const above =
-                                              rect.bottom + 170 >
-                                              window.innerHeight;
-                                            setHovered({
-                                              key,
-                                              x: Math.min(
-                                                window.innerWidth - 332,
-                                                Math.max(12, rect.left - 24),
-                                              ),
-                                              y: above
-                                                ? Math.max(12, rect.top - 156)
-                                                : rect.bottom + 10,
-                                            });
-                                          }}
-                                          onPointerLeave={() =>
-                                            setHovered(null)
-                                          }
-                                          onFocus={(event) => {
-                                            const rect =
-                                              event.currentTarget.getBoundingClientRect();
-                                            setHovered({
-                                              key,
-                                              x: Math.min(
-                                                window.innerWidth - 332,
-                                                Math.max(12, rect.left - 24),
-                                              ),
-                                              y: Math.min(
-                                                window.innerHeight - 156,
-                                                rect.bottom + 10,
-                                              ),
-                                            });
-                                          }}
-                                          onBlur={() => setHovered(null)}
-                                          aria-pressed={active?.key === key}
-                                          data-timeline-active={
-                                            active?.key === key
-                                              ? "true"
-                                              : undefined
-                                          }
-                                          aria-label={tx(
-                                            "{map}, tick {tick}, {type}: {detail}",
-                                            "{map}, tick {tick}, {type}: {detail}",
-                                            {
-                                              map: source.mapName,
-                                              tick: event.tick,
-                                              type: storyEventLabel(event),
-                                              detail: timelineDetail(event),
-                                            },
-                                          )}
-                                        >
-                                          <b>
-                                            {infectedMarker &&
-                                            event.infectedClass ? (
-                                              <InfectedIcon
-                                                infectedClass={
-                                                  event.infectedClass
-                                                }
-                                              />
-                                            ) : (
-                                              storyEventLabel(event)
-                                            )}
-                                          </b>
-                                          {(event.actor || event.subject) && (
-                                            <small>
-                                              {event.actor ?? event.subject}
-                                            </small>
-                                          )}
-                                        </button>
-                                      );
-                                    },
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
-            {active && (
-              <article className={`timeline-focus ${active.event.type}`}>
-                <div>
-                  <time>
-                    {active.demo.demo.tickRate === null
-                      ? tx("Time N/A", "Tiempo no disponible")
-                      : formatElapsedTime(active.event.timeSeconds)}
-                  </time>
-                  <span>
-                    {tx("tick {tick}", "tick {tick}", {
-                      tick: whole.format(active.event.tick),
-                    })}
-                  </span>
-                </div>
-                <div>
-                  <span className="eyebrow">
-                    {active.demo.mapName} · {storyEventLabel(active.event)}
-                  </span>
-                  <h3>{timelineDetail(active.event)}</h3>
-                  <p>
-                    {[
-                      active.event.infectedClass,
-                      active.event.weapon,
-                      active.event.headshot
-                        ? tx("headshot", "disparo a la cabeza")
-                        : undefined,
-                      active.event.position
-                        ? tx(
-                            "position {x}, {y}, {z}",
-                            "posición {x}, {y}, {z}",
-                            {
-                              x: Math.round(active.event.position.x),
-                              y: Math.round(active.event.position.y),
-                              z: Math.round(active.event.position.z),
-                            },
-                          )
-                        : undefined,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <span>{active.demo.sha256.slice(0, 12)}</span>
-              </article>
+                    </button>
+                  )}
+                </Fragment>
+              );
+            })}
+            {storyLimit < storyItems.length && (
+              <button
+                type="button"
+                className="story-show-more"
+                onClick={() => setStoryLimit((current) => current + 100)}
+              >
+                {tx(
+                  "Show next {count} of {total} moments",
+                  "Mostrar los siguientes {count} de {total} momentos",
+                  {
+                    count: Math.min(100, storyItems.length - storyLimit),
+                    total: storyItems.length,
+                  },
+                )}
+              </button>
             )}
-            {hovered &&
-              (() => {
-                const item = visible.find(
-                  (candidate) => candidate.key === hovered.key,
-                );
-                if (!item) return null;
-                return createPortal(
-                  <div
-                    className="timeline-float-tooltip"
-                    role="tooltip"
-                    style={{ left: hovered.x, top: hovered.y }}
-                  >
-                    <em>
-                      {item.demo.mapName} ·{" "}
-                      {tx("tick {tick}", "tick {tick}", {
-                        tick: whole.format(item.event.tick),
-                      })}{" "}
-                      ·{" "}
-                      {item.demo.demo.tickRate === null
-                        ? tx("time unavailable", "tiempo no disponible")
-                        : formatElapsedTime(item.event.timeSeconds)}
-                    </em>
-                    <strong>
-                      {item.event.actor ??
-                        item.event.subject ??
-                        tx("Match", "Partida")}
-                      {item.event.victim
-                        ? tx(" to {victim}", " a {victim}", {
-                            victim: item.event.victim,
-                          })
-                        : ""}
-                    </strong>
-                    <small>{timelineDetail(item.event)}</small>
-                  </div>,
-                  document.body,
-                );
-              })()}
           </div>
         ) : (
-          <Empty
-            title={tx(
-              "No detailed timeline available",
-              "No hay una cronología detallada disponible",
+          <p className="muted">
+            {tx(
+              "No major story moments match the current map and category filters.",
+              "Ningún momento importante coincide con los filtros actuales de mapa y categoría.",
             )}
-            text={tx(
-              "This analysis predates detailed event retention or the demo did not expose supported match events.",
-              "Este análisis es anterior a la conservación detallada de eventos o la demo no expuso eventos compatibles de la partida.",
-            )}
-          />
-        ))}
+          </p>
+        )}
+        {selectedHitSummary && (
+          <article className="story-inspector hit-inspector" aria-live="polite">
+            <div>
+              <span>
+                {tx("Hit {number}", "Ataque {number}", {
+                  number: hitRoundContext(selectedHitSummary).hit,
+                })}{" "}
+                ·{" "}
+                {formatTickTime(
+                  selectedHitSummary.hit.tickRange.start,
+                  selectedHitSummary.demo.demo.tickRate,
+                )}
+                –
+                {formatTickTime(
+                  selectedHitSummary.hit.tickRange.end,
+                  selectedHitSummary.demo.demo.tickRate,
+                )}
+              </span>
+              <strong>
+                {whole.format(
+                  selectedHitSummary.hit.observedSurvivorHealthLoss,
+                )}{" "}
+                {tx(
+                  "observed HP loss · {controls} controls · peak {pins} pins",
+                  "pérdida de PS observada · {controls} controles · máximo de {pins} agarres",
+                  {
+                    controls: selectedHitSummary.hit.controls,
+                    pins: selectedHitSummary.hit.peakSimultaneousPins,
+                  },
+                )}
+              </strong>
+              <small>
+                {
+                  selectedHitSummary.demo.events.filter(
+                    ({ event }) =>
+                      event.tick >= selectedHitSummary.hit.tickRange.start &&
+                      event.tick <= selectedHitSummary.hit.tickRange.end,
+                  ).length
+                }{" "}
+                {tx(
+                  "constituent retained events · spawn-gap-v1 grouping",
+                  "eventos constituyentes conservados · agrupación spawn-gap-v1",
+                )}
+              </small>
+            </div>
+          </article>
+        )}
+        {active && !selectedHitSummary && (
+          <article className="story-inspector" aria-live="polite">
+            <div>
+              <span>
+                {formatElapsedTime(active.event.timeSeconds)} ·{" "}
+                {active.event.type.replaceAll("_", " ")}
+              </span>
+              <strong>{timelineDetail(active.event)}</strong>
+              <small>
+                {tx("tick {tick} · {map}", "tick {tick} · {map}", {
+                  tick: whole.format(active.event.tick),
+                  map: active.demo.mapName,
+                })}
+              </small>
+            </div>
+          </article>
+        )}
+      </section>
     </div>
   );
 }
