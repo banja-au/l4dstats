@@ -21,6 +21,7 @@ RUN apt-get update \
   && corepack prepare pnpm@11.13.1 --activate
 
 WORKDIR /workspace
+ENV CI=true
 COPY . .
 COPY --from=native-build /native/demo-source1-stage /workspace/native/demo-source1-stage
 COPY --from=native-build /native/build-sha256 /workspace/native/build-sha256
@@ -48,4 +49,3 @@ ENV NODE_OPTIONS=--conditions=production
 ENV L4DSTATS_CONTAINER_WORK_ROOT=/tmp/l4dstats
 
 ENTRYPOINT ["/usr/local/bin/l4dstats-cloudflare-container"]
-
