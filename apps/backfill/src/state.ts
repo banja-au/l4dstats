@@ -204,7 +204,12 @@ export class BackfillState {
 
   public complete(
     item: PendingDemo,
-    result: { resultSha256: string; resultKey: string; jobId: string },
+    result: {
+      resultSha256: string;
+      resultKey: string;
+      jobId: string;
+      gameId?: string;
+    },
   ): void {
     this.db
       .prepare(

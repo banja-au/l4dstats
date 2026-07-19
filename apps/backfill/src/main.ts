@@ -19,6 +19,27 @@ function workspacePath(value: string): string {
   return resolve(REPOSITORY_ROOT, value);
 }
 
+export function publicBaseUrl(environment: NodeJS.ProcessEnv): string {
+  const configured = environment.L4DSTATS_PUBLIC_BASE_URL;
+  if (configured) return new URL(configured).origin;
+  const hostname = environment.PRODUCTION_HOSTNAME;
+  if (!hostname)
+    throw new Error(
+      "PRODUCTION_HOSTNAME or L4DSTATS_PUBLIC_BASE_URL is required",
+    );
+  return new URL(`https://${hostname}`).origin;
+}
+
+export function importedGameUrls(
+  gameIds: readonly string[],
+  environment: NodeJS.ProcessEnv,
+): string[] {
+  const baseUrl = publicBaseUrl(environment);
+  return [...new Set(gameIds)]
+    .sort()
+    .map((gameId) => `${baseUrl}/game/${gameId}/overview`);
+}
+
 function positiveInteger(flag: string, value: string | undefined): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 1)
@@ -91,6 +112,14 @@ async function main(): Promise<void> {
     log(
       `backfill finished in ${((Date.now() - started) / 1_000).toFixed(1)}s: ${JSON.stringify(summary)}`,
     );
+    if (summary.gameIds.length > 0) {
+      process.stdout.write("\nImported game URLs:\n");
+      for (const url of importedGameUrls(summary.gameIds, process.env))
+        process.stdout.write(`${url}\n`);
+      process.stdout.write("\n");
+    } else {
+      log("no games were imported in this run");
+    }
     if (summary.failed > 0) process.exitCode = 1;
   } finally {
     process.removeListener("SIGINT", stop);

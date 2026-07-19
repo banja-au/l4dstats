@@ -18,6 +18,7 @@ export interface PublishResult {
   resultSha256: string;
   resultKey: string;
   jobId: string;
+  gameId: string;
 }
 
 export interface Publisher {
@@ -123,7 +124,12 @@ export class HostedPublisher implements Publisher {
         throw new Error(
           "completed backfill job conflicts with the local result",
         );
-      return { resultSha256, resultKey, jobId: job.id };
+      const gameId = await this.repository.getGameIdForJob(job.id);
+      if (!gameId)
+        throw new Error(
+          "completed backfill job has no hosted game association",
+        );
+      return { resultSha256, resultKey, jobId: job.id, gameId };
     }
     const owner = `local-backfill-${process.pid}`;
     const claimed = await this.repository.claim({
@@ -161,7 +167,9 @@ export class HostedPublisher implements Publisher {
         .catch(() => undefined);
       throw error;
     }
-    return { resultSha256, resultKey, jobId: job.id };
+    const gameId = await this.repository.getGameIdForJob(job.id);
+    if (!gameId) throw new Error("backfill job has no hosted game association");
+    return { resultSha256, resultKey, jobId: job.id, gameId };
   }
 
   public close(): void {

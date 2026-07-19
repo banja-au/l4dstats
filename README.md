@@ -146,6 +146,9 @@ the command skips completed source items and retries eligible transient
 failures. See [ADR 0014](docs/decisions/0014-local-hosted-backfill.md).
 The local source-object cap is 100 MiB; expanded demos are bounded at the native
 parser's 512 MiB hard input cap and a 200:1 compression ratio.
+At completion, the command prints one production `/game/:id/overview` URL for
+each unique game imported during that run. Several processed map demos can
+therefore produce one game URL.
 
 `pnpm dev:docker` force-recreates the three application containers so the web
 proxy and API cannot retain different authentication environments. Named
