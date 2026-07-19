@@ -4,7 +4,10 @@ import { createServer, request as proxyRequest } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const distRoot = resolve(fileURLToPath(new URL("./dist/", import.meta.url)));
+const distRoot = resolve(
+  process.env.L4DSTATS_WEB_ROOT ??
+    fileURLToPath(new URL("./dist/", import.meta.url)),
+);
 const port = positiveInteger(process.env.PORT ?? "5173", "PORT");
 const api = new URL(process.env.L4DSTATS_API_URL ?? "http://127.0.0.1:8787");
 const apiToken = process.env.L4DSTATS_API_TOKEN;

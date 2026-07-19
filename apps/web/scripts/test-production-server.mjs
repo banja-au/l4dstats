@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const username = "reviewer";
 const password = "production-test-password";
@@ -9,6 +12,12 @@ const viewerPassword = "production-viewer-password";
 const apiToken = "production-test-api-token-0123456789";
 const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 const viewerAuthorization = `Basic ${Buffer.from(`${viewerUsername}:${viewerPassword}`).toString("base64")}`;
+const webRoot = await mkdtemp(join(tmpdir(), "l4dstats-production-web-"));
+await writeFile(
+  join(webRoot, "index.html"),
+  "<!doctype html><html><body>L4DStats production test</body></html>",
+  { mode: 0o600 },
+);
 
 const upstream = createServer((request, response) => {
   if (request.headers.authorization !== `Bearer ${apiToken}`) {
@@ -65,6 +74,7 @@ const child = spawn(process.execPath, ["server.mjs"], {
       },
     ]),
     L4DSTATS_REQUIRE_AUTH: "true",
+    L4DSTATS_WEB_ROOT: webRoot,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -164,4 +174,5 @@ try {
   child.kill("SIGTERM");
   upstream.close();
   await Promise.allSettled([childExit, upstreamClose]);
+  await rm(webRoot, { recursive: true, force: true });
 }
