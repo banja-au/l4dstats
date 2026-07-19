@@ -1,9 +1,9 @@
 {
-  "format": "witchwatch-map-catalog-v1",
+  "format": "l4dstats-map-catalog-v1",
   "sourceKind": "steam-dedicated-server",
   "steamAppId": 222860,
   "steamBuildId": "23990100",
-  "extractor": "@witchwatch/map-source1@0.1.0",
+  "extractor": "@l4dstats/map-source1@0.1.0",
   "maps": [
     {
       "map": "c5m1_waterfront",
