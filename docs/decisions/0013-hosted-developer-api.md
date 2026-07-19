@@ -20,8 +20,12 @@ private source objects durable.
   same service after that domain is registered and activated.
 - Store developer accounts, sessions, API-key hashes, daily counters, bounded
   request logs and upload ownership in Turso. Passwords use PBKDF2-SHA-256 with
-  unique salts and 600,000 iterations. Session cookies are `HttpOnly`, `Secure`
-  and `SameSite=Lax`; state-changing console requests require the exact Origin.
+  unique salts and the Cloudflare Workers WebCrypto maximum of 100,000
+  iterations. This is below OWASP's general PBKDF2-HMAC-SHA-256 preference but
+  meets its ASVS typical minimum; authentication is additionally throttled by
+  account/IP and passwords are bounded to 12–128 characters. Session cookies
+  are `HttpOnly`, `Secure` and `SameSite=Lax`; state-changing console requests
+  require the exact Origin.
 - Show API keys once, retain only SHA-256 hashes and a display prefix, and allow
   at most five active keys per account.
 - Enforce 100 authenticated API requests per UTC day with an atomic Turso
@@ -46,3 +50,4 @@ teams, billing and delegated access.
 ## References
 
 - [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [OWASP ASVS credential-storage controls](https://cornucopia.owasp.org/taxonomy/asvs-4.0.3/02-authentication/04-credential-storage)

@@ -100,7 +100,10 @@ async function passwordHash(
       name: "PBKDF2",
       hash: "SHA-256",
       salt: Uint8Array.from(salt).buffer,
-      iterations: 600_000,
+      // Cloudflare Workers WebCrypto rejects PBKDF2 work factors above 100k.
+      // This is the provider maximum; authentication is also account/IP
+      // throttled and passwords are bounded to 12–128 characters.
+      iterations: 100_000,
     },
     key,
     256,
