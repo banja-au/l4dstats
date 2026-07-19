@@ -189,7 +189,7 @@ export function App() {
                 <h1 className="mt-2 text-4xl font-black tracking-tight">
                   Account
                 </h1>
-                <p className="mt-2 text-stone-400">{account.email}</p>
+                <p className="mt-2 break-all text-stone-400">{account.email}</p>
               </div>
               <button
                 className="pill"
@@ -202,7 +202,7 @@ export function App() {
               </button>
             </div>
             <div className="mt-9 grid gap-5 lg:grid-cols-3">
-              <article className="panel p-6">
+              <article className="panel min-w-0 p-6">
                 <p className="eyebrow">DAILY USAGE</p>
                 <p className="mt-4 text-4xl font-black">
                   {account.requestsUsed}
@@ -220,8 +220,8 @@ export function App() {
                   Resets at {new Date(account.resetAt).toLocaleString()}
                 </p>
               </article>
-              <article className="panel p-6 lg:col-span-2">
-                <div className="flex items-center justify-between">
+              <article className="panel min-w-0 p-6 lg:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <p className="eyebrow">API KEYS</p>
                     <p className="mt-2 text-sm text-stone-400">
@@ -246,10 +246,10 @@ export function App() {
                 <div className="mt-4 space-y-2">
                   {keys.map((key) => (
                     <div
-                      className="flex justify-between border-t border-white/8 pt-3 text-sm"
+                      className="flex flex-wrap justify-between gap-2 border-t border-white/8 pt-3 text-sm"
                       key={key.id}
                     >
-                      <code>{key.prefix}••••••••</code>
+                      <code className="break-all">{key.prefix}••••••••</code>
                       <span className="flex items-center gap-4 text-stone-500">
                         {key.name}
                         <button
