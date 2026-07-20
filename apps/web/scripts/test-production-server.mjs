@@ -58,6 +58,15 @@ const upstream = createServer((request, response) => {
         ],
       }),
     );
+  } else if (request.url === "/api/players/resolve?q=76561198000000007") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        steamId64: "76561198000000007",
+        displayName: "Coach",
+        games: [{ id: "one" }, { id: "two" }],
+      }),
+    );
   } else {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true, path: request.url }));
@@ -156,6 +165,29 @@ try {
     throw new Error(
       "game route did not receive campaign-specific social metadata",
     );
+  const statsPage = await fetch(`${base}/stats`, {
+    headers: { authorization },
+  });
+  const statsHtml = await statsPage.text();
+  if (
+    !statsHtml.includes("L4DStats · The archive in numbers") ||
+    !statsHtml.includes(
+      'property="og:image" content="https://l4dstats.gg/art/og-stats.webp"',
+    )
+  )
+    throw new Error("stats route did not receive bespoke social metadata");
+  const playerPage = await fetch(`${base}/player/76561198000000007`, {
+    headers: { authorization },
+  });
+  const playerHtml = await playerPage.text();
+  if (
+    !playerHtml.includes("Coach · Player dossier · L4DStats") ||
+    !playerHtml.includes("2 retained games") ||
+    !playerHtml.includes(
+      'name="twitter:image" content="https://l4dstats.gg/art/og-player.webp"',
+    )
+  )
+    throw new Error("player route did not receive bespoke social metadata");
   if (page.headers.get("x-frame-options") !== "DENY")
     throw new Error("frame protection is absent");
   const proxied = await fetch(`${base}/api/test?value=1`, {

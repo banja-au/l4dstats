@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Radio, Skull, Users } from "lucide-react";
+import { ArrowUpRight, Skull, Users } from "lucide-react";
 import { workbenchApi, type ApiPublicStats } from "./api";
+import EvidenceLoader from "./EvidenceLoader";
 import { useI18n } from "./i18n";
 import "./stats-page.css";
 
@@ -63,7 +64,7 @@ function StatsPage() {
   const [stats, setStats] = useState<ApiPublicStats | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    document.title = "The numbers | L4DStats";
+    document.title = "Stats | L4DStats";
     void workbenchApi
       .stats()
       .then(setStats, (reason) =>
@@ -83,9 +84,7 @@ function StatsPage() {
     );
   if (!stats)
     return (
-      <main className="public-stats stats-loading">
-        <Radio /> {tx("Reading the tape…", "Leyendo la grabación…")}
-      </main>
+      <EvidenceLoader label={tx("Reading the archive", "Leyendo el archivo")} />
     );
   const cards = [
     [tx("Demos processed", "Demos procesadas"), stats.totals.demosProcessed],
@@ -106,6 +105,9 @@ function StatsPage() {
   ] as const;
   return (
     <main className="public-stats">
+      <div className="stats-poster-type" aria-hidden="true">
+        {tx("ARCHIVE", "ARCHIVO")}
+      </div>
       <header className="stats-masthead">
         <a className="stats-wordmark" href="/">
           L4D<span>STATS</span>
@@ -122,7 +124,10 @@ function StatsPage() {
             )}
           </p>
         </div>
-        <Skull aria-hidden="true" />
+        <div className="stats-stamp" aria-hidden="true">
+          <Skull />
+          <span>{tx("EST. 2026", "EST. 2026")}</span>
+        </div>
       </header>
       <section
         className="stats-counters"

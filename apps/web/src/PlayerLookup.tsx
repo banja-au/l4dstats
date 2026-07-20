@@ -4,6 +4,7 @@ import { type ApiPlayerHistory, workbenchApi } from "./api";
 import { gameCampaignName } from "./campaign-metadata";
 import { useI18n } from "./i18n";
 import { captureAnalyticsEvent } from "./analytics";
+import { EvidencePulse } from "./EvidenceLoader";
 
 function campaignForMaps(mapNames: string[]): string | null {
   return gameCampaignName(
@@ -114,7 +115,7 @@ export function PlayerLookup() {
           spellCheck={false}
         />
         <button type="submit" disabled={loading || !query.trim()}>
-          <Search aria-hidden="true" />
+          {loading ? <EvidencePulse /> : <Search aria-hidden="true" />}
           {loading ? t("playerSearch.searching") : t("playerSearch.search")}
         </button>
       </form>

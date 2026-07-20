@@ -1,18 +1,47 @@
 .global-player {
+  position: relative;
   min-height: 100vh;
+  overflow: hidden;
   padding: clamp(20px, 4vw, 64px);
   background:
     radial-gradient(circle at 85% 0, rgb(167 255 56 / 10%), transparent 28%),
+    linear-gradient(
+      90deg,
+      rgb(5 8 6 / 97%),
+      rgb(5 8 6 / 82%) 54%,
+      rgb(5 8 6 / 95%)
+    ),
+    url("/art/dark-carnival.webp") center 14% / cover fixed,
     #080b09;
   color: var(--ink);
 }
-.global-player-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--green);
-  font-weight: 800;
+.global-player::before {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.2;
+  pointer-events: none;
+  content: "";
+  background:
+    repeating-linear-gradient(0deg, transparent 0 4px, rgb(0 0 0 / 17%) 5px),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.24'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+}
+.global-player > *:not(.global-player-poster-type) {
+  position: relative;
+  z-index: 1;
+}
+.global-player-poster-type {
+  position: absolute;
+  top: 2vw;
+  right: -2vw;
+  color: rgb(237 244 239 / 3.8%);
+  font-size: clamp(90px, 22vw, 350px);
+  font-weight: 1000;
+  line-height: 0.72;
+  letter-spacing: -0.13em;
+  user-select: none;
+  transform: rotate(2deg) scaleY(1.08);
 }
 .global-player-back,
 .global-player > a {
@@ -22,10 +51,17 @@
   color: var(--muted);
   text-decoration: none;
 }
+.global-player-back {
+  padding: 7px 11px;
+  border: 1px solid rgb(237 244 239 / 13%);
+  background: rgb(5 9 6 / 74%);
+  transform: rotate(-1deg);
+}
 .global-player-back svg {
   width: 16px;
 }
 .global-player-hero {
+  position: relative;
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -33,7 +69,28 @@
   max-width: 1400px;
   margin: 32px auto 0;
   padding: clamp(24px, 5vw, 70px) 0 30px;
-  border-bottom: 4px solid var(--ink);
+  border-bottom: 5px solid var(--ink);
+}
+.global-player-hero::before {
+  position: absolute;
+  top: 18px;
+  right: 24%;
+  width: 90px;
+  height: 20px;
+  background: rgb(222 212 177 / 15%);
+  content: "";
+  transform: rotate(5deg);
+}
+.global-player-hero::after {
+  position: absolute;
+  right: 5%;
+  bottom: -11px;
+  width: 170px;
+  height: 18px;
+  background: rgb(167 255 56 / 52%);
+  content: "";
+  clip-path: polygon(1% 14%, 100% 0, 97% 91%, 0 100%);
+  transform: rotate(-2deg);
 }
 .global-player-hero span {
   color: var(--green);
@@ -49,6 +106,8 @@
   font-size: clamp(3rem, 8vw, 8rem);
   line-height: 0.82;
   letter-spacing: -0.075em;
+  text-shadow: 5px 5px 0 rgb(167 255 56 / 7%);
+  transform: skew(-2deg);
 }
 .global-player-hero p {
   margin: 0;
@@ -64,6 +123,8 @@
   background: var(--green);
   font-weight: 900;
   text-decoration: none;
+  box-shadow: 7px 7px 0 rgb(0 0 0 / 66%);
+  transform: rotate(1deg);
 }
 .global-player-hero > a svg {
   width: 16px;
@@ -82,6 +143,10 @@
   border-bottom: 1px solid var(--line);
   flex-direction: column;
   justify-content: space-between;
+  background: linear-gradient(145deg, rgb(13 19 16 / 88%), rgb(7 11 8 / 76%));
+}
+.global-player-counters article:nth-child(even) {
+  transform: translateY(7px);
 }
 .global-player-counters article:first-child {
   border-left: 1px solid var(--line);
@@ -114,6 +179,7 @@
   gap: 8px;
   padding: 18px;
   background: var(--panel);
+  backdrop-filter: blur(10px);
 }
 .global-player-detail strong {
   overflow: hidden;
@@ -121,11 +187,23 @@
   text-overflow: ellipsis;
 }
 .global-player-section {
+  position: relative;
   max-width: 1400px;
   margin: 0 auto 34px;
   border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: 8px 8px 0 #030403;
+  box-shadow: 12px 12px 0 rgb(0 0 0 / 72%);
+  backdrop-filter: blur(12px);
+}
+.global-player-section::before {
+  position: absolute;
+  top: -7px;
+  left: 20px;
+  width: 70px;
+  height: 13px;
+  background: rgb(222 212 177 / 16%);
+  content: "";
+  transform: rotate(-3deg);
 }
 .global-player-section > header {
   display: flex;
@@ -158,6 +236,9 @@
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
+.global-player-metrics article:hover {
+  background: linear-gradient(135deg, rgb(167 255 56 / 7%), transparent);
+}
 .global-player-metrics span {
   color: var(--muted);
   font-size: 0.72rem;
@@ -188,6 +269,12 @@
 }
 .global-player-games > a:hover {
   background: rgb(167 255 56 / 6%);
+  transform: translateX(4px);
+}
+.global-player-games > a {
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
 }
 .global-player-games div {
   display: grid;

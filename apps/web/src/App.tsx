@@ -62,6 +62,7 @@ import { parsePlayerProfilePath, PlayerIdentityLinks } from "./player-links";
 import { INFECTED_CLASSES, InfectedIcon } from "./visual";
 import { useI18n } from "./i18n";
 import { captureAnalyticsEvent } from "./analytics";
+import EvidenceLoader from "./EvidenceLoader";
 const StatsPage = lazy(() => import("./StatsPage"));
 const GlobalPlayerPage = lazy(() => import("./GlobalPlayerPage"));
 
@@ -393,12 +394,22 @@ function Ring({ value, label }: { value: number; label: string }) {
 }
 
 function App() {
+  const { locale, t, tx } = useI18n();
   const globalPlayer = window.location.pathname.match(
     /^\/player\/(7656119\d{10})\/?$/,
   )?.[1];
   if (globalPlayer)
     return (
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          <EvidenceLoader
+            label={tx(
+              "Loading player dossier",
+              "Cargando expediente del jugador",
+            )}
+          />
+        }
+      >
         <GlobalPlayerPage steamId64={globalPlayer} />
       </Suspense>
     );
@@ -407,11 +418,16 @@ function App() {
     window.location.pathname === "/stats/"
   )
     return (
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          <EvidenceLoader
+            label={tx("Loading the archive", "Cargando el archivo")}
+          />
+        }
+      >
         <StatsPage />
       </Suspense>
     );
-  const { locale, t, tx } = useI18n();
   const requestedPlayerProfile = parsePlayerProfilePath(
     window.location.pathname,
   );
@@ -1071,7 +1087,11 @@ function App() {
         </main>
       )}
 
-      {phase === "loading" && (
+      {phase === "loading" && routeLoading && items.length === 0 && (
+        <EvidenceLoader label={tx("Loading game", "Cargando partida")} />
+      )}
+
+      {phase === "loading" && !(routeLoading && items.length === 0) && (
         <main className="loading-screen" aria-live="polite">
           {picker}
           <img

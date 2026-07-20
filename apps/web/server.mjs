@@ -49,6 +49,8 @@ const expectedUsers = configuredUsers.map((user) => ({
 const authFailures = new Map();
 const publicOrigin = "https://l4dstats.gg";
 const homeSocialImage = `${publicOrigin}/art/og-home.webp`;
+const statsSocialImage = `${publicOrigin}/art/og-stats.webp`;
+const playerSocialImage = `${publicOrigin}/art/og-player.webp`;
 
 const mime = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -308,6 +310,68 @@ async function gameMetadata(request, pathname) {
   }
 }
 
+function statsMetadata(pathname) {
+  if (!/^\/stats\/?$/.test(pathname)) return null;
+  return {
+    title: "L4DStats · The archive in numbers",
+    description:
+      "Live L4D2 demo processing totals, review-signal volume, player rankings and the latest reconstructed games.",
+    url: `${publicOrigin}${pathname}`,
+    image: statsSocialImage,
+    imageAlt: "L4DStats archive statistics evidence poster",
+  };
+}
+
+async function playerMetadata(request, pathname) {
+  const match = /^\/player\/(7656119\d{10})\/?$/.exec(pathname);
+  if (!match) return null;
+  const steamId64 = match[1];
+  const fallback = {
+    title: "Player dossier · L4DStats",
+    description:
+      "Observed L4D2 player statistics, review signals and every retained reconstructed game.",
+    url: `${publicOrigin}${pathname}`,
+    image: playerSocialImage,
+    imageAlt: "L4DStats player evidence dossier poster",
+  };
+  try {
+    const headers = {
+      "x-l4dstats-user": request.authenticatedIdentity.username,
+      "x-l4dstats-role": request.authenticatedIdentity.role,
+    };
+    if (apiToken) headers.authorization = `Bearer ${apiToken}`;
+    const response = await fetch(
+      new URL(`/api/players/resolve?q=${encodeURIComponent(steamId64)}`, api),
+      { headers, signal: AbortSignal.timeout(2_000) },
+    );
+    if (!response.ok) return fallback;
+    const player = await response.json();
+    const displayName =
+      typeof player?.displayName === "string" && player.displayName.trim()
+        ? player.displayName.trim().slice(0, 128)
+        : "Player dossier";
+    const games = Array.isArray(player?.games) ? player.games.length : null;
+    return {
+      ...fallback,
+      title: `${displayName} · Player dossier · L4DStats`,
+      description:
+        games === null
+          ? fallback.description
+          : `${games} retained ${games === 1 ? "game" : "games"}, observed performance and review-signal history for ${displayName}.`,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function routeMetadata(request, pathname) {
+  return (
+    statsMetadata(pathname) ??
+    (await playerMetadata(request, pathname)) ??
+    (await gameMetadata(request, pathname))
+  );
+}
+
 async function staticFile(request, response, pathname) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     secureHeaders(response);
@@ -364,7 +428,7 @@ async function staticFile(request, response, pathname) {
   });
   if (request.method === "HEAD") response.end();
   else if (extension === ".html") {
-    const metadata = await gameMetadata(request, pathname);
+    const metadata = await routeMetadata(request, pathname);
     const html = await readFile(path, "utf8");
     response.end(metadata ? renderSocialMetadata(html, metadata) : html);
   } else createReadStream(path).pipe(response);

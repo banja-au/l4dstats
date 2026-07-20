@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowUpRight, ExternalLink, Radio } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ExternalLink } from "lucide-react";
 import { workbenchApi, type ApiPlayerHistory } from "./api";
 import { gameCampaignName } from "./campaign-metadata";
 import { useI18n } from "./i18n";
+import EvidenceLoader from "./EvidenceLoader";
 import "./global-player.css";
 
 const whole = new Intl.NumberFormat();
@@ -40,15 +41,17 @@ export default function GlobalPlayerPage({ steamId64 }: { steamId64: string }) {
     );
   if (!history)
     return (
-      <main className="global-player global-player-loading">
-        <Radio />{" "}
-        {tx("Reconstructing player history…", "Reconstruyendo historial…")}
-      </main>
+      <EvidenceLoader
+        label={tx("Loading player dossier", "Cargando expediente del jugador")}
+      />
     );
   const stats = history.stats;
   const demos = history.games.reduce((sum, game) => sum + game.demos.length, 0);
   return (
     <main className="global-player">
+      <div className="global-player-poster-type" aria-hidden="true">
+        {tx("DOSSIER", "EXPEDIENTE")}
+      </div>
       <a className="global-player-back" href="/stats">
         <ArrowLeft /> {tx("All stats", "Todas las estadísticas")}
       </a>
