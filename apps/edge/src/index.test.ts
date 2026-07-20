@@ -149,6 +149,43 @@ describe("edge dispatcher", () => {
     await expect(response.json()).resolves.toEqual({ schemaVersion: 1 });
   });
 
+  it("rewrites social metadata for stats and player SPA routes", async () => {
+    const env = environment();
+    const shell = `<!doctype html><html><head>
+      <link rel="canonical" href="https://l4dstats.gg/" />
+      <meta name="description" content="home" />
+      <meta property="og:title" content="home" />
+      <meta property="og:description" content="home" />
+      <meta property="og:url" content="https://l4dstats.gg/" />
+      <meta property="og:image" content="home.webp" />
+      <meta property="og:image:alt" content="home" />
+      <meta name="twitter:title" content="home" />
+      <meta name="twitter:description" content="home" />
+      <meta name="twitter:image" content="home.webp" />
+      <title>Home</title></head></html>`;
+    env.ASSETS = {
+      async fetch() {
+        return new Response(shell, {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      },
+    };
+    const stats = await (
+      await fetchHandler(new Request("https://l4dstats.gg/stats"), env)
+    ).text();
+    expect(stats).toContain("L4DStats · The archive in numbers");
+    expect(stats).toContain("https://l4dstats.gg/art/og-stats.webp");
+    expect(stats).toContain('rel="canonical" href="https://l4dstats.gg/stats"');
+    const player = await (
+      await fetchHandler(
+        new Request("https://l4dstats.gg/player/76561198000000007"),
+        env,
+      )
+    ).text();
+    expect(player).toContain("Player dossier · L4DStats");
+    expect(player).toContain("https://l4dstats.gg/art/og-player.webp");
+  });
+
   it("publishes the bounded authenticated developer contract", async () => {
     const document = openApiDocument("https://developers.l4dstats.gg") as {
       paths: Record<string, unknown>;

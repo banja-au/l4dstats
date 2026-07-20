@@ -31,6 +31,7 @@ export function isSupportedUploadFilename(filename: string): boolean {
 }
 const SHA256 = /^[a-f0-9]{64}$/;
 const UPLOAD_ID = /^[a-f0-9-]{16,64}$/;
+const PUBLIC_ORIGIN = "https://l4dstats.gg";
 
 interface QueueMessage<T> {
   body: T;
@@ -83,6 +84,98 @@ interface AssetsBinding {
 
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
+}
+
+interface SocialMetadata {
+  title: string;
+  description: string;
+  url: string;
+  image: string;
+  imageAlt: string;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character]!,
+  );
+}
+
+function replaceMetadata(
+  html: string,
+  selector: string,
+  value: string,
+): string {
+  const attribute = selector.startsWith("og:") ? "property" : "name";
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return html.replace(
+    new RegExp(
+      `(<meta\\s+${attribute}=["']${escapedSelector}["']\\s+content=["'])[^"']*(["']\\s*\\/?>)`,
+    ),
+    `$1${escapeHtml(value)}$2`,
+  );
+}
+
+function socialMetadata(pathname: string): SocialMetadata | null {
+  if (/^\/stats\/?$/.test(pathname))
+    return {
+      title: "L4DStats · The archive in numbers",
+      description:
+        "Live L4D2 demo processing totals, review-signal volume, player rankings and the latest reconstructed games.",
+      url: `${PUBLIC_ORIGIN}${pathname}`,
+      image: `${PUBLIC_ORIGIN}/art/og-stats.webp`,
+      imageAlt: "L4DStats archive statistics evidence poster",
+    };
+  if (/^\/player\/7656119\d{10}\/?$/.test(pathname))
+    return {
+      title: "Player dossier · L4DStats",
+      description:
+        "Observed L4D2 player statistics, review signals and every retained reconstructed game.",
+      url: `${PUBLIC_ORIGIN}${pathname}`,
+      image: `${PUBLIC_ORIGIN}/art/og-player.webp`,
+      imageAlt: "L4DStats player evidence dossier poster",
+    };
+  return null;
+}
+
+async function withSocialMetadata(
+  response: Response,
+  pathname: string,
+): Promise<Response> {
+  const metadata = socialMetadata(pathname);
+  if (!metadata || !response.headers.get("content-type")?.includes("text/html"))
+    return response;
+  let html = await response.text();
+  html = html.replace(
+    /<link rel="canonical" href="[^"]*"\s*\/>/,
+    `<link rel="canonical" href="${escapeHtml(metadata.url)}" />`,
+  );
+  html = html.replace(
+    /<title>[^<]*<\/title>/,
+    `<title>${escapeHtml(metadata.title)}</title>`,
+  );
+  for (const [selector, value] of [
+    ["description", metadata.description],
+    ["og:title", metadata.title],
+    ["og:description", metadata.description],
+    ["og:url", metadata.url],
+    ["og:image", metadata.image],
+    ["og:image:alt", metadata.imageAlt],
+    ["twitter:title", metadata.title],
+    ["twitter:description", metadata.description],
+    ["twitter:image", metadata.image],
+  ] as const)
+    html = replaceMetadata(html, selector, value);
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return new Response(html, { status: response.status, headers });
 }
 
 export interface EdgeEnvironment {
@@ -667,7 +760,10 @@ export async function fetchHandler(
         "content-security-policy",
         "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://us.i.posthog.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       );
-      return new Response(response.body, { status: response.status, headers });
+      return withSocialMetadata(
+        new Response(response.body, { status: response.status, headers }),
+        url.pathname,
+      );
     }
   }
   return json(404, { error: "not found" });
