@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a focused improvement to the review workbench
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the reviewer need and the evidence it would use. L4DStats does not support cheating verdicts, automatic enforcement, public accusation, or manufactured values for unavailable telemetry.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Reviewer problem
+      description: What concrete review task is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest useful outcome, not just an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and limitations
+      description: Which available demo fields support this, what can be missing, and what counterevidence should a reviewer see?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope checks
+      options:
+        - label: I searched existing issues for this request.
+          required: true
+        - label: This request does not add a cheating verdict, automatic enforcement, threshold-based banning, or public accusation.
+          required: true
+        - label: This request does not require committing real demos, identifiers, game assets, clips, databases, or secrets.
+          required: true

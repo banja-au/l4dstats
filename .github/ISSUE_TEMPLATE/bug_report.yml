@@ -1,0 +1,55 @@
+name: Bug report
+description: Report reproducible incorrect or unexpected behavior
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not attach real demos, player identifiers, databases, credentials, game assets, clips, or private telemetry. Use a minimal synthetic reproduction. Report vulnerabilities privately through the Security tab.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide the smallest safe sequence, synthetic fixture, or code sample that reproduces the problem.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Commit SHA, release, or container image tag.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, architecture, browser, and Docker/Node versions as relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe evidence
+      description: Paste sanitized logs or synthetic output. Remove identifiers and secrets.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: This report contains no real demo, player identifier, database, secret, game asset, clip, or private telemetry.
+          required: true
+        - label: This is not a vulnerability report.
+          required: true

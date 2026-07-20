@@ -4,64 +4,69 @@
 
 ### Drop demos. Get the whole match.
 
-A local-first Left 4 Dead 2 demo deep dive.
+A local-first Left 4 Dead 2 demo review workbench for match statistics,
+tactical reconstruction, and explainable review signals.
 
-[Run it](#run-it) · [L4D2 & Versus reference](L4D2.md) · [Demo data contract](DEMO-DATA.md) · [Rating methodology](docs/L4DSTATS-RATING.md) · [Architecture](docs/ARCHITECTURE.md) · [Plan](PLAN.md)
-
-Production operators should also keep the
-[monitoring and incident-response runbook](docs/operations/production-response.md)
-with the deployment.
-
-The proposed independently scalable Cloudflare/Turso deployment and the manual
-provider setup it requires are tracked in the
-[hosted operations runbook](docs/operations/hosted-cloudflare-turso.md). It is
-not yet a replacement for the production Compose path.
+[Try L4DStats](https://l4dstats.gg) · [Quick start](#quick-start) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
-![L4DStats demo deep dive](docs/assets/l4dstats-overview.jpg)
+![L4DStats match overview](docs/assets/l4dstats-overview.jpg)
 
-L4DStats turns up to ten SourceTV `.dem` files into a fast, privacy-conscious match report. The hosted app also accepts one demo per `.dem.zip`, `.dem.gz`, `.dem.xz`, `.dem.bz2`, or `.dem.zst` file through a bounded, fail-closed expansion boundary. Demos are streamed, hashed, queued, and analyzed in parallel.
+L4DStats turns SourceTV `.dem` files into a browsable account of a Versus
+match. It reconstructs rounds and players, calculates descriptive statistics,
+plots tick-addressed events, and surfaces unusual moments for human review.
 
-The result is statistics first. Detector output is deliberately secondary and is always presented as a review signal - not a cheating verdict.
+It is designed to preserve uncertainty. Missing telemetry stays missing,
+provenance travels with derived results, and every review signal includes its
+explanation, limitations, and strongest available counterevidence.
 
-The hosted developer console at `developers.l4dstats.gg` provides account-scoped
-API keys, 100 requests per UTC day, request logs, an OpenAPI 3.1 contract and
-bounded one-to-ten-demo upload batches. API uploads reuse the same parser and
-delete-after-extraction transaction as the browser.
+> [!IMPORTANT]
+> L4DStats does not determine whether a player cheated. Its output is
+> descriptive and must not be used for automated enforcement or as the sole
+> basis for punitive action.
 
-## What it extracts
+## Highlights
 
-- Match duration, playback ticks, effective tick rate, map, file size, and SHA-256 provenance
-- Player names, Steam profile identities, epoch-safe joins, team/class, tracked duration, and sample count
-- Exact SteamID64/profile lookup for navigating retained hosted games without exposing an enumerable player directory
-- Movement distance, view-angle travel, observed position/angle coverage, and weapon usage
-- Total decoded events plus supported event-family counts
-- Field-by-field reconstruction availability and parser issue counts
-- Interesting detector windows with exact ticks, explanation, counterevidence, and quality
-- Filename-independent game reconstruction from embedded server continuity,
-  stable roster, campaign, and chapter evidence
-- Game-wide totals with per-map inclusion toggles across every statistics tab
-- Persistent `/game/:id/:tab` links for sharing a complete game, plus legacy
-  `/analysis/:id/:tab` links for an individual demo
-- Versus campaign/chapter score, half/team-flip context, Survivor/SI deaths, and Tank/Witch outcomes
-- Eight-player Survivor/Infected scoreboard with CI/SI kills, incaps, revives, pins, class/weapon attribution, and checkpoint counters
-- Filterable tick-addressed story for SI spawns, pins, incaps, revives, team swaps, round boundaries, and deaths
-- One-click reanalysis of older stored artifacts with the current engine
+- Upload one to ten demos and follow each analysis job live.
+- Group map demos into complete games using embedded continuity, roster,
+  campaign, and chapter evidence—not filenames alone.
+- Explore Survivor and Infected scoreboards, weapons, SI classes, pins,
+  incaps, revives, deaths, checkpoints, Tank and Witch outcomes, and campaign
+  scoring.
+- Scrub a filterable event story using ticks as the canonical coordinate.
+- Inspect movement and view-angle coverage, parser quality, reconstruction
+  availability, and provenance alongside the statistics.
+- Review prerequisite-gated detector windows with tick deep links,
+  explanations, limitations, counterevidence, and quality metadata.
+- Visualize player paths against provenance-stamped analytical geometry for
+  all 57 official campaign maps.
+- Reanalyze retained artifacts with the current engine without pretending old
+  and new parser versions are equivalent.
 
-## Run it
+## Quick start
 
-Docker Desktop is the only host dependency:
+The complete local stack requires Docker Desktop (or Docker Engine with Compose):
 
 ```bash
+git clone https://github.com/banja-au/l4dstats.git
+cd l4dstats
 docker compose up --build
-# equivalent: pnpm dev:docker
 ```
 
-Open [http://localhost:5173](http://localhost:5173), then drop up to ten `.dem` files onto the page. From another device on your LAN or Twingate network, open `http://<your-mac-ip>:5173`. The web and API ports are explicitly published on `0.0.0.0`, so they accept traffic arriving through either interface. Your macOS firewall and Twingate resource policy must allow TCP port 5173.
+Open [http://localhost:5173](http://localhost:5173) and drop in up to ten
+`.dem` files. The API, worker, SQLite database, upload storage, native parser,
+and web app run in Compose; application data and dependencies remain in named
+volumes.
 
-Before sharing the web port, enable its single-user access gate and replace the
-development API secret:
+Stop the stack with `Ctrl+C`, then remove its containers with:
+
+```bash
+pnpm dev:docker:down
+```
+
+To expose the workbench beyond localhost, set credentials and replace the
+development API secret first:
 
 ```bash
 export L4DSTATS_WEB_USERNAME=l4dstats
@@ -70,40 +75,14 @@ export L4DSTATS_API_TOKEN="$(openssl rand -hex 32)"
 pnpm dev:docker
 ```
 
-Use the web gate only through Twingate or TLS. It protects a private single-user
-workbench. The compiled production server also supports a secret-managed
-`L4DSTATS_WEB_USERS_JSON` array with `viewer`, `reviewer`, and `admin` roles;
-see [local operations](docs/operations/local-workbench.md).
+Use that access gate only behind TLS or a trusted private network. See the
+[local operations guide](docs/operations/local-workbench.md) for role-based
+credentials, backup, restore, retention, and production Compose guidance.
 
-For the compiled application and the hardened static/proxy server, use the
-production Compose overlay. It refuses to start without the web credentials and
-API token above:
+### Native development
 
-```bash
-pnpm prod:docker
-pnpm health:production
-pnpm metrics:production
-pnpm prod:docker:down
-```
-
-The readiness probe checks the public web, API and SQLite path. The metrics
-probe additionally verifies worker-heartbeat freshness and queue age. Both use
-the production web credentials and are intended to run through the same private
-network path as operators.
-
-`pnpm test:production` also renders and validates the production Compose model.
-It requires Docker Compose, but does not require a running Docker daemon for
-that configuration gate.
-
-The web app, API, worker, SQLite database, upload storage, and native dependencies all run inside Compose. Source files are bind-mounted for hot reload; dependencies and application data stay in named Docker volumes.
-
-Stop with `Ctrl+C`. Remove the containers with:
-
-```bash
-pnpm dev:docker:down
-```
-
-For native development with Node 24+ and Corepack:
+Native development requires Node.js 24+, Corepack, and the Rust toolchain
+pinned by `rust-toolchain.toml`:
 
 ```bash
 ./init.sh
@@ -111,193 +90,117 @@ pnpm build
 pnpm dev
 ```
 
-Native `pnpm dev` starts the web surface only; use Compose for the complete analysis pipeline.
-The normal evidence path requires the repository-built Rust Node-API addon at
-`crates/demo-source1-node/dist/demo-source1-node.node`. A fresh development
-Compose worker prepares that addon with `pnpm native:prepare`; local CLI and web
-development commands use the same prerequisite. Production images build and
-verify a provenance-stamped addon themselves. The Rust parser is the only demo
-parser implementation; an
-addon load or compatibility failure stops analysis rather than selecting another
-parser.
+`pnpm dev` starts the web surface. Use `pnpm dev:docker` for the complete
+upload-to-analysis pipeline. The repository-built Node-API addon is mandatory:
+if it is missing, stale, or incompatible, analysis fails explicitly rather
+than falling back to a different parser.
 
-### Local hosted backfill
-
-Authorized external corpora can be downloaded and parsed locally while only
-verified result JSON and compact indexes are published to the hosted R2/Turso
-deployment. Configure the variables documented in `.env.example`, use the same
-`L4DSTATS_PSEUDONYM_KEY` as the hosted parser, and run:
-
-```bash
-pnpm backfill --concurrency 2 --max-demos 20
-```
-
-Run `pnpm native:prepare` first after parser source changes or on a checkout
-without the native addon. The backfill command itself verifies parser lineage
-and fails closed if the addon is missing or stale.
-
-The command currently discovers L4D2Center demos, checkpoints source items in
-`data/backfill/state.sqlite`, and retains downloaded and expanded bytes under
-the ignored `data/backfill/objects` content-addressed store. It processes the
-newest source games first and maps within a likely source game chronologically.
-Source filename game prefixes are scheduling hints only; hosted grouping uses
-embedded server, roster, campaign, chapter and generation evidence. Re-running
-the command skips completed source items and retries eligible transient
-failures. See [ADR 0014](docs/decisions/0014-local-hosted-backfill.md).
-The local source-object cap is 100 MiB; expanded demos are bounded at the native
-parser's 512 MiB hard input cap and a 200:1 compression ratio.
-At completion, the command prints one production `/game/:id/overview` URL for
-each unique game imported during that run. Several processed map demos can
-therefore produce one game URL.
-By default, source games must be quiet for 60 minutes before processing. The
-`--max-demos` value is a target: the selector may exceed it to keep one source
-game intact, and it never imports only the first half of a currently visible
-group. Official campaigns must also have reached at least map 3; campaigns
-without standard `cNmN` names require three distinct map names. Override these
-guards with `--settle-minutes` and `--minimum-chapter` only when the source is
-known to be historical and stable. If a later map appears on a subsequent run,
-its provider game key associates it with and extends the existing hosted game.
-
-`pnpm dev:docker` force-recreates the three application containers so the web
-proxy and API cannot retain different authentication environments. Named
-volumes are preserved, so this does not delete existing analyses or downloaded
-dependencies.
-
-### Optional official-map geometry
-
-The repository includes provenance-stamped analytical meshes for The Parish
-(`c5m1`-`c5m5`). `pnpm dev:docker` uses locally extracted geometry first and
-falls back to the committed subset automatically, so Parish reports render real
-static BSP-derived geometry on a fresh checkout.
-
-To build the complete 57-map local cache, install the L4D2 dedicated-server
-depot into a Docker volume and extract the analytical meshes:
-
-```bash
-pnpm maps:install
-pnpm maps:extract
-```
-
-To copy the validated complete cache out of Docker's named volume and into the
-checkout, run:
-
-```bash
-pnpm maps:export
-```
-
-The export is idempotent. It refuses to copy a partial cache and requires 57
-official map meshes plus `catalog.json` before writing `map-geometry/`.
-
-On a fresh x86-64 Ubuntu host, the idempotent setup script installs Docker from
-Docker's official apt repository, validates available storage, and runs both
-steps:
-
-```bash
-sudo ./scripts/setup-maps-ubuntu.sh
-```
-
-It is safe to rerun. It preserves the named source-assets and workbench-data
-volumes and never invokes volume cleanup. The source BSPs remain local to that
-Ubuntu installation. A complete local cache takes precedence over the committed
-Parish subset.
-
-This is a substantial optional Steam download. The generated BSPs and geometry
-cache remain inside local named volumes. Extraction writes one analytical mesh
-for all 57 official campaign chapters plus a local `catalog.json`. The
-installation resolver follows Source search precedence across `update`, DLC3,
-DLC2, DLC1, and the base game, and fails if any official chapter is missing.
-The catalog records the selected content root, BSP hash, Steam build ID when
-SteamCMD exposes it, extractor version, triangle count, and map revision. Audit
-an existing cache against its source installation with
-`pnpm --filter @l4dstats/map-source1 validate-installation
-path/to/l4d2 path/to/geometry`. Restart is unnecessary because the API reads
-the cache on demand. Custom maps can use
-the same extractor with `pnpm --filter @l4dstats/map-source1 extract
-path/to/map.bsp path/to/geometry/map.json`. See
-[ADR 0007](docs/decisions/0007-local-map-geometry-assets.md) for coverage,
-licensing, and correctness boundaries.
-
-To verify that parsed demo player coordinates share the extracted BSP world
-coordinate system, run `pnpm --filter @l4dstats/map-source1
-validate-demo-alignment path/to/geometry path/to/demo.dem [...]`. The command
-reports observed counts, in-bounds counts and observed coordinate bounds, and
-fails rather than inventing a rate when position telemetry is unavailable.
-
-## Architecture
+## How it works
 
 ```text
-browser .dem files
-       │ streamed + SHA-256 hashed
-       ▼
-local API ──► durable SQLite job queue ──► worker
-                                              │
-                   native Rust decode ──► L4D2 observation projection
-                                              │
-                   descriptive stats ◄── events + player telemetry
-                                              │
-                   review signals ◄──── explainable detectors
-                                              │
-       browser results ◄──── versioned analysis artifact
+browser uploads
+      │ streamed, bounded, SHA-256 hashed
+      ▼
+API ──► durable SQLite queue ──► worker
+                                      │
+                clean-room Rust decode + L4D2 projection
+                                      │
+                statistics + explainable review signals
+                                      │
+      browser ◄── versioned analysis artifact
 ```
 
-The monorepo uses pnpm and Turborepo. The engine is deliberately narrow and dependency-light; unknown protocol data remains explicitly unavailable rather than silently becoming zero.
+The decoder is clean-room Rust exposed through one coarse, bytes-only Node-API
+boundary. TypeScript owns strict contract adaptation, statistics, detectors,
+storage, and presentation. Parser execution is isolated from network access;
+uploaded archives pass through bounded, fail-closed expansion checks before
+decoding.
+
+The monorepo is organized around narrow interfaces:
 
 ```text
-apps/web/             React/Vite upload, progress, and results experience
-apps/api/             streaming uploads, job state, and bounded local API
-apps/worker/          retryable analysis jobs and artifact persistence
-apps/cli/             deterministic demo/corpus inspection
-packages/contracts/   parser-neutral observation and projection contracts
-crates/demo-source1-native clean-room bounded Rust decoder and projection
-crates/demo-source1-node coarse bytes-only Node-API binding
-packages/detectors/   explainable, prerequisite-gated review signals
-packages/storage/     SQLite jobs and content-addressed artifacts
+apps/web/                 React/Vite review experience
+apps/api/                 streaming uploads and job state
+apps/worker/              isolated, retryable analysis jobs
+apps/cli/                 deterministic demo and corpus inspection
+apps/edge/                hosted Cloudflare boundary
+packages/contracts/       versioned observation and evidence contracts
+packages/detectors/       explainable review-signal detectors
+packages/l4d2-rating/     shared rating methodology implementation
+packages/storage/         SQLite/Turso metadata and artifact indexes
+packages/map-source1/     bounded analytical map-geometry extraction
+crates/demo-source1-native/ clean-room Source 1 decoder and L4D2 projection
+crates/demo-source1-node/ bytes-only Node-API binding
 ```
 
-## Quality and safety
+Read the [architecture guide](docs/ARCHITECTURE.md) and
+[threat model](docs/THREAT_MODEL.md) for the full trust boundaries.
+
+## Supported inputs and evidence boundaries
+
+The browser accepts raw `.dem` files. Hosted ingestion also supports a single
+demo in `.zip`, `.dem.gz`, `.dem.xz`, `.dem.bz2`, or `.dem.zst`, subject to
+suffix/magic agreement, member and path checks, compressed and expanded byte
+caps, ratio limits, timeouts, hashing, and idempotent job handling.
+
+Demo telemetry is not ground truth. SourceTV perspective, packet loss, parser
+coverage, pauses, skips, map assets, and game context all limit what can be
+concluded. L4DStats therefore:
+
+- uses ticks as the primary timeline and stores derived demo time separately;
+- identifies a player by stable Steam identity plus a demo-local connection
+  epoch, never a slot or user ID alone;
+- records parser, detector, model, configuration, map-asset, and derivation
+  lineage;
+- renders unavailable values as unavailable, never as zero; and
+- reports review priority or insufficient data—not a verdict about conduct.
+
+The exact extracted, derived, and unavailable fields are documented in
+[DEMO-DATA.md](DEMO-DATA.md). See [RESEARCH.md](docs/RESEARCH.md) for the
+scientific limits and [DETECTORS.md](docs/DETECTORS.md) for signal semantics.
+
+## Verification
+
+Install dependencies with `./init.sh`, then run the repository gates:
 
 ```bash
+pnpm format:check
 pnpm check
 pnpm test
 pnpm build
-pnpm --filter @l4dstats/web test:e2e
-pnpm --filter @l4dstats/web test:e2e:real
-pnpm test:production
-pnpm test:recovery
-pnpm test:sandbox
-pnpm security:check
 ```
 
-When the ignored fresh corpus is present, the real-boundary browser test uploads
-the three-map CEDAPug game `916532` through the browser → API → worker → parser
-→ SQLite path used by the product. It checks grouped identities, v6 HP bounds
-and every result tab at a phone viewport. Production assets have an enforced
-first-load budget. The recovery gate verifies checksum rejection, archive
-safety, SQLite reopening and exact artifact hashes after restoration.
-On Linux, the sandbox gate runs a complete real CEDAPug evidence bundle through
-the production seccomp and Node-permission boundary.
+Additional boundaries have focused gates:
 
-Native performance regressions use `tools/demo-benchmark/benchmark.mjs` with
-explicit ignored demo paths. The harness hashes fixtures instead of retaining
-their contents, enforces release artifacts, runs demos sequentially, performs
-warmups and records repeated wall, CPU, maximum-RSS and throughput
-distributions plus command, artifact, toolchain and host provenance. Optional
-same-host median wall/RSS/throughput thresholds can fail
-a regression run. Stage and end-to-end addon measurements remain separate. The
-historical comparison recorded on the Linux arm64 benchmark host found that the
-five-demo end-to-end median fell from 138.985 seconds for the optimized
-now-removed TypeScript implementation to 53.816 seconds for native Rust
-(2.583x); median peak RSS
-fell from 1,988,496 KiB to 1,290,136 KiB. This is 9.36x faster than the original
-503.57-second baseline. These TypeScript figures are historical migration
-evidence, not a selectable benchmark target. Demos and identity-bearing outputs
-must never be committed.
+```bash
+pnpm test:e2e          # browser tests; real-corpus cases require ignored fixtures
+pnpm test:production   # production Compose model, probes, stack, and sandbox
+pnpm test:recovery     # backup/restore and archive-safety recovery checks
+pnpm test:sandbox      # parser process isolation
+pnpm security:check    # JS and Rust dependency/license policy
+```
 
-> [!IMPORTANT]
-> L4DStats output is descriptive. Demo telemetry is incomplete, behavior is contextual, and skilled play can look extraordinary. Signals do not prove player conduct and must not be used for automated enforcement.
+Real demos, archives, player identifiers, databases, clips, and source game
+assets are intentionally excluded from the repository. Tests that need a real
+corpus validate ignored local fixtures by hash.
 
-## Project status
+## Documentation
 
-The upload, parallel job processing, descriptive statistics, player/event/quality views, secondary signal review, Docker workflow, and real-corpus boundary are implemented. Parser and detector validation work continues under [PLAN.md](PLAN.md); see [RESEARCH.md](docs/RESEARCH.md) for the evidence limits.
+- [L4D2 and Versus domain model](L4D2.md)
+- [Demo data and availability contract](DEMO-DATA.md)
+- [Rating methodology](docs/L4DSTATS-RATING.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Detector behavior](docs/DETECTORS.md)
+- [Threat model](docs/THREAT_MODEL.md)
+- [Third-party and licensing notes](docs/THIRD_PARTY.md)
+- [Architecture decision records](docs/decisions/)
 
-No software license has been selected. The repository is not offered for redistribution until one is added. Third-party parser code and reference assets must remain isolated and license-reviewed.
+## Contributing and security
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), keep
+changes focused, add tests at the cheapest useful layer, and preserve the
+project's evidence and privacy boundaries.
+
+L4DStats processes untrusted binary files and potentially sensitive behavioral
+telemetry. Please read [SECURITY.md](SECURITY.md) before reporting a
+vulnerability, and never include private demos or real player data in an issue.

@@ -24,7 +24,8 @@ vulnerabilities or any license category outside the reviewed allowlist in
 `scripts/check-licenses.mjs`. Cargo dependencies are exact-version pinned in
 `Cargo.lock`; the same command runs `cargo deny check` to reject advisories,
 duplicate or wildcard versions, unapproved licenses, and non-crates.io sources.
-The current categories are Apache-2.0, BSD-3-Clause, BlueOak-1.0.0,
-CC-BY-4.0, ISC, MIT, MPL-2.0, OFL-1.1 and Unicode-3.0.
+The current categories are 0BSD, Apache-2.0, BSD-2-Clause, BSD-3-Clause,
+BlueOak-1.0.0, CC-BY-4.0, ISC, MIT, MIT OR Apache-2.0, MPL-2.0, OFL-1.1 and
+Unicode-3.0.
 Dependency approval does not select a license for this repository or establish
 redistribution rights for local CEDAPug demos, Valve assets or extracted maps.

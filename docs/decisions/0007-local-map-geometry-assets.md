@@ -2,7 +2,7 @@
 
 - Status: accepted for implementation
 - Date: 2026-07-17
-- Amended: 2026-07-19
+- Amended: 2026-07-20
 
 ## Decision
 
@@ -34,14 +34,14 @@ legal review, bounded derived mesh JSON may be committed when it contains no
 textures, lightmaps, models, sounds, entity text, BSP bytes, or other source
 assets and retains the source BSP hash, source byte count, Steam build ID when
 available, content root, extractor version, map revision, coverage, and catalog
-lineage. The initial committed scope is the five Parish chapters. A demo does
-not carry the source BSP hash or Steam build identifier, so resolving an
-artifact by map name does not prove that it is the exact map revision used by
+lineage. The committed catalog now covers all 57 official campaign chapters. A
+demo does not carry the source BSP hash or Steam build identifier, so resolving
+an artifact by map name does not prove that it is the exact map revision used by
 the recorded server. The UI must expose this version limitation.
 
 Development resolves geometry in precedence order: the writable local cache
-first, then the committed derived subset. This preserves local full-installation
-and custom-map overrides while making covered maps available on a fresh clone.
+first, then the committed derived catalog. This preserves local and custom-map
+overrides while making all official campaign maps available on a fresh clone.
 
 ## Why this is feasible without an installed game
 
@@ -202,11 +202,11 @@ static-prop collision meshes, each with distinct provenance and coverage.
 
 ## Consequences
 
-The committed Parish subset works on a fresh checkout. Users can derive the
-remaining official-map geometry from a local L4D2 installation; that setup is a
-substantial optional download. Map visuals are reproducible for a recorded BSP
-hash and use the same Source world coordinate system as demo positions. Exact
-map-revision equivalence to a demo remains unverified because the demo does not
-identify its BSP bytes. Custom campaigns still require the user to mount their
-own BSP. Absence of a matching artifact remains an explicit quality state, not
-a reason to fabricate geometry.
+The committed 57-map official campaign catalog works on a fresh checkout. Users
+can regenerate it from a local L4D2 installation or derive geometry for custom
+maps; installing the dedicated-server assets is a substantial optional download.
+Map visuals are reproducible for a recorded BSP hash and use the same Source
+world coordinate system as demo positions. Exact map-revision equivalence to a
+demo remains unverified because the demo does not identify its BSP bytes. Custom
+campaigns still require the user to provide their own BSP. Absence of a matching
+artifact remains an explicit quality state, not a reason to fabricate geometry.

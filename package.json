@@ -1,7 +1,17 @@
 {
   "name": "l4dstats",
   "version": "0.0.0",
+  "description": "A local-first Left 4 Dead 2 demo analysis and review workbench",
   "private": true,
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/banja-au/l4dstats#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/banja-au/l4dstats.git"
+  },
+  "bugs": {
+    "url": "https://github.com/banja-au/l4dstats/issues"
+  },
   "packageManager": "pnpm@11.13.1",
   "engines": {
     "node": ">=24"

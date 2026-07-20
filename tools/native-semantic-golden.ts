@@ -17,7 +17,7 @@ interface Manifest {
   semanticContract: typeof CONTRACT;
   provenance: {
     basis: "historical-typescript-parity-plus-current-native-regression";
-    historicalParity: "22/22 PreparedDemoProjection equality recorded in sprint-rust-parser-execution.md";
+    historicalParity: "22/22 PreparedDemoProjection equality recorded by the native migration validation";
     generator: "native-provider";
   };
   demos: Entry[];
@@ -93,7 +93,7 @@ export async function buildManifest(
     provenance: {
       basis: "historical-typescript-parity-plus-current-native-regression",
       historicalParity:
-        "22/22 PreparedDemoProjection equality recorded in sprint-rust-parser-execution.md",
+        "22/22 PreparedDemoProjection equality recorded by the native migration validation",
       generator: "native-provider",
     },
     demos,
@@ -121,7 +121,7 @@ export function parseManifest(value: unknown): Manifest {
       "historical-typescript-parity-plus-current-native-regression" ||
     provenance.generator !== "native-provider" ||
     provenance.historicalParity !==
-      "22/22 PreparedDemoProjection equality recorded in sprint-rust-parser-execution.md"
+      "22/22 PreparedDemoProjection equality recorded by the native migration validation"
   )
     throw new TypeError("native semantic manifest provenance is invalid");
   if (!Array.isArray(value.demos) || value.demos.length !== 22)

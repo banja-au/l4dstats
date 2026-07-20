@@ -3,7 +3,7 @@
   "semanticContract": "prepared-demo-projection/v1-minus-parser-lineage",
   "provenance": {
     "basis": "historical-typescript-parity-plus-current-native-regression",
-    "historicalParity": "22/22 PreparedDemoProjection equality recorded in sprint-rust-parser-execution.md",
+    "historicalParity": "22/22 PreparedDemoProjection equality recorded by the native migration validation",
     "generator": "native-provider"
   },
   "demos": [
