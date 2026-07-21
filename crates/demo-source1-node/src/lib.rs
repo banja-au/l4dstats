@@ -119,6 +119,9 @@ impl Task for DecodeFramingTask {
                             "UNKNOWN_DEMO_COMMAND"
                         }
                         demo_source1_native::demo::DecodeIssueCode::TrailingData => "TRAILING_DATA",
+                        demo_source1_native::demo::DecodeIssueCode::TruncatedTail => {
+                            "TRUNCATED_TAIL"
+                        }
                     }
                     .to_owned(),
                     offset,

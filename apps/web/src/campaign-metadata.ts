@@ -23,22 +23,29 @@ export interface L4d2MapMetadata {
   campaignCode: string;
   campaignName: string | null;
   chapter: number;
+  source: "official" | "custom";
 }
 
 export function parseL4d2MapName(mapName: string): L4d2MapMetadata | null {
   const basename = mapName.trim().split(/[\\/]/).at(-1) ?? "";
   const match = /^(c\d+)m(\d+)(?:_|$)/i.exec(basename);
-  if (!match) return null;
+  const custom = /^([a-z][a-z0-9-]*?)(\d{1,3})(?:_|$)/i.exec(basename);
+  if (!match && !custom) return null;
 
-  const campaignCode = match[1]!.toLowerCase();
-  const chapter = Number.parseInt(match[2]!, 10);
+  const campaignCode = match
+    ? match[1]!.toLowerCase()
+    : `custom:${custom![1]!.toLowerCase()}`;
+  const chapter = Number.parseInt((match?.[2] ?? custom?.[2])!, 10);
   if (!Number.isSafeInteger(chapter) || chapter < 1) return null;
 
   return {
     campaignCode,
     campaignName:
-      OFFICIAL_L4D2_CAMPAIGNS[campaignCode as OfficialCampaignCode] ?? null,
+      (match
+        ? OFFICIAL_L4D2_CAMPAIGNS[campaignCode as OfficialCampaignCode]
+        : `Custom campaign (${custom![1]!.toUpperCase()})`) ?? null,
     chapter,
+    source: match ? "official" : "custom",
   };
 }
 

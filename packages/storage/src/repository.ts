@@ -1,6 +1,40 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
+function stablePlayerIds(engineResult: unknown): Set<string> {
+  const result = engineResult as {
+    demo?: {
+      stats?: {
+        players?: Array<{ identity?: { steamId64?: unknown } | null }>;
+        spectators?: Array<{ steamId64?: unknown }>;
+      };
+    };
+  };
+  return new Set(
+    [
+      ...(result.demo?.stats?.players ?? []).map(
+        (player) => player.identity?.steamId64,
+      ),
+      ...(result.demo?.stats?.spectators ?? []).map(
+        (spectator) => spectator.steamId64,
+      ),
+    ].filter(
+      (value): value is string =>
+        typeof value === "string" && /^7656119\d{10}$/.test(value),
+    ),
+  );
+}
+
+function hasStrongRosterOverlap(
+  left: Set<string>,
+  right: Set<string>,
+): boolean {
+  if (left.size < 4 || right.size < 4) return false;
+  let shared = 0;
+  for (const id of left) if (right.has(id)) shared += 1;
+  return shared >= 4 && shared / Math.min(left.size, right.size) >= 0.75;
+}
+
 export type JobState =
   | "queued"
   | "running"
@@ -940,26 +974,30 @@ export class WorkbenchRepository {
           (value): value is string => typeof value === "string",
         )
       : [];
+    const currentPlayerIds = stablePlayerIds(input.engineResult);
     const possibleCandidates =
       serverToken && rosterToken
         ? (this.db
             .prepare(
-              `SELECT DISTINCT g.id,g.created_at FROM games g
+              `SELECT DISTINCT g.id,g.created_at,g.roster_token FROM games g
                JOIN game_demos d ON d.game_id=g.id
-               WHERE g.server_token=? AND g.roster_token=? AND g.campaign IS ?
+               WHERE g.server_token=? AND g.campaign IS ?
                  AND (? IS NULL OR d.server_count IS NULL OR ABS(d.server_count-?)<=1)
                  AND (? IS NULL OR d.chapter IS NULL OR ABS(d.chapter-?)<=1)
                ORDER BY g.created_at,g.id`,
             )
             .all(
               serverToken,
-              rosterToken,
               campaign,
               serverCount,
               serverCount,
               chapter,
               chapter,
-            ) as Array<{ id: string; created_at: string }>)
+            ) as Array<{
+            id: string;
+            created_at: string;
+            roster_token: string | null;
+          }>)
         : [];
     const candidates = possibleCandidates.filter((candidate) => {
       const existing = this.db
@@ -973,6 +1011,32 @@ export class WorkbenchRepository {
       }>;
       if (existing.some((row) => row.demo_sha256 === input.demoSha256))
         return true;
+      const exactRoster = candidate.roster_token === rosterToken;
+      let acceptedRoster = exactRoster;
+      if (!acceptedRoster && serverCount !== null && chapter !== null) {
+        const existingPlayers = new Set(
+          (
+            this.db
+              .prepare(
+                `SELECT a.engine_result_json FROM job_analyses a
+                 JOIN game_demos d ON d.job_id=a.job_id WHERE d.game_id=?`,
+              )
+              .all(candidate.id) as Array<{ engine_result_json: string }>
+          ).flatMap((row) => [
+            ...stablePlayerIds(JSON.parse(row.engine_result_json) as unknown),
+          ]),
+        );
+        const adjacent = existing.some(
+          (row) =>
+            row.server_count !== null &&
+            row.chapter !== null &&
+            Math.abs(row.server_count - serverCount) === 1 &&
+            Math.abs(row.chapter - chapter) === 1,
+        );
+        acceptedRoster =
+          adjacent && hasStrongRosterOverlap(currentPlayerIds, existingPlayers);
+      }
+      if (!acceptedRoster) return false;
       return !existing.some(
         (row) =>
           (serverCount !== null && row.server_count === serverCount) ||

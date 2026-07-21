@@ -39,11 +39,19 @@ describe("L4D2 campaign metadata", () => {
       campaignCode: "c4",
       campaignName: "Hard Rain",
       chapter: 3,
+      source: "official",
     });
     expect(parseL4d2MapName("maps/C14M2_lighthouse")).toEqual({
       campaignCode: "c14",
       campaignName: "The Last Stand",
       chapter: 2,
+      source: "official",
+    });
+    expect(parseL4d2MapName("hf04_escape")).toEqual({
+      campaignCode: "custom:hf",
+      campaignName: "Custom campaign (HF)",
+      chapter: 4,
+      source: "custom",
     });
     expect(parseL4d2MapName("custom_map")).toBeNull();
   });

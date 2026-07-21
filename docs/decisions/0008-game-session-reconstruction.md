@@ -4,7 +4,7 @@ Status: accepted
 
 ## Decision
 
-Treat an L4D2 game as an ordered collection of per-map SourceTV demos. Do not
+Treat an L4D2 game as an ordered collection of per-map SourceTV or player-POV demos. Do not
 use filenames as identity evidence. L4D2 SourceTV demos do not expose a
 universal match UUID, so grouping remains an explicit reconstruction with a
 confidence label and retained reasons.
@@ -17,10 +17,18 @@ Each artifact retains:
 - the campaign code and chapter ordinal parsed from the embedded map name; and
 - the extraction rules that supplied those values.
 
-Two maps join when server token, roster token, and campaign agree and their
-server-generation values are adjacent. A single map is provisional. Two or
-more compatible maps are high confidence. Missing identity evidence produces
-an unassociated one-map game rather than a speculative merge.
+Official `cXmY` names and conservative custom prefix/ordinal names such as
+`hf04_escape` supply campaign/chapter lineage. Custom campaign codes are
+namespaced (`custom:hf`) so they cannot collide with official campaigns.
+
+Two maps normally join when server token, roster token, and campaign agree and
+their server-generation values are adjacent. When a substitution or spectator
+change alters the whole-roster hash, they may still join only if chapter and
+server generation are both exactly adjacent and the stable identity sets share
+at least four members and 75% of the smaller set. Repeated chapters or server
+generations remain separate. A single map is provisional. Two or more
+compatible maps are high confidence. Missing identity evidence produces an
+unassociated one-map game rather than a speculative merge.
 
 Game identifiers are local random UUIDs. The API exposes the ordered aggregate
 at `/api/games/:id`; the web report uses `/game/:id/:tab`. Map inclusion is a

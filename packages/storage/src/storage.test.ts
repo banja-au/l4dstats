@@ -264,6 +264,52 @@ describe("WorkbenchRepository", () => {
     });
     repo.close();
   });
+  it("groups adjacent custom-campaign maps with strong roster continuity", () => {
+    const repo = new WorkbenchRepository();
+    const rosters = [
+      [1, 2, 3, 4, 5, 6, 7, 8],
+      [1, 2, 3, 4, 5, 6, 7, 9],
+      [1, 2, 3, 4, 5, 6, 9, 10],
+    ];
+    const jobs = rosters.map((roster, index) => {
+      const job = repo.enqueue(
+        { kind: "remote", url: `https://example.invalid/hf0${index + 2}.dem` },
+        `custom-${index}`,
+      );
+      repo.recordJobAnalysis({
+        jobId: job.id,
+        demoSha256: String(index + 1).repeat(64),
+        sourceManifest: {},
+        engineResult: {
+          demo: {
+            mapName: `hf0${index + 2}_fixture`,
+            session: {
+              serverToken: "server-custom",
+              rosterToken: `changed-roster-${index}`,
+              serverCount: index + 4,
+              campaign: "custom:hf",
+              chapter: index + 2,
+              evidence: ["custom-campaign-map-sequence-v1"],
+            },
+            stats: {
+              players: roster.map((id) => ({
+                identity: {
+                  steamId64: `7656119${String(id).padStart(10, "0")}`,
+                },
+              })),
+            },
+          },
+          cases: [],
+        },
+        engineResultSha256: "f".repeat(64),
+      });
+      return job;
+    });
+    expect(new Set(jobs.map((job) => repo.getGameIdForJob(job.id))).size).toBe(
+      1,
+    );
+    repo.close();
+  });
   it("groups the four real 915679 Hard Rain maps without filename evidence", () => {
     const repo = new WorkbenchRepository();
     const maps = [

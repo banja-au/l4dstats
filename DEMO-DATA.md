@@ -141,6 +141,14 @@ stop if an unknown command makes subsequent framing ambiguous, and distinguish
 clean `stop`, truncation, and trailing bytes. Current defaults cap a demo at
 512 MiB, ten million outer commands, and 64 MiB per outer payload.
 
+If a valid header and at least one complete command have been decoded, an EOF
+inside the final command is recoverable. The decoder discards only that
+incomplete command, emits `TRUNCATED_TAIL` at its starting byte, consumes the
+full input, and records `stopped=false`. Header truncation, invalid signed
+lengths, oversized payloads, and corruption that is not an EOF shortage remain
+fatal. Consequently every field after the last complete command is unavailable;
+it must not be inferred from header playback totals or rendered as zero.
+
 ### Clocks and packet messages
 
 At least three coordinates can coexist:
@@ -264,13 +272,18 @@ unavailable.
 
 ## Derived artifact statistics
 
-- Game/session evidence: an HMAC-protected embedded SourceTV server identity,
+- Game/session evidence: an HMAC-protected embedded server identity,
   privacy-safe stable-human-roster token, Source server generation counter,
-  campaign code, and chapter ordinal. L4D2 demos do not expose a universal
-  match UUID. The workbench therefore groups maps only when server, roster,
-  campaign, and adjacent generation evidence agree. It records whether that
-  association is provisional, high-confidence, or unassociated. Filenames are
-  never used for grouping.
+  campaign code, and chapter ordinal. Official names use `c<number>m<number>`.
+  Custom names with an embedded prefix and ordinal, such as `hf04_escape`, use
+  the namespaced campaign `custom:hf` and chapter `4`, with
+  `custom-campaign-map-sequence-v1` provenance. L4D2 demos do not expose a
+  universal match UUID. Exact roster hashes remain the primary continuity
+  evidence. A changed roster may join only when the protected server and
+  campaign agree, both chapter and server generation are exactly adjacent, and
+  at least four stable identities and 75% of the smaller roster overlap. This
+  accommodates substitutions and spectators while keeping rematches with a
+  repeated chapter/generation separate. Filenames are never used for grouping.
 
 - Demo: duration, tick rate, perspective, observation/event counts, decode
   issues, field availability, and recorder-command decoding/gap coverage.

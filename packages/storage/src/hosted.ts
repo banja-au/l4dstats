@@ -18,6 +18,40 @@ import type {
 
 const SHA256 = /^[a-f0-9]{64}$/;
 
+function stablePlayerIds(engineResult: unknown): Set<string> {
+  const result = engineResult as {
+    demo?: {
+      stats?: {
+        players?: Array<{ identity?: { steamId64?: unknown } | null }>;
+        spectators?: Array<{ steamId64?: unknown }>;
+      };
+    };
+  };
+  return new Set(
+    [
+      ...(result.demo?.stats?.players ?? []).map(
+        (player) => player.identity?.steamId64,
+      ),
+      ...(result.demo?.stats?.spectators ?? []).map(
+        (spectator) => spectator.steamId64,
+      ),
+    ].filter(
+      (value): value is string =>
+        typeof value === "string" && /^7656119\d{10}$/.test(value),
+    ),
+  );
+}
+
+function hasStrongRosterOverlap(
+  left: Set<string>,
+  right: Set<string>,
+): boolean {
+  if (left.size < 4 || right.size < 4) return false;
+  let shared = 0;
+  for (const id of left) if (right.has(id)) shared += 1;
+  return shared >= 4 && shared / Math.min(left.size, right.size) >= 0.75;
+}
+
 export interface HostedSource {
   kind: "object" | "local-backfill";
   bucket: string;
@@ -753,19 +787,19 @@ export class HostedJobRepository {
           (value): value is string => typeof value === "string",
         )
       : [];
+    const currentPlayerIds = stablePlayerIds(input.engineResult);
     const possible =
       serverToken && rosterToken
         ? (
             await this.client.execute(
-              `SELECT DISTINCT g.id,g.created_at FROM hosted_games g
+              `SELECT DISTINCT g.id,g.created_at,g.roster_token FROM hosted_games g
            JOIN hosted_game_demos d ON d.game_id=g.id
-           WHERE g.server_token=? AND g.roster_token=? AND g.campaign IS ?
+           WHERE g.server_token=? AND g.campaign IS ?
              AND (? IS NULL OR d.server_count IS NULL OR ABS(d.server_count-?)<=1)
              AND (? IS NULL OR d.chapter IS NULL OR ABS(d.chapter-?)<=1)
            ORDER BY g.created_at,g.id`,
               [
                 serverToken,
-                rosterToken,
                 campaign,
                 serverCount,
                 serverCount,
@@ -783,14 +817,37 @@ export class HostedJobRepository {
           [candidate.id],
         )
       ).rows;
-      if (
-        existing.some((row) => row.demo_sha256 === input.demoSha256) ||
-        !existing.some(
+      const exactRoster = String(candidate.roster_token ?? "") === rosterToken;
+      let acceptedRoster = exactRoster;
+      if (!acceptedRoster && serverCount !== null && chapter !== null) {
+        const existingPlayers = new Set(
+          (
+            await this.client.execute(
+              "SELECT DISTINCT steam_id64 FROM hosted_player_demos WHERE game_id=?",
+              [candidate.id],
+            )
+          ).rows.map((row) => String(row.steam_id64)),
+        );
+        const adjacent = existing.some(
           (row) =>
-            (serverCount !== null &&
-              Number(row.server_count) === serverCount) ||
-            (chapter !== null && Number(row.chapter) === chapter),
-        )
+            row.server_count !== null &&
+            row.chapter !== null &&
+            Math.abs(Number(row.server_count) - serverCount) === 1 &&
+            Math.abs(Number(row.chapter) - chapter) === 1,
+        );
+        acceptedRoster =
+          adjacent && hasStrongRosterOverlap(currentPlayerIds, existingPlayers);
+      }
+      if (
+        (acceptedRoster &&
+          existing.some((row) => row.demo_sha256 === input.demoSha256)) ||
+        (acceptedRoster &&
+          !existing.some(
+            (row) =>
+              (serverCount !== null &&
+                Number(row.server_count) === serverCount) ||
+              (chapter !== null && Number(row.chapter) === chapter),
+          ))
       )
         candidates.push(String(candidate.id));
     }

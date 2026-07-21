@@ -9,6 +9,7 @@ import type {
   L4d2MatchState,
   L4d2ServerInfo,
   L4d2WitchObservation,
+  PlayerObservation,
   PlayerEpoch,
   PlayerProjectionCoverage,
   ProjectableUserInfo,
@@ -16,6 +17,20 @@ import type {
   RecorderCommandCoverage,
   RecorderCommandObservation,
 } from "@l4dstats/contracts";
+
+function maximum(values: readonly number[]): number | undefined {
+  let result: number | undefined;
+  for (const value of values)
+    if (result === undefined || value > result) result = value;
+  return result;
+}
+
+function minimum(values: readonly number[]): number | undefined {
+  let result: number | undefined;
+  for (const value of values)
+    if (result === undefined || value < result) result = value;
+  return result;
+}
 import {
   buildRealAimEvidence,
   defaultAimConfig,
@@ -512,7 +527,16 @@ function buildSessionEvidence(
   stableTokens: readonly string[],
   pseudonymKey: string | Uint8Array,
 ): DemoSessionEvidence {
-  const mapSequence = /^((?:c|m)[0-9]+)m([0-9]+)/i.exec(header.mapName);
+  const basename = header.mapName.trim().split(/[\\/]/).at(-1) ?? "";
+  const officialSequence = /^((?:c|m)[0-9]+)m([0-9]+)(?:_|$)/i.exec(basename);
+  const customSequence = /^([a-z][a-z0-9-]*?)([0-9]{1,3})(?:_|$)/i.exec(
+    basename,
+  );
+  const campaign =
+    officialSequence?.[1]?.toLowerCase() ??
+    (customSequence?.[1] ? `custom:${customSequence[1].toLowerCase()}` : null);
+  const chapterText = officialSequence?.[2] ?? customSequence?.[2];
+  const chapter = chapterText ? Number(chapterText) : null;
   const serverToken = header.serverName
     ? createHmac("sha256", pseudonymKey)
         .update(`server:${header.serverName}`)
@@ -526,13 +550,14 @@ function buildSessionEvidence(
     serverToken,
     rosterToken,
     serverCount: serverInfo?.serverCount ?? null,
-    campaign: mapSequence?.[1]?.toLowerCase() ?? null,
-    chapter: mapSequence?.[2] ? Number(mapSequence[2]) : null,
+    campaign,
+    chapter,
     evidence: [
       ...(serverToken ? ["hmac-server-identity-v1"] : []),
       ...(rosterToken ? ["stable-human-roster-v1"] : []),
       ...(serverInfo ? ["source-server-count"] : []),
-      ...(mapSequence ? ["campaign-map-sequence"] : []),
+      ...(officialSequence ? ["campaign-map-sequence"] : []),
+      ...(customSequence ? ["custom-campaign-map-sequence-v1"] : []),
     ],
   };
 }
@@ -769,6 +794,17 @@ function buildDemoStats(
   },
 ): DemoStats {
   const observations = projected.map(({ observation }) => observation);
+  const projectedByEpoch = new Map<string, ProjectedPlayerObservation[]>();
+  const observationsByEpoch = new Map<string, PlayerObservation[]>();
+  for (const row of projected) {
+    const id = row.observation.playerEpochId;
+    const projectedRows = projectedByEpoch.get(id) ?? [];
+    projectedRows.push(row);
+    projectedByEpoch.set(id, projectedRows);
+    const observationRows = observationsByEpoch.get(id) ?? [];
+    observationRows.push(row.observation);
+    observationsByEpoch.set(id, observationRows);
+  }
   const availableRate = (
     field: "position" | "eyeAngles" | "team" | "playerClass" | "weapon",
   ) =>
@@ -835,7 +871,7 @@ function buildDemoStats(
       const values = rows.flatMap((row) =>
         typeof row.l4d2[field] === "number" ? [row.l4d2[field] as number] : [],
       );
-      return values.length ? Math.max(...values) : undefined;
+      return maximum(values);
     })();
   const fakeUserIds = new Set(
     displayIdentities
@@ -892,10 +928,8 @@ function buildDemoStats(
     ).values(),
   ].sort((left, right) => left.displayName.localeCompare(right.displayName));
   const players = [...participantIds].sort().map((id) => {
-    const projectedRows = projected.filter(
-      ({ observation }) => observation.playerEpochId === id,
-    );
-    const rows = observations.filter((row) => row.playerEpochId === id);
+    const projectedRows = projectedByEpoch.get(id) ?? [];
+    const rows = observationsByEpoch.get(id) ?? [];
     const positions = rows.flatMap((row) =>
       row.position.value === undefined ? [] : [row.position.value],
     );
@@ -958,9 +992,7 @@ function buildDemoStats(
             ),
           ],
     );
-    const checkpointInfectedKills = checkpointInfectedKillSamples.length
-      ? Math.max(...checkpointInfectedKillSamples)
-      : undefined;
+    const checkpointInfectedKills = maximum(checkpointInfectedKillSamples);
     let pinSeconds = 0;
     let ghostSeconds = 0;
     let observedHealthLost = 0;
@@ -1028,8 +1060,7 @@ function buildDemoStats(
         ),
       ),
       sampleCount: rows.length,
-      durationSeconds:
-        times.length > 1 ? Math.max(...times) - Math.min(...times) : 0,
+      durationSeconds: times.length > 1 ? maximum(times)! - minimum(times)! : 0,
       distanceUnits,
       viewTravelDegrees,
       observedPositionRate: rows.length ? positions.length / rows.length : 0,
@@ -1088,7 +1119,8 @@ function buildDemoStats(
             const value = row.l4d2.counters?.[name];
             return value === undefined ? [] : [value];
           });
-          return values.length ? [[name, Math.max(...values)]] : [];
+          const value = maximum(values);
+          return value === undefined ? [] : [[name, value]];
         }),
       ),
     };
@@ -1249,9 +1281,7 @@ function buildDemoStats(
     ["m_checkpointPZNumChargeVictims", "Charger victim registered"],
   ] as const;
   for (const id of participantIds) {
-    const rows = projected.filter(
-      ({ observation }) => observation.playerEpochId === id,
-    );
+    const rows = projectedByEpoch.get(id) ?? [];
     const alias = aliases.get(id)!;
     for (let index = 1; index < rows.length; index += 1) {
       const previous = rows[index - 1]!;
@@ -1447,10 +1477,10 @@ function buildDemoStats(
       enragedTick: enraged?.tick ?? null,
       burningTick: burning?.tick ?? null,
       peakRage: rows.some((row) => row.rage !== undefined)
-        ? Math.max(...rows.flatMap((row) => row.rage ?? []))
+        ? (maximum(rows.flatMap((row) => row.rage ?? [])) ?? null)
         : null,
       peakWanderRage: rows.some((row) => row.wanderRage !== undefined)
-        ? Math.max(...rows.flatMap((row) => row.wanderRage ?? []))
+        ? (maximum(rows.flatMap((row) => row.wanderRage ?? [])) ?? null)
         : null,
       sampleCount: rows.length,
       endReason: death ? "death-correlated" : "despawn-or-demo-end",
@@ -2003,7 +2033,7 @@ function deriveHalfPlayerSummary(
     const values = rows.flatMap((row) =>
       typeof row.l4d2[field] === "number" ? [row.l4d2[field] as number] : [],
     );
-    return values.length ? Math.max(...values) : undefined;
+    return maximum(values);
   };
   let checkpointInfectedKills: number | undefined;
   let pinSeconds = 0;
@@ -2065,8 +2095,7 @@ function deriveHalfPlayerSummary(
   };
   return {
     sampleCount: rows.length,
-    durationSeconds:
-      times.length > 1 ? Math.max(...times) - Math.min(...times) : 0,
+    durationSeconds: times.length > 1 ? maximum(times)! - minimum(times)! : 0,
     distanceUnits,
     viewTravelDegrees,
     observedPositionRate: rows.length ? positions.length / rows.length : 0,
@@ -2153,8 +2182,8 @@ export function clusterSpawnWindows<
   }
   const windows = groups.map((group) => {
     const start = group[0]!.tickRange.start;
-    const lastSpawn = Math.max(...group.map((life) => life.tickRange.start));
-    const lastLifeEnd = Math.max(...group.map((life) => life.tickRange.end));
+    const lastSpawn = maximum(group.map((life) => life.tickRange.start))!;
+    const lastLifeEnd = maximum(group.map((life) => life.tickRange.end))!;
     return {
       group,
       start,
@@ -2305,13 +2334,13 @@ export function deriveObservedOpeningAreaV1(input: {
     min: Object.fromEntries(
       axes.map((axis) => [
         axis,
-        Math.min(...samples.map((sample) => sample.position[axis])),
+        minimum(samples.map((sample) => sample.position[axis]))!,
       ]),
     ) as { x: number; y: number; z: number },
     max: Object.fromEntries(
       axes.map((axis) => [
         axis,
-        Math.max(...samples.map((sample) => sample.position[axis])),
+        maximum(samples.map((sample) => sample.position[axis]))!,
       ]),
     ) as { x: number; y: number; z: number },
   };
@@ -2320,8 +2349,8 @@ export function deriveObservedOpeningAreaV1(input: {
     derivation,
     anchor,
     tickRange: {
-      start: Math.min(...samples.map((sample) => sample.tick)),
-      end: Math.max(...samples.map((sample) => sample.tick)),
+      start: minimum(samples.map((sample) => sample.tick))!,
+      end: maximum(samples.map((sample) => sample.tick))!,
     },
     samples,
     center,
@@ -2353,6 +2382,12 @@ export function deriveCompetitiveStats(input: {
   const playerIds = [
     ...new Set(input.projected.map((row) => row.observation.playerEpochId)),
   ];
+  const projectedByPlayer = new Map<string, ProjectedPlayerObservation[]>();
+  for (const row of input.projected) {
+    const rows = projectedByPlayer.get(row.observation.playerEpochId) ?? [];
+    rows.push(row);
+    projectedByPlayer.set(row.observation.playerEpochId, rows);
+  }
   const firstSecondHalfState = input.matchStates.find(
     (state, index, states) =>
       state.secondHalf === true &&
@@ -2396,10 +2431,15 @@ export function deriveCompetitiveStats(input: {
       (row) =>
         row.observation.tick >= half.start && row.observation.tick <= half.end,
     );
+    const scopedByPlayer = new Map<string, ProjectedPlayerObservation[]>();
+    for (const row of scoped) {
+      const rows = scopedByPlayer.get(row.observation.playerEpochId) ?? [];
+      rows.push(row);
+      scopedByPlayer.set(row.observation.playerEpochId, rows);
+    }
     const dominantSide = (id: string): 2 | 3 | undefined => {
       const counts = { 2: 0, 3: 0 };
-      for (const row of scoped) {
-        if (row.observation.playerEpochId !== id) continue;
+      for (const row of scopedByPlayer.get(id) ?? []) {
         const team = row.observation.team.value;
         if (team === 2 || team === 3) counts[team] += 1;
       }
@@ -2410,10 +2450,8 @@ export function deriveCompetitiveStats(input: {
     const infectedPlayerIds = playerIds.filter((id) => dominantSide(id) === 3);
     const playerHalf = (playerId: string, side: "Survivor" | "Infected") => {
       const team = side === "Survivor" ? 2 : 3;
-      const rows = scoped.filter(
-        (row) =>
-          row.observation.playerEpochId === playerId &&
-          row.observation.team.value === team,
+      const rows = (scopedByPlayer.get(playerId) ?? []).filter(
+        (row) => row.observation.team.value === team,
       );
       return {
         playerId,
@@ -2510,9 +2548,7 @@ export function deriveCompetitiveStats(input: {
     row.l4d2.pummelVictim !== undefined;
   const infectedLives: CompetitiveStats["infectedLives"] = [];
   for (const playerId of playerIds) {
-    const rows = input.projected.filter(
-      (row) => row.observation.playerEpochId === playerId,
-    );
+    const rows = projectedByPlayer.get(playerId) ?? [];
     let start = -1;
     for (let index = 0; index <= rows.length; index += 1) {
       const row = rows[index];
@@ -2674,7 +2710,7 @@ export function deriveCompetitiveStats(input: {
         playerIds: [...new Set(group.map((life) => life.playerId))],
         infectedClasses: [...new Set(group.map((life) => life.infectedClass))],
         spawnSpreadSeconds:
-          (Math.max(...group.map((life) => life.tickRange.start)) - start) *
+          (maximum(group.map((life) => life.tickRange.start))! - start) *
           secondsPerTick,
         controls: group.reduce((sum, life) => sum + life.controls, 0),
         peakSimultaneousPins,
@@ -2759,9 +2795,8 @@ export function deriveCompetitiveStats(input: {
   const tankEncounters: CompetitiveStats["tankEncounters"] = infectedLives
     .filter((life) => life.infectedClass === "Tank")
     .map((life, index) => {
-      const rows = input.projected.filter(
+      const rows = (projectedByPlayer.get(life.playerId) ?? []).filter(
         (row) =>
-          row.observation.playerEpochId === life.playerId &&
           row.observation.tick >= life.tickRange.start &&
           row.observation.tick <= life.tickRange.end,
       );
@@ -2778,9 +2813,8 @@ export function deriveCompetitiveStats(input: {
       );
       const damageDealt = life.counterDeltas.m_checkpointPZTankDamage;
       const damageBySurvivor = playerIds.flatMap((playerId) => {
-        const survivorRows = input.projected.filter(
+        const survivorRows = (projectedByPlayer.get(playerId) ?? []).filter(
           (row) =>
-            row.observation.playerEpochId === playerId &&
             row.observation.team.value === 2 &&
             row.observation.tick >= life.tickRange.start &&
             row.observation.tick <= life.tickRange.end,
@@ -2805,10 +2839,10 @@ export function deriveCompetitiveStats(input: {
         tickRange: life.tickRange,
         durationSeconds: life.durationSeconds,
         healthAtTake: health[0] ?? null,
-        lowestObservedHealth: health.length ? Math.min(...health) : null,
+        lowestObservedHealth: minimum(health) ?? null,
         healthAtEnd: health.at(-1) ?? null,
         maximumObservedFrustration: frustration.length
-          ? Math.max(...frustration)
+          ? (maximum(frustration) ?? null)
           : null,
         punches: life.counterDeltas.m_checkpointPZTankPunches ?? 0,
         registeredRockThrows: life.counterDeltas.m_checkpointPZTankThrows ?? 0,

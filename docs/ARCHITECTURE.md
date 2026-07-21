@@ -43,6 +43,13 @@ their own prepared view when invoked independently. Native failures cross the
 binding as a stable typed envelope with stage and the best defensible byte
 offset; unavailable offsets remain explicit rather than inferred.
 
+Downstream statistics index projected observations by player epoch before
+aggregation. Large demos must not rescan the full observation array per epoch
+or spread unbounded arrays into JavaScript function arguments. A valid demo
+with an incomplete final command yields a partial artifact with explicit
+`TRUNCATED_TAIL`/`stopped=false` lineage; earlier or structural corruption is
+still rejected.
+
 The addon is loaded only inside the parser child. That child has exact
 demo/application read permissions, no-network seccomp, a read-only production
 filesystem, rlimits, bounded output and process-group cancellation. Node's

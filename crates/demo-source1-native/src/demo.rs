@@ -88,6 +88,7 @@ pub struct DemoCommandFrame<'a> {
 pub enum DecodeIssueCode {
     UnknownDemoCommand,
     TrailingData,
+    TruncatedTail,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +160,9 @@ pub struct DecodeOptions {
     pub max_input_bytes: usize,
     pub max_commands: usize,
     pub max_payload_bytes: usize,
+    /// Preserve complete commands when the file ends part-way through a final
+    /// command. Header truncation and all non-EOF framing errors remain fatal.
+    pub allow_truncated_tail: bool,
 }
 impl Default for DecodeOptions {
     fn default() -> Self {
@@ -166,10 +170,12 @@ impl Default for DecodeOptions {
             max_input_bytes: 512 * 1024 * 1024,
             max_commands: 10_000_000,
             max_payload_bytes: 64 * 1024 * 1024,
+            allow_truncated_tail: true,
         }
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn decode_demo(
     bytes: &[u8],
     options: DecodeOptions,
@@ -191,6 +197,7 @@ pub fn decode_demo(
     let mut frames = Vec::new();
     let mut issues = Vec::new();
     let mut stopped = false;
+    let mut recovered_truncated_tail = false;
     while reader.remaining() > 0 {
         if frames.len() >= options.max_commands {
             return Err(err(
@@ -230,42 +237,70 @@ pub fn decode_demo(
             }
             break;
         }
-        let tick = Some(reader.i32()?);
-        let slot = if header.demo_protocol >= 4 {
-            Some(reader.u8()?)
-        } else {
-            None
-        };
-        let mut frame = empty_frame(command, kind, tick, slot, offset);
-        match kind {
-            DemoCommandKind::SyncTick => {}
-            DemoCommandKind::Signon | DemoCommandKind::Packet => {
-                let count = if header.demo_protocol >= 4 { 4 } else { 1 };
-                frame.command_info = (0..count)
-                    .map(|_| read_command_info(&mut reader))
-                    .collect::<Result<_, _>>()?;
-                frame.sequence_in = Some(reader.i32()?);
-                frame.sequence_out = Some(reader.i32()?);
-                read_payload(&mut reader, options.max_payload_bytes, &mut frame)?;
+        let parsed = (|| -> Result<DemoCommandFrame<'_>, DemoParseError> {
+            let tick = Some(reader.i32()?);
+            let slot = if header.demo_protocol >= 4 {
+                Some(reader.u8()?)
+            } else {
+                None
+            };
+            let mut frame = empty_frame(command, kind, tick, slot, offset);
+            match kind {
+                DemoCommandKind::SyncTick => {}
+                DemoCommandKind::Signon | DemoCommandKind::Packet => {
+                    let count = if header.demo_protocol >= 4 { 4 } else { 1 };
+                    frame.command_info = (0..count)
+                        .map(|_| read_command_info(&mut reader))
+                        .collect::<Result<_, _>>()?;
+                    frame.sequence_in = Some(reader.i32()?);
+                    frame.sequence_out = Some(reader.i32()?);
+                    read_payload(&mut reader, options.max_payload_bytes, &mut frame)?;
+                }
+                DemoCommandKind::UserCommand => {
+                    frame.outgoing_sequence = Some(reader.i32()?);
+                    read_payload(&mut reader, options.max_payload_bytes, &mut frame)?;
+                }
+                DemoCommandKind::CustomData => {
+                    frame.custom_data_callback = Some(reader.i32()?);
+                    read_payload(&mut reader, options.max_payload_bytes, &mut frame)?;
+                }
+                _ => read_payload(&mut reader, options.max_payload_bytes, &mut frame)?,
             }
-            DemoCommandKind::UserCommand => {
-                frame.outgoing_sequence = Some(reader.i32()?);
-                read_payload(&mut reader, options.max_payload_bytes, &mut frame)?;
+            Ok(frame)
+        })();
+        match parsed {
+            Ok(frame) => frames.push(frame),
+            Err(error)
+                if options.allow_truncated_tail
+                    && !frames.is_empty()
+                    && error.code == DemoParseErrorCode::Truncated =>
+            {
+                issues.push(DecodeIssue {
+                    code: DecodeIssueCode::TruncatedTail,
+                    offset,
+                    command: Some(command),
+                    message: format!(
+                        "Final command is truncated at byte {}; preserved {} complete commands",
+                        error.offset,
+                        frames.len()
+                    ),
+                });
+                recovered_truncated_tail = true;
+                break;
             }
-            DemoCommandKind::CustomData => {
-                frame.custom_data_callback = Some(reader.i32()?);
-                read_payload(&mut reader, options.max_payload_bytes, &mut frame)?;
-            }
-            _ => read_payload(&mut reader, options.max_payload_bytes, &mut frame)?,
+            Err(error) => return Err(error),
         }
-        frames.push(frame);
     }
     Ok(DemoDecodeResult {
         header,
         frames,
         issues,
         stopped,
-        bytes_consumed: reader.offset(),
+        bytes_consumed: if recovered_truncated_tail {
+            bytes.len()
+        } else {
+            reader.offset()
+        },
     })
 }
 
@@ -485,5 +520,20 @@ mod tests {
         let e = decode_demo(&b, DecodeOptions::default()).unwrap_err();
         assert_eq!(e.code, DemoParseErrorCode::InvalidPayloadLength);
         assert_eq!(e.offset, 1078);
+    }
+
+    #[test]
+    fn preserves_complete_commands_before_a_truncated_tail() {
+        let mut b = header(4);
+        b.push(3); // sync tick
+        b.extend(1_i32.to_le_bytes());
+        b.push(0);
+        b.push(3); // incomplete final sync tick
+        b.extend([2, 0]);
+        let d = decode_demo(&b, DecodeOptions::default()).unwrap();
+        assert_eq!(d.frames.len(), 1);
+        assert_eq!(d.issues[0].code, DecodeIssueCode::TruncatedTail);
+        assert!(!d.stopped);
+        assert_eq!(d.bytes_consumed, b.len());
     }
 }

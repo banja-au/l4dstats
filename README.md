@@ -29,8 +29,9 @@ explanation, limitations, and strongest available counterevidence.
 ## Highlights
 
 - Upload one to ten demos and follow each analysis job live.
-- Group map demos into complete games using embedded continuity, roster,
-  campaign, and chapter evidence—not filenames alone.
+- Group official and custom-campaign map demos into complete games using
+  embedded server, roster-overlap, campaign, chapter, and generation
+  continuity—not filenames alone.
 - Explore Survivor and Infected scoreboards, weapons, SI classes, pins,
   incaps, revives, deaths, checkpoints, Tank and Witch outcomes, and campaign
   scoring.
