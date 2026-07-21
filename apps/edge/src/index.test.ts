@@ -5,6 +5,7 @@ import {
   isDeterministicContainerStatus,
   isSupportedUploadFilename,
   parseSteamLookup,
+  shouldAcknowledgeUnclaimableState,
   type EdgeEnvironment,
 } from "./index.js";
 import { openApiDocument } from "./developer-api.js";
@@ -67,6 +68,12 @@ describe("edge dispatcher", () => {
     expect(isDeterministicContainerStatus(408)).toBe(false);
     expect(isDeterministicContainerStatus(429)).toBe(false);
     expect(isDeterministicContainerStatus(500)).toBe(false);
+  });
+  it("acknowledges duplicate deliveries owned or completed elsewhere", () => {
+    for (const state of ["running", "succeeded", "failed", "cancelled"])
+      expect(shouldAcknowledgeUnclaimableState(state)).toBe(true);
+    expect(shouldAcknowledgeUnclaimableState("queued")).toBe(false);
+    expect(shouldAcknowledgeUnclaimableState(undefined)).toBe(false);
   });
   it("accepts only explicit safe demo and single-stream/archive suffixes", () => {
     for (const filename of [

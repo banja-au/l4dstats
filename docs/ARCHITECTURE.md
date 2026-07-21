@@ -50,6 +50,13 @@ with an incomplete final command yields a partial artifact with explicit
 `TRUNCATED_TAIL`/`stopped=false` lineage; earlier or structural corruption is
 still rejected.
 
+Queue delivery is at-least-once. A duplicate delivery that cannot claim an
+already-running or terminal job is acknowledged; it must not be retried into a
+tight loop. Only a still-queued/unavailable claim is deferred for another
+bounded attempt. Deployment resets can interrupt a live Durable Object, so the
+lease remains the recovery boundary rather than evidence that a parser is
+still alive.
+
 The addon is loaded only inside the parser child. That child has exact
 demo/application read permissions, no-network seccomp, a read-only production
 filesystem, rlimits, bounded output and process-group cancellation. Node's

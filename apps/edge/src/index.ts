@@ -43,6 +43,12 @@ interface MessageBatch<T> {
   messages: Array<QueueMessage<T>>;
 }
 
+export function shouldAcknowledgeUnclaimableState(
+  state: string | undefined,
+): boolean {
+  return ["succeeded", "running", "failed", "cancelled"].includes(state ?? "");
+}
+
 interface QueueBinding<T> {
   send(body: T): Promise<void>;
 }
@@ -850,7 +856,7 @@ async function queueHandler(
       });
       if (!job) {
         const current = await repo.getJob(message.body.jobId);
-        if (current?.state === "succeeded") {
+        if (shouldAcknowledgeUnclaimableState(current?.state)) {
           message.ack();
           continue;
         }
