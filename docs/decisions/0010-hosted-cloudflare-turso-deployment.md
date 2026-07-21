@@ -62,6 +62,11 @@ exceed parser capacity. These are bounded operating defaults, not capacity
 claims; representative benchmarks and production queue-age, cold-start, memory,
 failure and cost measurements govern later changes.
 
+The named Container identity includes the compact-parser wire generation as
+well as the job ID. Cloudflare may resume a sleeping named Container with its
+previous image after a Worker deployment; a parser-wire change must therefore
+select a fresh name instead of waking stale code for a retried idempotent job.
+
 ## Source deletion and completion protocol
 
 The source object is staging data, not a durable artifact. A job may be reported

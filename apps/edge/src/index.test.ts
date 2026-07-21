@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  analysisContainerName,
   fetchHandler,
   isDeterministicContainerStatus,
   isSupportedUploadFilename,
@@ -57,6 +58,9 @@ function environment(): EdgeEnvironment {
 }
 
 describe("edge dispatcher", () => {
+  it("versions named containers so old parser images cannot be resumed", () => {
+    expect(analysisContainerName("job-id")).toBe("parser-wire-3-job-id");
+  });
   it("does not retry deterministic parser responses", () => {
     expect(isDeterministicContainerStatus(422)).toBe(true);
     expect(isDeterministicContainerStatus(400)).toBe(true);

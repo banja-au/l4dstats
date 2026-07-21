@@ -264,8 +264,16 @@ class ContainerResponseError extends Error {
     } catch {
       // Non-JSON container failures retain bounded text in the error only.
     }
-    this.code = typeof parsed.code === "string" ? parsed.code : "unknown";
-    this.stage = typeof parsed.stage === "string" ? parsed.stage : "unknown";
+    const nestedCode = detail.match(/\\?"code\\?"\s*:\s*\\?"([^"\\]+)\b/);
+    const nestedStage = detail.match(/\\?"stage\\?"\s*:\s*\\?"([^"\\]+)\b/);
+    this.code =
+      typeof parsed.code === "string"
+        ? parsed.code
+        : (nestedCode?.[1] ?? "unknown");
+    this.stage =
+      typeof parsed.stage === "string"
+        ? parsed.stage
+        : (nestedStage?.[1] ?? "unknown");
   }
 }
 
@@ -278,6 +286,12 @@ function isDeterministicFailure(error: unknown): boolean {
 
 export function isDeterministicContainerStatus(status: number): boolean {
   return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+const ANALYSIS_CONTAINER_GENERATION = "parser-wire-3";
+
+export function analysisContainerName(jobId: string): string {
+  return `${ANALYSIS_CONTAINER_GENERATION}-${jobId}`;
 }
 
 function isTransientContainerCapacity(error: unknown): boolean {
@@ -853,7 +867,7 @@ async function queueHandler(
       if (!source || source.size !== job.source.bytes)
         throw new Error("temporary source object is unavailable or incomplete");
       const container = environment.ANALYSIS_CONTAINER.getByName(
-        message.body.jobId,
+        analysisContainerName(message.body.jobId),
       );
       await repo.progress({
         id: job.id,
