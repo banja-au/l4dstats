@@ -104,6 +104,14 @@ TypeScript implementation. Production
 Docker execution and browser E2E evidence remain separate exit gates and are
 not claimed by this addendum.
 
+Wire version 3 losslessly inherits unchanged L4D2 state within a player epoch.
+It retains every observation and keeps the 256 MiB native output guard; `null`
+in that private tuple position means repeat-prior-state and is rejected before
+an epoch's first full state. This addresses player-POV artifacts whose repeated
+full counter/state tuples exceeded the guard despite modest compressed demo
+size. It does not change parser config version 2 or any public observation
+contract.
+
 The compact artifact builder constructs exactly one prepared demo view. It
 performs one outer framing decode and caches one bounded network inspection per
 packet/signon payload; identity, server metadata, entity projection, and event

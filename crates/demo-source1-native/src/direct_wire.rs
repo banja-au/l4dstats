@@ -24,6 +24,7 @@ pub struct DirectCompactObservations {
     property_paths: Vec<String>,
     property_path_indexes: HashMap<String, usize>,
     counters_present: [bool; COUNTER_NAMES.len()],
+    last_l4d2_by_epoch: HashMap<usize, DirectL4d2Row>,
     rows: Vec<DirectObservationRow>,
 }
 
@@ -37,6 +38,7 @@ impl Default for DirectCompactObservations {
             property_paths: Vec::new(),
             property_path_indexes: HashMap::new(),
             counters_present: [false; COUNTER_NAMES.len()],
+            last_l4d2_by_epoch: HashMap::new(),
             rows: Vec::new(),
         }
     }
@@ -53,6 +55,7 @@ struct DirectObservationRow {
     player_class: Option<usize>,
     weapon: Option<usize>,
     l4d2: DirectL4d2Row,
+    repeats_l4d2: bool,
     demo_time_seconds: Option<f64>,
     provenance: DirectProvenance,
 }
@@ -69,7 +72,7 @@ struct DirectProvenance {
     weapon_path: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct DirectL4d2Row {
     entity_index: usize,
     values: crate::projection::L4d2PlayerState,
@@ -185,6 +188,16 @@ impl DirectCompactObservations {
                 .take()
                 .map(|path| self.intern_property_path(path)),
         };
+        let l4d2 = DirectL4d2Row {
+            entity_index: value.l4d2.entity_index,
+            values: value.l4d2,
+            ammo_class,
+            counter_values,
+        };
+        let repeats_l4d2 = self.last_l4d2_by_epoch.get(&epoch_index) == Some(&l4d2);
+        if !repeats_l4d2 {
+            self.last_l4d2_by_epoch.insert(epoch_index, l4d2.clone());
+        }
         self.rows.push(DirectObservationRow {
             epoch_index,
             tick: value.tick,
@@ -194,12 +207,8 @@ impl DirectCompactObservations {
             team: value.team,
             player_class,
             weapon,
-            l4d2: DirectL4d2Row {
-                entity_index: value.l4d2.entity_index,
-                values: value.l4d2,
-                ammo_class,
-                counter_values,
-            },
+            l4d2,
+            repeats_l4d2,
             demo_time_seconds: value.demo_time_seconds,
             provenance,
         });
@@ -262,10 +271,14 @@ impl Serialize for Row<'_> {
         row.serialize_element(&v.team)?;
         row.serialize_element(&v.player_class)?;
         row.serialize_element(&v.weapon)?;
-        row.serialize_element(&L4d2 {
-            row: &v.l4d2,
-            counters: self.counters,
-        })?;
+        if v.repeats_l4d2 {
+            row.serialize_element(&Option::<u8>::None)?;
+        } else {
+            row.serialize_element(&L4d2 {
+                row: &v.l4d2,
+                counters: self.counters,
+            })?;
+        }
         row.serialize_element(&(
             v.demo_time_seconds,
             v.provenance.position_form,
@@ -425,7 +438,7 @@ mod tests {
             counters: BTreeMap::from([("m_checkpointDeaths".into(), 3.0)]),
         };
         let mut direct = DirectCompactObservations::default();
-        direct.push(CoreObservation {
+        let first = CoreObservation {
             player_epoch_id: "epoch".into(),
             tick: 9,
             entity_index: 4,
@@ -438,13 +451,20 @@ mod tests {
             demo_time_seconds: None,
             compact_provenance: crate::projection::CompactProvenance::default(),
             canonical: None,
-        });
+        };
+        direct.push(first.clone());
+        let mut second = first;
+        second.tick = 10;
+        direct.push(second);
         assert_eq!(
             serde_json::to_value(direct).unwrap(),
             serde_json::json!({
                 "epochs":["epoch"], "strings":["Survivor"], "counters":["m_checkpointDeaths"],
                 "propertyPaths":[],
-                "rows":[[0,9,4,null,null,null,0,0,[4,1,0.0,[3.0]],[null,0,[],0,[],null,null,0,null]]]
+                "rows":[
+                    [0,9,4,null,null,null,0,0,[4,1,0.0,[3.0]],[null,0,[],0,[],null,null,0,null]],
+                    [0,10,4,null,null,null,0,0,null,[null,0,[],0,[],null,null,0,null]]
+                ]
             })
         );
     }

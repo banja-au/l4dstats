@@ -115,6 +115,8 @@ fn main() -> ExitCode {
                         "bytesConsumed": artifact.bytes_consumed,
                         "stopped": artifact.stopped,
                         "epochs": artifact.projection.epochs.len(),
+                        "framesVisited": artifact.projection.coverage.frames_visited,
+                        "observations": artifact.projection.coverage.observations_emitted,
                         "events": artifact.raw_events.len(),
                         "recorderCommands": artifact.recorder_commands.len(),
                         "decodedRecorderCommands": artifact.command_telemetry_summary.decoded_commands,

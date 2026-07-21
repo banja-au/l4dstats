@@ -16,7 +16,7 @@ use std::io::{self, Write};
 const BINDING_API_VERSION: u32 = 2;
 const FRAMING_SUMMARY_VERSION: u32 = 1;
 const PROJECT_CONFIG_VERSION: u32 = 2;
-const COMPACT_ARTIFACT_WIRE_VERSION: u32 = 2;
+const COMPACT_ARTIFACT_WIRE_VERSION: u32 = 3;
 const PARSER_CONFIG_ID: &str = "source1-l4d2-2100-v2";
 const MAX_CONFIG_BYTES: usize = 4 * 1024;
 const MAX_KEY_BYTES: usize = 64;

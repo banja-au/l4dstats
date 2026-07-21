@@ -56,9 +56,20 @@ or statistic change. Never present an unavailable value as zero.
 Normal evidence analysis uses the clean-room Rust parser through one coarse,
 bytes-only Node-API call. It is the repository's only demo parser; failures are
 reported explicitly and never select a fallback implementation. Rust emits
-compact artifact wire version 2, a private
+compact artifact wire version 3, a private
 transport into the shared TypeScript statistics, detector and evidence packaging
 path rather than a second public data contract.
+
+Wire v3 keeps every projected observation tick but losslessly delta-encodes the
+large L4D2 state tuple within each player epoch: a `null` row entry means
+“identical to the preceding state for this epoch,” never unavailable or zero.
+The first row in an epoch must carry a complete tuple, and the strict adapter
+rejects an inheritance marker before that definition. Position, eye angles,
+team, class, weapon, demo time and provenance remain present per observation.
+This removes repeated counter/loadout/state serialization without sampling the
+timeline. On the 69,961,475-byte player-POV validation demo, all 702,874
+observations are retained while the private artifact is 145,231,187 bytes,
+below the unchanged 256 MiB output limit; the final evidence result is 5.9 MiB.
 
 The adapter independently verifies input byte length and demo SHA-256 and
 strictly validates bounded registries, rows, masks, nested events, match state,

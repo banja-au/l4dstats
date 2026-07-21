@@ -79,7 +79,7 @@ test("uploads and analyzes real demos through the browser, API, worker, and stor
       engine: "rust-native",
       bindingApiVersion: 2,
       configVersion: 2,
-      wireVersion: 2,
+      wireVersion: 3,
       parserConfigId: "source1-l4d2-2100-v2",
     });
     expect(parser?.buildSha256).toMatch(/^[a-f0-9]{64}$/);

@@ -141,6 +141,9 @@ Read the [architecture guide](docs/ARCHITECTURE.md) and
 The hosted production boundary uses Terraform-owned capacity policy and a
 Wrangler-published Worker/Container image; production currently permits ten
 concurrent `standard-3` parser Containers with matching Queue concurrency.
+Each claimed job now exposes coarse stage progress, deterministic 4xx parser
+failures stop immediately instead of consuming three attempts, and privacy-safe
+PostHog events distinguish real attempt latency from total job age.
 
 ## Supported inputs and evidence boundaries
 

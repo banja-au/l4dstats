@@ -18,8 +18,9 @@ Send explicit, coarse PostHog events from three boundaries:
 1. the web client records anonymous pageviews, upload/search intent, terminal
    client outcomes, locale, result-section navigation and outbound actions;
 2. the edge/queue boundary records authoritative upload acceptance, processing
-   duration/outcome/failure category, developer-console actions and normalized
-   developer API routes; and
+   end-to-end duration, per-attempt duration/outcome, structured parser stage
+   and code, retryability, developer-console actions and normalized developer
+   API routes; and
 3. the developer portal records its anonymous account/key funnel and UI errors.
 
 All browser events set `$process_person_profile: false` and use a random local
@@ -35,8 +36,10 @@ Maintain one pinned `L4DStats — Product & Reliability` dashboard with a rollin
 30-day window. Its insights cover visitors, activation, format/size mix,
 analysis latency and reliability, failure categories, player search, result
 engagement, locale, discovery, developer activation/API usage, and exceptions.
-`scripts/provision-posthog-dashboard.mjs` creates missing dashboard assets
-idempotently using a scoped PostHog personal API key.
+`scripts/provision-posthog-dashboard.mjs` creates missing dashboard assets and
+updates existing named insights idempotently using a scoped PostHog personal
+API key. Delivery remains best-effort, but non-2xx responses and transport
+errors are written to structured Worker logs instead of being silently hidden.
 
 ## Consequences
 

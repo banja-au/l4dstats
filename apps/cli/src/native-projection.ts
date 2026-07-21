@@ -80,7 +80,7 @@ export function rehydrateNativeProjection(
     ],
     "artifact",
   );
-  if (integer(root.version, "version", 2) !== 2) fail("version must be 2");
+  if (integer(root.version, "version", 3) !== 3) fail("version must be 3");
   const header = readHeader(root.header);
   const projection = object(root.projection, "projection");
   exact(
@@ -154,6 +154,7 @@ export function rehydrateNativeProjection(
     if (new Set(values).size !== values.length)
       fail(`${name} registry repeats a value`);
   const rows = array(observationWire.rows, "rows", limits.observations);
+  const lastL4d2ByEpoch = new Map<string, L4d2PlayerState>();
   const observations = rows.map((row, index) =>
     readObservation(
       row,
@@ -164,6 +165,7 @@ export function rehydrateNativeProjection(
       stringRegistry,
       counterRegistry,
       propertyPaths,
+      lastL4d2ByEpoch,
     ),
   );
   const serverInfo =
@@ -264,7 +266,7 @@ export function rehydrateNativeProjection(
         : commandSummary === null
           ? {
               unavailableReason:
-                "recorder command telemetry was not present in compact wire v2",
+                "recorder command telemetry was not present in compact wire v3",
             }
           : {}),
     },
@@ -284,6 +286,7 @@ function readObservation(
   strings: string[],
   counters: string[],
   paths: string[],
+  lastL4d2ByEpoch: Map<string, L4d2PlayerState>,
 ): ProjectedPlayerObservation {
   const row = tuple(value, 10, `rows[${index}]`);
   const epoch = epochs[indexOf(row[0], epochs, `rows[${index}].epoch`)]!;
@@ -298,7 +301,13 @@ function readObservation(
     `rows[${index}].playerClass`,
   );
   const weapon = nullableIndex(row[7], strings, `rows[${index}].weapon`);
-  const l4d2 = readL4d2(row[8], strings, counters, entityIndex, index);
+  const l4d2 =
+    row[8] === null
+      ? lastL4d2ByEpoch.get(epoch)
+      : readL4d2(row[8], strings, counters, entityIndex, index);
+  if (l4d2 === undefined)
+    fail(`rows[${index}] repeats L4D2 state before defining it`);
+  if (row[8] !== null) lastL4d2ByEpoch.set(epoch, l4d2);
   const p = tuple(row[9], 9, `rows[${index}].provenance`);
   const demoTime = nullableNumber(p[0], "demoTimeSeconds");
   const positionForm = integer(p[1], "positionForm", 3);

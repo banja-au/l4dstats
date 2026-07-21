@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fetchHandler,
+  isDeterministicContainerStatus,
   isSupportedUploadFilename,
   parseSteamLookup,
   type EdgeEnvironment,
@@ -56,6 +57,13 @@ function environment(): EdgeEnvironment {
 }
 
 describe("edge dispatcher", () => {
+  it("does not retry deterministic parser responses", () => {
+    expect(isDeterministicContainerStatus(422)).toBe(true);
+    expect(isDeterministicContainerStatus(400)).toBe(true);
+    expect(isDeterministicContainerStatus(408)).toBe(false);
+    expect(isDeterministicContainerStatus(429)).toBe(false);
+    expect(isDeterministicContainerStatus(500)).toBe(false);
+  });
   it("accepts only explicit safe demo and single-stream/archive suffixes", () => {
     for (const filename of [
       "match.dem",

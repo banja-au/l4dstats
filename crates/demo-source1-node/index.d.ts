@@ -2,7 +2,7 @@ export interface BindingMetadata {
   bindingApiVersion: 2;
   framingSummaryVersion: 1;
   projectConfigVersion: 2;
-  compactArtifactWireVersion: 2;
+  compactArtifactWireVersion: 3;
   parserConfigId: "source1-l4d2-2100-v2";
   buildSha256: string;
   bindingCrateVersion: string;

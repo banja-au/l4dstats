@@ -92,7 +92,7 @@ export function validateNativeParserAttestation(
     !/^\d+\.\d+\.\d+/.test(parser.bindingVersion) ||
     parser.bindingApiVersion !== 2 ||
     parser.configVersion !== 2 ||
-    parser.wireVersion !== 2 ||
+    parser.wireVersion !== 3 ||
     parser.parserConfigId !== "source1-l4d2-2100-v2" ||
     typeof parser.buildSha256 !== "string" ||
     !/^[a-f0-9]{64}$/.test(parser.buildSha256) ||

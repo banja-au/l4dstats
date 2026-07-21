@@ -196,6 +196,7 @@ export interface EdgeEnvironment {
 type OperationalEvent =
   | "developer_api_request"
   | "developer_console_action"
+  | "hosted_analysis_attempt_finished"
   | "hosted_analysis_failed"
   | "hosted_analysis_succeeded"
   | "hosted_upload_accepted";
@@ -238,12 +239,45 @@ function consoleAction(method: string, pathname: string): string {
 }
 
 function failureCategory(error: unknown): string {
+  if (error instanceof ContainerResponseError) return "container_response";
   const message = error instanceof Error ? error.message : "";
   if (message.includes("container")) return "container";
   if (message.includes("source object")) return "source_object";
   if (message.includes("artifact")) return "derived_artifact";
   if (message.includes("claim")) return "job_claim";
   return "unknown";
+}
+
+class ContainerResponseError extends Error {
+  public readonly code: string;
+  public readonly stage: string;
+
+  public constructor(
+    public readonly status: number,
+    detail: string,
+  ) {
+    super(`container returned ${status}: ${detail.slice(0, 2_000)}`);
+    this.name = "ContainerResponseError";
+    let parsed: { code?: unknown; stage?: unknown } = {};
+    try {
+      parsed = JSON.parse(detail) as typeof parsed;
+    } catch {
+      // Non-JSON container failures retain bounded text in the error only.
+    }
+    this.code = typeof parsed.code === "string" ? parsed.code : "unknown";
+    this.stage = typeof parsed.stage === "string" ? parsed.stage : "unknown";
+  }
+}
+
+function isDeterministicFailure(error: unknown): boolean {
+  return (
+    error instanceof ContainerResponseError &&
+    isDeterministicContainerStatus(error.status)
+  );
+}
+
+export function isDeterministicContainerStatus(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
 function isTransientContainerCapacity(error: unknown): boolean {
@@ -263,7 +297,7 @@ async function captureOperationalEvent(
   if (!environment.POSTHOG_PROJECT_TOKEN) return;
   const host = environment.POSTHOG_HOST ?? "https://us.i.posthog.com";
   try {
-    await fetch(`${host.replace(/\/$/, "")}/capture/`, {
+    const response = await fetch(`${host.replace(/\/$/, "")}/capture/`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -278,8 +312,23 @@ async function captureOperationalEvent(
       }),
       signal: AbortSignal.timeout(2_000),
     });
-  } catch {
+    if (!response.ok)
+      console.error(
+        JSON.stringify({
+          event: "posthog.capture.failed",
+          analyticsEvent: event,
+          status: response.status,
+        }),
+      );
+  } catch (error) {
     // Observability is best-effort and must never affect analysis delivery.
+    console.error(
+      JSON.stringify({
+        event: "posthog.capture.failed",
+        analyticsEvent: event,
+        detail: error instanceof Error ? error.message : "unknown error",
+      }),
+    );
   }
 }
 
@@ -775,6 +824,7 @@ async function queueHandler(
 ): Promise<void> {
   for (const message of batch.messages) {
     const owner = crypto.randomUUID();
+    const attemptStartedAt = Date.now();
     const repo = repository(environment);
     let claimed: Awaited<ReturnType<HostedJobRepository["claim"]>> = undefined;
     try {
@@ -793,12 +843,24 @@ async function queueHandler(
         throw new Error("job is not currently claimable");
       }
       claimed = job;
+      await repo.progress({
+        id: job.id,
+        owner,
+        value: 0.02,
+        message: "Loading uploaded demo",
+      });
       const source = await environment.TEMPORARY_DEMOS.get(job.source.key);
       if (!source || source.size !== job.source.bytes)
         throw new Error("temporary source object is unavailable or incomplete");
       const container = environment.ANALYSIS_CONTAINER.getByName(
         message.body.jobId,
       );
+      await repo.progress({
+        id: job.id,
+        owner,
+        value: 0.04,
+        message: "Starting native demo analysis",
+      });
       const response = await container.fetch(
         new Request(`http://container/jobs/${message.body.jobId}`, {
           method: "POST",
@@ -811,9 +873,16 @@ async function queueHandler(
         }),
       );
       if (!response.ok)
-        throw new Error(
-          `container returned ${response.status}: ${(await response.text()).slice(0, 2_000)}`,
+        throw new ContainerResponseError(
+          response.status,
+          await response.text(),
         );
+      await repo.progress({
+        id: job.id,
+        owner,
+        value: 0.82,
+        message: "Validating analysis result",
+      });
       const resultBytes = new Uint8Array(await response.arrayBuffer());
       if (
         resultBytes.byteLength < 2 ||
@@ -845,6 +914,12 @@ async function queueHandler(
       );
       if (!stored || stored.size !== resultBytes.byteLength)
         throw new Error("derived artifact write was not confirmed");
+      await repo.progress({
+        id: job.id,
+        owner,
+        value: 0.94,
+        message: "Recording analysis result",
+      });
       await repo.recordAnalysis({
         jobId: job.id,
         demoSha256: result.demo.sha256,
@@ -867,6 +942,23 @@ async function queueHandler(
         resultSizeBand:
           resultBytes.byteLength < 1024 * 1024 ? "under_1mb" : "1mb_or_more",
       });
+      await captureOperationalEvent(
+        environment,
+        "hosted_analysis_attempt_finished",
+        {
+          attempt: job.attempt,
+          attemptDurationSeconds: Math.max(
+            0,
+            Math.round((Date.now() - attemptStartedAt) / 1000),
+          ),
+          outcome: "succeeded",
+          jobAgeAtAttemptSeconds: Math.max(
+            0,
+            Math.round((attemptStartedAt - Date.parse(job.createdAt)) / 1000),
+          ),
+          format: sourceFormat(job.source.filename),
+        },
+      );
       message.ack();
     } catch (error) {
       const detail =
@@ -881,6 +973,35 @@ async function queueHandler(
         }),
       );
       const job = claimed ?? (await repo.getJob(message.body.jobId));
+      const deterministic = isDeterministicFailure(error);
+      await captureOperationalEvent(
+        environment,
+        "hosted_analysis_attempt_finished",
+        {
+          attempt: job?.attempt ?? 0,
+          attemptDurationSeconds: Math.max(
+            0,
+            Math.round((Date.now() - attemptStartedAt) / 1000),
+          ),
+          category: failureCategory(error),
+          code:
+            error instanceof ContainerResponseError ? error.code : "unknown",
+          format: job ? sourceFormat(job.source.filename) : "unknown",
+          jobAgeAtAttemptSeconds: job
+            ? Math.max(
+                0,
+                Math.round(
+                  (attemptStartedAt - Date.parse(job.createdAt)) / 1000,
+                ),
+              )
+            : 0,
+          outcome: "failed",
+          retryable: !deterministic,
+          stage:
+            error instanceof ContainerResponseError ? error.stage : "unknown",
+          status: error instanceof ContainerResponseError ? error.status : 0,
+        },
+      );
       await captureOperationalEvent(environment, "hosted_analysis_failed", {
         attempt: job?.attempt ?? 0,
         category: failureCategory(error),
@@ -891,7 +1012,8 @@ async function queueHandler(
             )
           : 0,
         format: job ? sourceFormat(job.source.filename) : "unknown",
-        terminal: job?.state === "running" && job.attempt >= 3,
+        terminal:
+          job?.state === "running" && (deterministic || job.attempt >= 3),
       });
       if (job?.state === "running" && isTransientContainerCapacity(error)) {
         await repo.defer({
@@ -900,7 +1022,10 @@ async function queueHandler(
           message: "Hosted analysis capacity is busy; retrying",
         });
         message.retry({ delaySeconds: 30 });
-      } else if (job?.state === "running" && job.attempt >= 3) {
+      } else if (
+        job?.state === "running" &&
+        (deterministic || job.attempt >= 3)
+      ) {
         await environment.TEMPORARY_DEMOS.delete(job.source.key).catch(
           () => undefined,
         );
@@ -908,7 +1033,9 @@ async function queueHandler(
           id: job.id,
           owner,
           state: "failed",
-          message: "Analysis failed after three bounded attempts",
+          message: deterministic
+            ? "Demo could not be decoded by the current parser"
+            : "Analysis failed after three bounded attempts",
         });
         message.ack();
       } else if (job?.state === "running") {

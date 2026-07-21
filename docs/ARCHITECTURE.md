@@ -29,7 +29,7 @@ engine CLI = decoder → L4D2 projection → observations → detectors → scor
 The production engine uses a clean-room Rust decoder through one asynchronous,
 coarse Node-API call. The addon accepts demo bytes, a privacy key and canonical
 bounded configuration; it exposes no path or network API. It returns compact
-wire v2, which a strict TypeScript adapter rehydrates before the existing
+wire v3, which a strict TypeScript adapter rehydrates before the existing
 statistics, detectors and evidence packaging run. The versioned CLI/JSON
 boundary keeps API, storage and UI contracts independent of parser language.
 The Rust core is the only demo decoder and L4D2 projector. TypeScript retains the

@@ -4,7 +4,7 @@ import { rehydrateNativeProjection } from "./native-projection";
 const hash = "a".repeat(64);
 function artifact(row?: unknown) {
   return {
-    version: 2,
+    version: 3,
     header: {
       stamp: "HL2DEMO",
       demoProtocol: 4,
@@ -74,7 +74,7 @@ describe("native compact projection validation", () => {
   it("rejects versions, unknown fields and mismatched input lineage", () => {
     expect(() =>
       rehydrateNativeProjection({ ...artifact(), version: 1 }, expected),
-    ).toThrow("version must be 2");
+    ).toThrow("version must be 3");
     expect(() =>
       rehydrateNativeProjection({ ...artifact(), extra: true }, expected),
     ).toThrow("fields are invalid");
@@ -189,6 +189,51 @@ describe("native compact projection validation", () => {
     expect(() => rehydrateNativeProjection(badFinite, expected)).toThrow(
       "finite",
     );
+  });
+  it("losslessly inherits repeated L4D2 state within one player epoch", () => {
+    const first = [
+      0,
+      1,
+      1,
+      null,
+      null,
+      null,
+      null,
+      null,
+      [1, 1, 87, []],
+      [null, 0, [], 0, [], null, null, 0, null],
+    ];
+    const value = artifact(first);
+    value.projection.epochs = [
+      {
+        id: "epoch",
+        entitySlot: 1,
+        lifetime: 1,
+        userId: null,
+        stableToken: null,
+        connectedAtTick: 1,
+        disconnectedAtTick: null,
+      },
+    ] as unknown as typeof value.projection.epochs;
+    value.projection.coverage.observationsEmitted = 2;
+    value.projection.observations.rows = [
+      first,
+      [
+        0,
+        2,
+        1,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        [null, 0, [], 0, [], null, null, 0, null],
+      ],
+    ];
+    const projected = rehydrateNativeProjection(value, expected);
+    expect(projected.observations).toHaveLength(2);
+    expect(projected.observations[1]?.l4d2.health).toBe(87);
   });
   it("rejects malformed nested match, coverage and event primitives", () => {
     const badMatch = artifact();

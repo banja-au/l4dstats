@@ -142,11 +142,41 @@ const insights = [
   },
   {
     name: "Backend analysis reliability",
-    description: "Successful analyses versus failed attempts.",
+    description: "Successful terminal analyses versus failed attempts.",
     query: trend([
       event("hosted_analysis_succeeded", "Succeeded"),
       event("hosted_analysis_failed", "Failed attempt"),
     ]),
+  },
+  {
+    name: "Backend attempt latency p50 / p95",
+    description:
+      "Actual Queue-to-Container attempt duration, excluding time accumulated by earlier retries.",
+    query: trend([
+      event("hosted_analysis_attempt_finished", "p50 seconds", {
+        math: "median",
+        math_property: "attemptDurationSeconds",
+      }),
+      event("hosted_analysis_attempt_finished", "p95 seconds", {
+        math: "p95",
+        math_property: "attemptDurationSeconds",
+      }),
+    ]),
+  },
+  {
+    name: "Backend attempt outcomes",
+    description: "Every backend attempt split by success/failure outcome.",
+    query: breakdown("hosted_analysis_attempt_finished", "outcome", "Attempts"),
+  },
+  {
+    name: "Parser failure stages",
+    description:
+      "Structured failure stages without filenames, job IDs, or raw errors.",
+    query: breakdown(
+      "hosted_analysis_attempt_finished",
+      "stage",
+      "Failed attempts",
+    ),
   },
   {
     name: "Failure categories",
@@ -264,19 +294,28 @@ if (!dashboard) {
 const existing = await api(
   `/insights/?basic=true&limit=100&dashboards=${encodeURIComponent(JSON.stringify([dashboard.id]))}`,
 );
-const names = new Set((existing.results ?? []).map((item) => item.name));
+const byName = new Map(
+  (existing.results ?? []).map((item) => [item.name, item]),
+);
 let created = 0;
+let updated = 0;
 for (const insight of insights) {
-  if (names.has(insight.name)) continue;
-  await api("/insights/?include_dashboards=true", {
-    method: "POST",
-    body: JSON.stringify({
-      ...insight,
-      dashboards: [dashboard.id],
-      tags: ["l4dstats", "production"],
-    }),
-  });
-  created += 1;
+  const current = byName.get(insight.name);
+  await api(
+    current
+      ? `/insights/${current.id}/?include_dashboards=true`
+      : "/insights/?include_dashboards=true",
+    {
+      method: current ? "PATCH" : "POST",
+      body: JSON.stringify({
+        ...insight,
+        dashboards: [dashboard.id],
+        tags: ["l4dstats", "production"],
+      }),
+    },
+  );
+  if (current) updated += 1;
+  else created += 1;
 }
 
 console.log(
@@ -284,6 +323,7 @@ console.log(
     dashboardId: dashboard.id,
     dashboardUrl: `${apiHost}/project/${projectId}/dashboard/${dashboard.id}`,
     insightsCreated: created,
+    insightsUpdated: updated,
     insightsTotal: insights.length,
   }),
 );

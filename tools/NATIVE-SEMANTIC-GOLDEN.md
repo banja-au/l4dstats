@@ -8,7 +8,7 @@ canonical prepared-projection semantic SHA-256, sorted by demo hash.
 The version-1 semantic hash excludes `parser` and `parserVersion`, whose native
 build lineage changes between builds. It also excludes the append-only
 perspective, recorder-command and concise-damage fields introduced by compact
-wire version 2. Every field that existed in the version-1 prepared projection
+wire version 3. Every field that existed in the version-1 prepared projection
 remains covered, so the historical manifest continues to prove SourceTV
 compatibility instead of being silently regenerated for the new schema. The
 new fields have focused contract tests and player-POV corpus validation. The
