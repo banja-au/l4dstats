@@ -1,9 +1,13 @@
 # Cloudflare infrastructure
 
 Terraform is the source of truth for private R2 application buckets, the
-24-hour abandoned-upload lifecycle rule, and the analysis/dead-letter Queues.
-Wrangler remains responsible for bundling and deploying Worker code, static
-assets and the Container image because those artifacts change with each commit.
+24-hour abandoned-upload lifecycle rule, the analysis/dead-letter Queues, and
+the parser Container capacity policy. Wrangler remains responsible for bundling
+and deploying Worker code, static assets and the Container image because those
+artifacts change with each commit. CI passes Terraform's validated
+`container_max_instances` and `container_instance_type` outputs into the
+ephemeral Wrangler configuration, so the two tools do not independently own
+capacity.
 
 The Cloudflare provider and Terraform CLI are pinned in `versions.tf`. State is
 stored in a separate private R2 bucket through Terraform's S3 backend. Creating
@@ -32,3 +36,8 @@ terraform -chdir=infra/terraform/cloudflare plan \
 
 Use `queue_delivery_paused=true` as an emergency dispatch brake. It does not
 delete queued metadata or source objects.
+
+Production defaults to ten concurrent `standard-3` parser Containers. The
+Wrangler Queue consumer uses the same concurrency ceiling. Change the Terraform
+variables together, apply them, and deploy the resulting application config;
+never edit a generated `wrangler.<environment>.jsonc` as durable configuration.

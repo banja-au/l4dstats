@@ -138,6 +138,9 @@ crates/demo-source1-node/ bytes-only Node-API binding
 
 Read the [architecture guide](docs/ARCHITECTURE.md) and
 [threat model](docs/THREAT_MODEL.md) for the full trust boundaries.
+The hosted production boundary uses Terraform-owned capacity policy and a
+Wrangler-published Worker/Container image; production currently permits ten
+concurrent `standard-3` parser Containers with matching Queue concurrency.
 
 ## Supported inputs and evidence boundaries
 

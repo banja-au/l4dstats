@@ -55,10 +55,12 @@ Add an optional hosted deployment with these boundaries:
    interfaces; detector, rating and canonical observation logic does not know
    about HTTP, Turso, R2 or Queues.
 
-The initial Container size is `standard-2` (1 vCPU, 6 GiB memory and 12 GB
-ephemeral disk), subject to an actual representative benchmark. Concurrency is
-bounded explicitly. Queue depth may request capacity only up to the configured
-cost and safety ceiling.
+The initial production Container size is `standard-3` (2 vCPU, 8 GiB memory and
+16 GB ephemeral disk), with at most ten concurrent instances. Queue consumer
+concurrency must equal the Container ceiling so dispatch cannot systematically
+exceed parser capacity. These are bounded operating defaults, not capacity
+claims; representative benchmarks and production queue-age, cold-start, memory,
+failure and cost measurements govern later changes.
 
 ## Source deletion and completion protocol
 
@@ -171,9 +173,14 @@ native sandbox boundary without a documented risk decision.
   explicit policy and measured size budget.
 - The accepted local deployment remains the reproducible option when retaining
   source demos is required.
-- Terraform manages durable Cloudflare buckets, lifecycle rules and Queues.
-  Wrangler packages and deploys the commit-specific Worker, static assets and
+- Terraform manages durable Cloudflare buckets, lifecycle rules and Queues. It
+  also declares and validates the Container instance ceiling and compute tier,
+  then exports those values to the application deployment.
+- Wrangler packages and deploys the commit-specific Worker, static assets and
   Container image because those build artifacts are not durable infrastructure.
+  CI renders its ephemeral Wrangler configuration from Terraform's capacity
+  outputs; generated environment configurations are not a second source of
+  truth.
 
 ## References
 

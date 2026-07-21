@@ -51,6 +51,9 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_R2_SECRET_ACCESS_KEY }}
       TF_IN_AUTOMATION: "true"
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    outputs:
+      container_max_instances: ${{ steps.capacity.outputs.max_instances }}
+      container_instance_type: ${{ steps.capacity.outputs.instance_type }}
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -76,6 +79,13 @@ jobs:
           terraform -chdir=infra/terraform/cloudflare validate
           terraform -chdir=infra/terraform/cloudflare plan -out=production.tfplan -var="environment=production"
           terraform -chdir=infra/terraform/cloudflare apply -auto-approve production.tfplan
+      - name: Export parser capacity for deployment
+        id: capacity
+        run: |
+          max_instances="$(terraform -chdir=infra/terraform/cloudflare output -raw container_max_instances)"
+          instance_type="$(terraform -chdir=infra/terraform/cloudflare output -raw container_instance_type)"
+          printf 'max_instances=%s\n' "$max_instances" >> "$GITHUB_OUTPUT"
+          printf 'instance_type=%s\n' "$instance_type" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: [verify, infrastructure]
@@ -86,6 +96,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       PRODUCTION_HOSTNAME: ${{ vars.PRODUCTION_HOSTNAME }}
+      L4DSTATS_CONTAINER_MAX_INSTANCES: ${{ needs.infrastructure.outputs.container_max_instances }}
+      L4DSTATS_CONTAINER_INSTANCE_TYPE: ${{ needs.infrastructure.outputs.container_instance_type }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

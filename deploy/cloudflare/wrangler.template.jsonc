@@ -37,6 +37,7 @@
         "queue": "l4dstats-__ENV__-analysis",
         "max_batch_size": 1,
         "max_batch_timeout": 5,
+        "max_concurrency": "__CONTAINER_MAX_INSTANCES__",
         "max_retries": 20,
         "dead_letter_queue": "l4dstats-__ENV__-analysis-dlq",
       },
@@ -46,8 +47,8 @@
     {
       "class_name": "AnalysisContainer",
       "image": "../../Dockerfile.cloudflare",
-      "max_instances": 10,
-      "instance_type": "standard-2",
+      "max_instances": "__CONTAINER_MAX_INSTANCES__",
+      "instance_type": "__CONTAINER_INSTANCE_TYPE__",
       "name": "l4dstats-__ENV__-analysis",
       "ssh": {
         "enabled": false,

@@ -86,6 +86,13 @@ the source must be confirmed before the job becomes successful. Large result
 and telemetry JSON stays out of Turso. Cloudflare placement is provider-selected
 and does not guarantee Los Angeles execution.
 
+Hosted capacity has one declarative source: Terraform validates and exports the
+Container instance ceiling and compute tier, while CI injects those values into
+Wrangler when it publishes the commit-specific Worker and Container image. Queue
+consumer concurrency matches the Container ceiling. Generated Wrangler
+environment files are disposable deployment artifacts, not configuration
+authority.
+
 The operator backfill path in ADR 0014 replaces hosted parser compute with a
 restartable local discovery and native-parser application. Raw source and
 expanded demos remain in an ignored local content-addressed store. The

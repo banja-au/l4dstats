@@ -1,5 +1,7 @@
 environment = "production"
 r2_location = "wnam"
+container_max_instances = 10
+container_instance_type = "standard-3"
 
 # Passed by CI as TF_VAR_cloudflare_account_id. Do not commit account IDs or
 # credentials in a real tfvars file.
