@@ -2,6 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import type {
   DecodeIssue,
   DemoHeader,
+  DemoSourcePerspective,
   DisplayUserInfoIdentity,
   GameEventTelemetrySummary,
   GameEventVisit,
@@ -12,6 +13,8 @@ import type {
   PlayerProjectionCoverage,
   ProjectableUserInfo,
   ProjectedPlayerObservation,
+  RecorderCommandCoverage,
+  RecorderCommandObservation,
 } from "@l4dstats/contracts";
 import {
   buildRealAimEvidence,
@@ -120,7 +123,38 @@ export interface ParserLineage {
   buildSha256: string | null;
 }
 
+export interface RecorderCommandEvidence {
+  availability: "observed" | "unavailable";
+  scope: "recorder-only";
+  semantics: "client-command-intent";
+  totalCommands: number;
+  decodedCommands: number;
+  malformedCommands: number;
+  commandGaps: number;
+  demoTickRange: { start: number; end: number } | null;
+  recorderPlayerEpochId: string | null;
+  recorderIdentityAvailability: "observed" | "derived" | "unavailable";
+  heldCommandCounts: Record<
+    "attack" | "secondaryAttack" | "reload" | "jump" | "duck" | "use",
+    number
+  >;
+  pressCounts: Record<
+    "attack" | "secondaryAttack" | "reload" | "jump" | "duck" | "use",
+    number
+  >;
+  intendedMovementCommands: number;
+  nonzeroMouseDeltaCommands: number;
+  limitations: string[];
+}
+
 export interface DemoStats {
+  sourcePerspective: DemoSourcePerspective;
+  evidenceSemantics: {
+    recorderCommands: "client-command-intent";
+    playerState: "server-observed-state";
+    gameEvents: "gameplay-outcome";
+  };
+  recorderCommandEvidence: RecorderCommandEvidence;
   durationSeconds: number;
   playbackTicks: number;
   tickRate: number | null;
@@ -174,6 +208,7 @@ export interface DemoStats {
       | "round_start"
       | "round_end"
       | "death"
+      | "damage"
       | "team_change"
       | "spawn"
       | "pin_start"
@@ -196,6 +231,13 @@ export interface DemoStats {
     weapon?: string;
     infectedClass?: string;
     headshot?: boolean;
+    evidenceClass?:
+      | "client-command-intent"
+      | "server-observed-state"
+      | "gameplay-outcome";
+    damage?: number;
+    damageType?: number;
+    attackerEntityIndex?: number;
     detail: string;
     position?: { x: number; y: number; z: number };
   }>;
@@ -518,6 +560,9 @@ export interface PreparedDemoProjection {
   readonly serverInfo: L4d2ServerInfo | null;
   readonly eventSummary: GameEventTelemetrySummary;
   readonly eventVisits: readonly GameEventVisit[];
+  readonly sourcePerspective: DemoSourcePerspective;
+  readonly recorderCommands: readonly RecorderCommandObservation[];
+  readonly recorderCommandCoverage: RecorderCommandCoverage;
 }
 
 export type DemoProjectionProvider = (
@@ -573,6 +618,9 @@ export function buildEvidenceBundleFromPrepared(
     serverInfo,
     eventSummary,
     eventVisits,
+    sourcePerspective,
+    recorderCommands,
+    recorderCommandCoverage,
     parserVersion,
   } = prepared;
   const tickIntervalSeconds = prepared.tickIntervalSeconds ?? undefined;
@@ -646,6 +694,9 @@ export function buildEvidenceBundleFromPrepared(
     tickIntervalSeconds,
     witchObservations,
     inferredIdentityEpochIds,
+    sourcePerspective,
+    recorderCommands,
+    recorderCommandCoverage,
   );
   progress(0.96, "Packaging evidence and analysis lineage");
   return {
@@ -700,6 +751,22 @@ function buildDemoStats(
   tickIntervalSeconds: number | undefined,
   witchObservations: readonly L4d2WitchObservation[],
   inferredIdentityEpochIds: ReadonlySet<string> = new Set(),
+  sourcePerspective: DemoSourcePerspective = "unknown",
+  recorderCommands: readonly RecorderCommandObservation[] = [],
+  recorderCommandCoverage: RecorderCommandCoverage = {
+    availability: "unavailable",
+    totalCommands: 0,
+    decodedCommands: 0,
+    malformedCommands: 0,
+    commandGaps: 0,
+    firstDemoTick: null,
+    lastDemoTick: null,
+    recorderPlayerEpochId: {
+      availability: "unavailable",
+      reason: "recorder command telemetry was not projected",
+    },
+    unavailableReason: "recorder command telemetry was not projected",
+  },
 ): DemoStats {
   const observations = projected.map(({ observation }) => observation);
   const availableRate = (
@@ -1087,6 +1154,39 @@ function buildDemoStats(
           },
         ];
       }
+      if (event.name === "player_hurt_concise") {
+        const victim = aliasForUserId(event.fields.userid);
+        const victimPlayerId =
+          typeof event.fields.userid === "number"
+            ? epochByUserId.get(event.fields.userid)
+            : undefined;
+        const damage =
+          typeof event.fields.dmg_health === "number"
+            ? event.fields.dmg_health
+            : undefined;
+        const damageType =
+          typeof event.fields.type === "number" ? event.fields.type : undefined;
+        const attackerEntityIndex =
+          typeof event.fields.attackerentid === "number"
+            ? event.fields.attackerentid
+            : undefined;
+        return [
+          {
+            tick: demoTick,
+            timeSeconds,
+            type: "damage" as const,
+            evidenceClass: "gameplay-outcome" as const,
+            ...(victim ? { victim } : {}),
+            ...(victimPlayerId ? { victimPlayerId } : {}),
+            ...(damage === undefined ? {} : { damage }),
+            ...(damageType === undefined ? {} : { damageType }),
+            ...(attackerEntityIndex === undefined
+              ? {}
+              : { attackerEntityIndex }),
+            detail: `${victim ?? "A player"} took ${damage === undefined ? "unknown" : String(damage)} concise-event damage${attackerEntityIndex === undefined ? "" : ` from entity ${attackerEntityIndex}`}`,
+          },
+        ];
+      }
       if (event.name === "round_start" || event.name === "round_end")
         return [
           {
@@ -1417,6 +1517,16 @@ function buildDemoStats(
     tickIntervalSeconds,
   });
   return {
+    sourcePerspective,
+    evidenceSemantics: {
+      recorderCommands: "client-command-intent",
+      playerState: "server-observed-state",
+      gameEvents: "gameplay-outcome",
+    },
+    recorderCommandEvidence: deriveRecorderCommandEvidence(
+      recorderCommands,
+      recorderCommandCoverage,
+    ),
     durationSeconds,
     playbackTicks,
     tickRate: durationSeconds > 0 ? playbackTicks / durationSeconds : null,
@@ -1499,6 +1609,81 @@ function buildDemoStats(
     }),
     spectators,
     players,
+  };
+}
+
+const recorderButtons = {
+  attack: 1 << 0,
+  jump: 1 << 1,
+  duck: 1 << 2,
+  use: 1 << 5,
+  secondaryAttack: 1 << 11,
+  reload: 1 << 13,
+} as const;
+
+export function deriveRecorderCommandEvidence(
+  commands: readonly RecorderCommandObservation[],
+  coverage: RecorderCommandCoverage,
+): RecorderCommandEvidence {
+  const heldCommandCounts = {
+    attack: 0,
+    secondaryAttack: 0,
+    reload: 0,
+    jump: 0,
+    duck: 0,
+    use: 0,
+  };
+  const pressCounts = { ...heldCommandCounts };
+  let previous: RecorderCommandObservation | undefined;
+  let intendedMovementCommands = 0;
+  let nonzeroMouseDeltaCommands = 0;
+  for (const command of commands) {
+    if (
+      command.intendedMovement.forward !== 0 ||
+      command.intendedMovement.side !== 0 ||
+      command.intendedMovement.up !== 0
+    )
+      intendedMovementCommands += 1;
+    if (command.mouseDelta.x !== 0 || command.mouseDelta.y !== 0)
+      nonzeroMouseDeltaCommands += 1;
+    const contiguous =
+      previous !== undefined &&
+      command.commandNumber === previous.commandNumber + 1;
+    for (const [name, mask] of Object.entries(recorderButtons) as Array<
+      [keyof typeof recorderButtons, number]
+    >) {
+      const held = (command.buttons & mask) !== 0;
+      if (held) heldCommandCounts[name] += 1;
+      if (held && (!contiguous || (previous!.buttons & mask) === 0))
+        pressCounts[name] += 1;
+    }
+    previous = command;
+  }
+  const identity = coverage.recorderPlayerEpochId;
+  return {
+    availability: coverage.availability,
+    scope: "recorder-only",
+    semantics: "client-command-intent",
+    totalCommands: coverage.totalCommands,
+    decodedCommands: coverage.decodedCommands,
+    malformedCommands: coverage.malformedCommands,
+    commandGaps: coverage.commandGaps,
+    demoTickRange:
+      coverage.firstDemoTick === null || coverage.lastDemoTick === null
+        ? null
+        : { start: coverage.firstDemoTick, end: coverage.lastDemoTick },
+    recorderPlayerEpochId: identity.value ?? null,
+    recorderIdentityAvailability: identity.availability,
+    heldCommandCounts,
+    pressCounts,
+    intendedMovementCommands,
+    nonzeroMouseDeltaCommands,
+    limitations: [
+      "Recorder-only client command intent; it is not authoritative movement or an outcome.",
+      "Attack input is not a fired shot and cannot supply a hit/miss accuracy denominator.",
+      "Mouse deltas are command-generation values, not guaranteed raw physical-device motion.",
+      ...(coverage.unavailableReason ? [coverage.unavailableReason] : []),
+    ],
   };
 }
 

@@ -56,12 +56,12 @@ try {
   );
   const parser = {
     engine: "rust-native",
-    coreVersion: "0.1.0",
-    bindingVersion: "0.1.0",
+    coreVersion: "0.2.0",
+    bindingVersion: "0.2.0",
     bindingApiVersion: 2,
-    configVersion: 1,
-    wireVersion: 1,
-    parserConfigId: "source1-l4d2-2100-v1",
+    configVersion: 2,
+    wireVersion: 2,
+    parserConfigId: "source1-l4d2-2100-v2",
     buildSha256: nativeBuildSha256,
   };
   const engineResult = {
@@ -130,8 +130,8 @@ try {
     restoredArtifact.demo?.parser?.engine !== "rust-native" ||
     restoredArtifact.demo?.parser?.buildSha256 !== nativeBuildSha256 ||
     restoredArtifact.demo?.parser?.bindingApiVersion !== 2 ||
-    restoredArtifact.demo?.parser?.configVersion !== 1 ||
-    restoredArtifact.demo?.parser?.wireVersion !== 1
+    restoredArtifact.demo?.parser?.configVersion !== 2 ||
+    restoredArtifact.demo?.parser?.wireVersion !== 2
   )
     throw new Error("restored analysis lost native parser attestation");
 

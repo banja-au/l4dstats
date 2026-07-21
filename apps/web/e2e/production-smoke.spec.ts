@@ -61,7 +61,7 @@ test.describe("production localization", () => {
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
     await expect(page.getByText("SUELTA LAS DEMOS")).toBeVisible();
-    await page.getByRole("button", { name: "EN ES" }).click();
+    await page.getByRole("button", { name: "Idioma: English" }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByText("DROP DEMOS")).toBeVisible();
     expect(
@@ -74,6 +74,8 @@ test.describe("production localization", () => {
     ).toBe("en");
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("button", { name: "EN ES" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Language: Español" }),
+    ).toBeVisible();
   });
 });

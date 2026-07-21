@@ -735,6 +735,7 @@ test("finds a Steam player and opens a durable game URL", async ({ page }) => {
     });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "Search by player" }).click();
   await page
     .getByLabel("SteamID64 or Steam profile URL")
     .fill("76561198000000007");

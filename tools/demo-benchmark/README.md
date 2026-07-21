@@ -13,12 +13,13 @@ a shell. Example:
 ```bash
 export L4DSTATS_NATIVE_BENCH_COMMAND='["/workspace/target/release/demo-source1-stage","framing","{demo}"]'
 export L4DSTATS_NATIVE_BENCH_ARTIFACT='/workspace/target/release/demo-source1-stage'
-export L4DSTATS_NATIVE_BENCH_VERSION='demo-source1-native@0.1.0'
+export L4DSTATS_NATIVE_BENCH_VERSION='demo-source1-native@0.2.0'
 export L4DSTATS_NATIVE_BENCH_BUILD_SHA256='<64 lowercase hex characters>'
 node tools/demo-benchmark/benchmark.mjs \
   --mode stage --warmups 1 --repetitions 5 \
   --max-median-wall-ms 60000 --max-median-rss-kib 1500000 \
   --min-median-throughput-bps 1000000 \
+  --min-quality-score 4.9 \
   --demo /ignored/a.dem --demo /ignored/b.dem \
   --demo /ignored/c.dem --demo /ignored/d.dem --demo /ignored/e.dem \
   > /ignored/results.json
@@ -38,3 +39,11 @@ Threshold flags are optional. When configured, a median wall-time or RSS excess,
 unavailable RSS, or median throughput shortfall fails the run. Choose thresholds
 from a recorded same-host baseline; the harness does not embed machine-specific
 defaults.
+
+Schema version 3 also reports `qualityScore` using the deterministic
+`release-threshold-headroom/v1` rule. Exactly meeting a configured threshold is
+4.0/5; reaching at least 25% headroom is 5.0/5, with linear interpolation and a
+0–5 clamp. The average covers every configured dimension with available
+measurement data. `--min-quality-score` enforces that average and fails when no
+dimension can be scored. A missing RSS measurement therefore cannot be hidden
+when an RSS threshold is configured: the ordinary threshold gate fails first.

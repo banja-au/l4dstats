@@ -23,7 +23,7 @@ if (!demoPath) {
   assert.equal(Buffer.isBuffer(encoded), true);
   assert.equal(encoded.byteLength <= 256 * 1024 * 1024, true);
   const artifact = JSON.parse(encoded.toString("utf8"));
-  assert.equal(artifact.version, 1);
+  assert.equal(artifact.version, 2);
   assert.equal(artifact.bytesConsumed, demo.byteLength);
   assert.equal(artifact.stopped, true);
   assert.equal(typeof artifact.projection.demoSha256, "string");

@@ -1,9 +1,9 @@
 export interface BindingMetadata {
   bindingApiVersion: 2;
   framingSummaryVersion: 1;
-  projectConfigVersion: 1;
-  compactArtifactWireVersion: 1;
-  parserConfigId: "source1-l4d2-2100-v1";
+  projectConfigVersion: 2;
+  compactArtifactWireVersion: 2;
+  parserConfigId: "source1-l4d2-2100-v2";
   buildSha256: string;
   bindingCrateVersion: string;
   coreCrateVersion: string;
@@ -35,9 +35,9 @@ export function bindingMetadata(): BindingMetadata;
 export function decodeFramingSummary(bytes: Buffer): Promise<FramingSummary>;
 
 /** Canonical UTF-8 JSON bytes in this exact field order, without whitespace. */
-export interface ProjectConfigV1 {
-  schemaVersion: 1;
-  parserConfig: "source1-l4d2-2100-v1";
+export interface ProjectConfigV2 {
+  schemaVersion: 2;
+  parserConfig: "source1-l4d2-2100-v2";
   maxInputBytes: number;
   maxObservations: number;
   maxIdentityMappings: number;

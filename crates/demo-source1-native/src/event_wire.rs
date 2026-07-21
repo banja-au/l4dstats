@@ -162,9 +162,11 @@ pub struct RequiredEventWire {
     pub actor_user_id: EventAvailabilityWire<f64>,
     pub victim_user_id: EventAvailabilityWire<f64>,
     pub attacker_user_id: EventAvailabilityWire<f64>,
+    pub attacker_entity_id: EventAvailabilityWire<f64>,
     pub weapon: EventAvailabilityWire<String>,
     pub damage: EventAvailabilityWire<f64>,
     pub health: EventAvailabilityWire<f64>,
+    pub damage_type: EventAvailabilityWire<f64>,
     pub decoded: DecodedGameEventWire,
 }
 
@@ -177,9 +179,11 @@ impl From<(&RequiredEvent, &DecodedGameEvent)> for RequiredEventWire {
             actor_user_id: availability_wire(&event.actor_user_id),
             victim_user_id: availability_wire(&event.victim_user_id),
             attacker_user_id: availability_wire(&event.attacker_user_id),
+            attacker_entity_id: availability_wire(&event.attacker_entity_id),
             weapon: availability_wire(&event.weapon),
             damage: availability_wire(&event.damage),
             health: availability_wire(&event.health),
+            damage_type: availability_wire(&event.damage_type),
             decoded: decoded.into(),
         }
     }

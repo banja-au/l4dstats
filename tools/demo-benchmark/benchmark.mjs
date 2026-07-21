@@ -48,8 +48,17 @@ export async function runBenchmark(options) {
     throw new Error(
       `native benchmark regression: ${thresholds.failures.join("; ")}`,
     );
+  const qualityScore = scoreQuality(
+    results,
+    options.thresholds,
+    options.minQualityScore,
+  );
+  if (!qualityScore.passed)
+    throw new Error(
+      `native benchmark quality score ${qualityScore.average ?? "unavailable"}/5 is below required ${qualityScore.minimumRequired}/5`,
+    );
   const result = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     mode: options.mode,
     generatedAt: new Date().toISOString(),
     config: {
@@ -64,6 +73,7 @@ export async function runBenchmark(options) {
     fixtures: fixtures.map(({ sha256, bytes }) => ({ sha256, bytes })),
     results,
     thresholds,
+    qualityScore,
   };
   return result;
 }
@@ -248,6 +258,58 @@ function evaluateThresholds(results, thresholds = {}) {
   return { configured: thresholds, passed: failures.length === 0, failures };
 }
 
+export function scoreQuality(results, thresholds = {}, minimumRequired) {
+  const dimensions = [];
+  const add = (name, observed, threshold, higherIsBetter) => {
+    if (threshold === undefined) return;
+    const ratio = higherIsBetter ? observed / threshold : threshold / observed;
+    dimensions.push({
+      name,
+      observed,
+      threshold,
+      score: Math.round(Math.min(5, Math.max(0, 4 * ratio)) * 1000) / 1000,
+    });
+  };
+  add(
+    "median-wall-time",
+    results.corpusWallMilliseconds.median,
+    thresholds.maxMedianWallMilliseconds,
+    false,
+  );
+  if (thresholds.maxMedianRssKiB !== undefined && results.maxRssKiB !== null)
+    add(
+      "median-rss",
+      results.maxRssKiB.median,
+      thresholds.maxMedianRssKiB,
+      false,
+    );
+  add(
+    "median-throughput",
+    results.throughputBytesPerSecond.median,
+    thresholds.minMedianThroughputBytesPerSecond,
+    true,
+  );
+  const average =
+    dimensions.length === 0
+      ? null
+      : Math.round(
+          (dimensions.reduce((sum, dimension) => sum + dimension.score, 0) /
+            dimensions.length) *
+            1000,
+        ) / 1000;
+  return {
+    methodology: "release-threshold-headroom/v1",
+    interpretation:
+      "4.0 meets a configured threshold; 5.0 is at least 25% better",
+    dimensions,
+    average,
+    minimumRequired: minimumRequired ?? null,
+    passed:
+      minimumRequired === undefined ||
+      (average !== null && average >= minimumRequired),
+  };
+}
+
 function validateOptions(options) {
   if (!Array.isArray(options.demos) || options.demos.length === 0)
     throw new Error("at least one explicit --demo is required");
@@ -270,6 +332,14 @@ function validateOptions(options) {
   for (const [name, value] of Object.entries(options.thresholds ?? {}))
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0)
       throw new Error(`${name} must be a positive finite number`);
+  if (
+    options.minQualityScore !== undefined &&
+    (typeof options.minQualityScore !== "number" ||
+      !Number.isFinite(options.minQualityScore) ||
+      options.minQualityScore < 0 ||
+      options.minQualityScore > 5)
+  )
+    throw new Error("minQualityScore must be between 0 and 5");
   if (
     options.nativeBuildSha256 !== undefined &&
     !/^[a-f0-9]{64}$/.test(options.nativeBuildSha256)
@@ -384,6 +454,7 @@ export function parseArguments(argv, env = process.env) {
   let repetitions = 5;
   let timeoutMilliseconds = DEFAULT_TIMEOUT_MS;
   let outputCapBytes = DEFAULT_OUTPUT_CAP;
+  let minQualityScore;
   const thresholds = {};
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
@@ -401,6 +472,8 @@ export function parseArguments(argv, env = process.env) {
       thresholds.maxMedianRssKiB = Number(argv[++index]);
     else if (value === "--min-median-throughput-bps")
       thresholds.minMedianThroughputBytesPerSecond = Number(argv[++index]);
+    else if (value === "--min-quality-score")
+      minQualityScore = Number(argv[++index]);
     else throw new Error(`unknown argument ${value}`);
   }
   if (demos.length === 0 && env.L4DSTATS_BENCH_DEMOS)
@@ -417,6 +490,7 @@ export function parseArguments(argv, env = process.env) {
     nativeVersion: env.L4DSTATS_NATIVE_BENCH_VERSION,
     nativeBuildSha256: env.L4DSTATS_NATIVE_BENCH_BUILD_SHA256,
     thresholds,
+    minQualityScore,
   };
 }
 

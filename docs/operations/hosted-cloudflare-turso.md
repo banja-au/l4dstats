@@ -149,7 +149,11 @@ bundle, static assets, bindings and Container image.
 Pushes to `main` run `.github/workflows/deploy-production.yml`: the complete
 quality gate runs first, Terraform plans and applies through the protected
 `production` GitHub environment, then Wrangler publishes secrets and deploys
-the verified commit. Configure these GitHub production environment values:
+the verified commit. It then retries the public edge `/health` boundary until it
+reports the production environment, queries the database-backed `/api/stats`
+boundary, and requires the public root route to answer successfully. A publish
+that cannot pass those live checks is a failed deployment, not a verified
+release. Configure these GitHub production environment values:
 
 - variable `PRODUCTION_HOSTNAME`;
 - secrets `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`;

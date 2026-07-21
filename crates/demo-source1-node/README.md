@@ -17,7 +17,7 @@ projectDemo(demoBytes: Buffer, pseudonymKey: Buffer, configBytes: Buffer)
 ```
 
 All three inputs and the result are bytes so JavaScript object construction does
-not dominate parsing. Config v1 is canonical UTF-8 JSON capped at 4 KiB, with
+not dominate parsing. Config v2 is canonical UTF-8 JSON capped at 4 KiB, with
 the exact field order in `index.d.ts`, no whitespace, unknown fields, duplicate
 fields, or trailing data. Artifact serialization writes directly into a capped
 Vec and cannot exceed 256 MiB. Parsing remains off the JavaScript event loop.

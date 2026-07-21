@@ -13,8 +13,8 @@ tactical reconstruction, and explainable review signals.
 
 ![L4DStats match overview](docs/assets/l4dstats-overview.jpg)
 
-L4DStats turns SourceTV `.dem` files into a browsable account of a Versus
-match. It reconstructs rounds and players, calculates descriptive statistics,
+L4DStats turns SourceTV and player-recorded POV `.dem` files into a browsable
+account of a Versus match. It reconstructs rounds and players, calculates descriptive statistics,
 plots tick-addressed events, and surfaces unusual moments for human review.
 
 It is designed to preserve uncertainty. Missing telemetry stays missing,
@@ -37,6 +37,9 @@ explanation, limitations, and strongest available counterevidence.
 - Scrub a filterable event story using ticks as the canonical coordinate.
 - Inspect movement and view-angle coverage, parser quality, reconstruction
   availability, and provenance alongside the statistics.
+- For player-POV recordings, inspect recorder-only command intent separately
+  from server-observed state and outcomes; attack input is never labelled a shot
+  or accuracy.
 - Review prerequisite-gated detector windows with tick deep links,
   explanations, limitations, counterevidence, and quality metadata.
 - Visualize player paths against provenance-stamped analytical geometry for
@@ -143,7 +146,7 @@ demo in `.zip`, `.dem.gz`, `.dem.xz`, `.dem.bz2`, or `.dem.zst`, subject to
 suffix/magic agreement, member and path checks, compressed and expanded byte
 caps, ratio limits, timeouts, hashing, and idempotent job handling.
 
-Demo telemetry is not ground truth. SourceTV perspective, packet loss, parser
+Demo telemetry is not ground truth. SourceTV/player-POV perspective, packet loss, parser
 coverage, pauses, skips, map assets, and game context all limit what can be
 concluded. L4DStats therefore:
 

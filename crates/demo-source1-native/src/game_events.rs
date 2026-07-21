@@ -55,15 +55,17 @@ pub struct RequiredEvent {
     pub actor_user_id: Availability<f64>,
     pub victim_user_id: Availability<f64>,
     pub attacker_user_id: Availability<f64>,
+    pub attacker_entity_id: Availability<f64>,
     pub weapon: Availability<String>,
     pub damage: Availability<f64>,
     pub health: Availability<f64>,
+    pub damage_type: Availability<f64>,
 }
 #[must_use]
 pub fn project_required_event(event: &DecodedGameEvent, tick: i32) -> Option<RequiredEvent> {
     if !matches!(
         event.name.as_str(),
-        "weapon_fire" | "player_hurt" | "player_death"
+        "weapon_fire" | "player_hurt" | "player_hurt_concise" | "player_death"
     ) {
         return None;
     }
@@ -110,13 +112,18 @@ pub fn project_required_event(event: &DecodedGameEvent, tick: i32) -> Option<Req
         } else {
             numeric("userid")
         },
-        attacker_user_id: if event.name == "weapon_fire" {
+        attacker_user_id: if event.name == "weapon_fire" || event.name == "player_hurt_concise" {
             unavailable("event has no attacker role")
         } else {
             numeric("attacker")
         },
+        attacker_entity_id: if event.name == "player_hurt_concise" {
+            numeric("attackerentid")
+        } else {
+            unavailable("event has no attacker entity role")
+        },
         weapon: string("weapon"),
-        damage: if event.name == "player_hurt" {
+        damage: if matches!(event.name.as_str(), "player_hurt" | "player_hurt_concise") {
             numeric("dmg_health")
         } else {
             unavailable("event has no damage field")
@@ -125,6 +132,11 @@ pub fn project_required_event(event: &DecodedGameEvent, tick: i32) -> Option<Req
             numeric("health")
         } else {
             unavailable("event has no health field")
+        },
+        damage_type: if event.name == "player_hurt_concise" {
+            numeric("type")
+        } else {
+            unavailable("event has no damage-type field")
         },
     })
 }
@@ -316,6 +328,38 @@ mod tests {
     fn rejects_unknown_schema() {
         let e = decode_event(&[0, 0], 9, &BTreeMap::new(), EventLimits::default()).unwrap_err();
         assert!(e.contains("no registered schema"));
+    }
+
+    #[test]
+    fn projects_concise_damage_without_inventing_an_attacker_user_id() {
+        let event = DecodedGameEvent {
+            id: 9,
+            name: "player_hurt_concise".into(),
+            fields: vec![
+                ("userid".into(), EventValue::Number(25.0)),
+                ("attackerentid".into(), EventValue::Number(2.0)),
+                ("type".into(), EventValue::Number(1.0)),
+                ("dmg_health".into(), EventValue::Number(8.0)),
+            ],
+            schema: EventSchema {
+                id: 9,
+                name: "player_hurt_concise".into(),
+                fields: Vec::new(),
+            },
+        };
+        let projected = project_required_event(&event, 123).unwrap();
+        assert!(matches!(
+            projected.attacker_user_id,
+            Availability::Unavailable { .. }
+        ));
+        assert!(matches!(
+            projected.attacker_entity_id,
+            Availability::Observed { value: 2.0, .. }
+        ));
+        assert!(matches!(
+            projected.damage_type,
+            Availability::Observed { value: 1.0, .. }
+        ));
     }
     #[test]
     fn empty_list_is_exact() {

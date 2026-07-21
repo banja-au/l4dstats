@@ -9,8 +9,8 @@ import { rehydrateNativeProjection } from "./native-projection.js";
 
 const require = createRequire(import.meta.url);
 const parserConfig = {
-  schemaVersion: 1,
-  parserConfig: "source1-l4d2-2100-v1",
+  schemaVersion: 2,
+  parserConfig: "source1-l4d2-2100-v2",
   maxInputBytes: 512 * 1024 * 1024,
   maxObservations: 2_000_000,
   maxIdentityMappings: 16_384,
@@ -55,9 +55,9 @@ export interface NativeFramingSummary {
 interface NativeMetadata {
   bindingApiVersion: 2;
   framingSummaryVersion: 1;
-  projectConfigVersion: 1;
-  compactArtifactWireVersion: 1;
-  parserConfigId: "source1-l4d2-2100-v1";
+  projectConfigVersion: 2;
+  compactArtifactWireVersion: 2;
+  parserConfigId: "source1-l4d2-2100-v2";
   buildSha256: string;
   bindingCrateVersion: string;
   coreCrateVersion: string;
@@ -84,8 +84,8 @@ function readMetadata(value: unknown): NativeMetadata {
       expectedKeys.sort().join("\0") ||
     metadata.bindingApiVersion !== 2 ||
     metadata.framingSummaryVersion !== 1 ||
-    metadata.projectConfigVersion !== 1 ||
-    metadata.compactArtifactWireVersion !== 1 ||
+    metadata.projectConfigVersion !== 2 ||
+    metadata.compactArtifactWireVersion !== 2 ||
     metadata.parserConfigId !== parserConfig.parserConfig ||
     typeof metadata.buildSha256 !== "string" ||
     !/^[a-f0-9]{64}$/.test(metadata.buildSha256) ||

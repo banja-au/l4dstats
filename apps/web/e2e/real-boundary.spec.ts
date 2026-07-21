@@ -78,13 +78,13 @@ test("uploads and analyzes real demos through the browser, API, worker, and stor
     expect(parser).toMatchObject({
       engine: "rust-native",
       bindingApiVersion: 2,
-      configVersion: 1,
-      wireVersion: 1,
-      parserConfigId: "source1-l4d2-2100-v1",
+      configVersion: 2,
+      wireVersion: 2,
+      parserConfigId: "source1-l4d2-2100-v2",
     });
     expect(parser?.buildSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(parser?.buildSha256).not.toMatch(/^0{64}$/);
-    const prefix = `demo-source1-native@${String(parser?.coreVersion)}+node-${String(parser?.bindingVersion)}/config-1/build-${String(parser?.buildSha256)}`;
+    const prefix = `demo-source1-native@${String(parser?.coreVersion)}+node-${String(parser?.bindingVersion)}/config-2/build-${String(parser?.buildSha256)}`;
     expect(caseParsers.every((value) => value === prefix)).toBe(true);
   }
   if (hasFresh) {

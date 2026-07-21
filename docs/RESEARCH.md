@@ -21,6 +21,23 @@ Alternatives do not remove the key risk. [`demoinfocs-golang`](https://github.co
 
 Unknowns that must be measured include whether archives are POV or SourceTV; which user commands/view angles are present; protocol drift; observer versus player state; slot/user-ID churn; pauses/timescale; cvars/plugins; and custom maps. These directly constrain which detectors are valid.
 
+### Player-POV evidence boundary
+
+A 2026-07-21 audit of an ignored local player-recorded corpus found the same
+demo/network protocols as the SourceTV corpus and a recorder `dem_usercmd`
+stream containing command clocks, view angles, movement values, buttons, weapon
+selection and mouse deltas. It also found a perspective-specific initial-entity
+lifecycle and `player_hurt_concise` events without authoritative `weapon_fire`.
+These observations justify shared low-level parsing but not interchangeable
+evidence semantics; see ADR 0016.
+
+POV enables research on recorder input continuity, attack-button timing,
+intended-versus-observed movement and command-angle/network-angle relationships.
+It does not directly provide physical mouse movement, rendered pixels, accepted
+shots, misses, exact recoil compensation or spread. Evaluation must split by
+capture perspective and player identity, report command/event availability,
+and avoid selecting only users who choose to provide more invasive POV data.
+
 ## Detection science
 
 Useful signal families are:
@@ -32,6 +49,19 @@ Useful signal families are:
 [BotScreen (USENIX Security 2023)](https://www.usenix.org/conference/usenixsecurity23/presentation/choi) supports abnormal aim time-series analysis. [XGuardian](https://arxiv.org/abs/2601.18068) explores explainable pitch/yaw trajectory features. Earlier [behavioral wallhack detection](https://research.tees.ac.uk/ws/files/6438470/111786.pdf) motivates hidden-opponent reactions but is weak evidence alone. [BlackMirror](https://doi.org/10.1145/3372297.3417890) explains the hidden-state basis of wallhacks but is prevention research, not validation of gaze-only accusations. [Adaptive aimbot research](https://arxiv.org/abs/2004.12183) shows that humanized assistance can evade behavioral systems.
 
 Aggregate by encounter, not tick, so correlated samples do not become fake confidence. Begin with an interpretable logistic/empirical-Bayes or monotonic model. Split evaluation by player and time/server. Calibrate on held-out data and report reliability, Brier/log loss, precision-recall, false positives per 1,000 players, prevalence-aware predictive value and player-level intervals. [T-Cal](https://www.jmlr.org/papers/v24/22-0320.html) is relevant to testing calibration; [limited-false-positive conformal methods](https://proceedings.mlr.press/v162/fisch22a.html) may help only when their exchangeability assumptions are credible.
+
+The native demo benchmark schema v3 provides an explicitly mechanical 0–5
+release-headroom score rather than a subjective rating. Under
+`release-threshold-headroom/v1`, exactly meeting each preconfigured performance
+threshold scores 4.0 and at least 25% headroom scores 5.0, with the release
+average covering every configured measurable dimension. Claims such as
+“4.9/5” must name the command stage, corpus lineage, host provenance,
+thresholds, repetitions and resulting per-dimension scores; the number alone
+is not portable between hosts or evidence of semantic parser correctness.
+Parser correctness is instead demonstrated with golden/corrupt fixtures,
+complete-corpus parse rates, semantic invariants and non-regression; detector
+quality requires held-out outcome metrics and uncertainty, not a performance
+headroom score.
 
 ## UI, visualization, and operations
 

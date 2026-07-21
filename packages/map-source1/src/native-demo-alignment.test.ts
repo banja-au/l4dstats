@@ -3,7 +3,7 @@ import { readNativeAlignmentArtifact } from "./native-demo-alignment";
 
 function artifact(rows: unknown[]): Record<string, unknown> {
   return {
-    version: 1,
+    version: 2,
     header: { mapName: "c1m1_hotel" },
     projection: { observations: { rows } },
   };
@@ -36,11 +36,11 @@ describe("native demo alignment artifact", () => {
 
   it("rejects incompatible versions and missing map identity", () => {
     expect(() =>
-      readNativeAlignmentArtifact({ ...artifact([]), version: 2 }),
+      readNativeAlignmentArtifact({ ...artifact([]), version: 1 }),
     ).toThrow("version");
     expect(() =>
       readNativeAlignmentArtifact({
-        version: 1,
+        version: 2,
         header: {},
         projection: { observations: { rows: [] } },
       }),

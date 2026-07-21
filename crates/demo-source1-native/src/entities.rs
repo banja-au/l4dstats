@@ -334,6 +334,7 @@ pub fn decode_packet_entity_data(
     updated_entries: usize,
     classes: &[FlattenedServerClass],
     class_by_entity: &HashMap<usize, u32>,
+    implicit_player_classes: &HashMap<usize, u32>,
     explicit_deletions: bool,
     is_delta: bool,
     max_entries: usize,
@@ -390,6 +391,7 @@ pub fn decode_packet_entity_data(
         }
         let id = *class_by_entity
             .get(&index)
+            .or_else(|| implicit_player_classes.get(&index))
             .ok_or_else(|| format!("delta for unknown entity {index}"))?;
         let class = by_id
             .get(&id)
@@ -450,7 +452,9 @@ fn bounded_ubit(r: &mut BitReader<'_>) -> Result<u32, String> {
 pub struct EntitySnapshot {
     pub entity_index: usize,
     pub class_id: u32,
-    pub serial: u32,
+    /// `None` is reserved for a guarded POV-local player recovered from a
+    /// delta before the recording supplies an authoritative Enter/serial.
+    pub serial: Option<u32>,
     pub lifetime: u64,
     pub active: bool,
     pub properties: Arc<Vec<Option<PropValue>>>,
@@ -566,6 +570,25 @@ impl EntityReconstructor {
                     current.active = false;
                 }
                 UpdateKind::Delta => {
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        entities.entry(update.entity_index)
+                    {
+                        let class_id = update.class_id.ok_or_else(|| {
+                            format!("delta for inactive entity {}", update.entity_index)
+                        })?;
+                        let lifetime = self.next_lifetime;
+                        self.next_lifetime += 1;
+                        entry.insert(EntitySnapshot {
+                            entity_index: update.entity_index,
+                            class_id,
+                            serial: None,
+                            lifetime,
+                            active: true,
+                            // Missing local state is unknown. Applying the
+                            // class baseline here would manufacture values.
+                            properties: Arc::new(Vec::new()),
+                        });
+                    }
                     let current = entities.get_mut(&update.entity_index).ok_or_else(|| {
                         format!("delta for inactive entity {}", update.entity_index)
                     })?;
@@ -579,7 +602,7 @@ impl EntityReconstructor {
                     let serial = update.serial.ok_or("enter lacks serial")?;
                     let resumed = entities
                         .get(&update.entity_index)
-                        .is_some_and(|v| v.class_id == class && v.serial == serial);
+                        .is_some_and(|v| v.class_id == class && v.serial == Some(serial));
                     let mut properties = if is_delta {
                         self.dynamic[baseline]
                             .get(&update.entity_index)
@@ -610,7 +633,7 @@ impl EntityReconstructor {
                     let entered = EntitySnapshot {
                         entity_index: update.entity_index,
                         class_id: class,
-                        serial,
+                        serial: Some(serial),
                         lifetime,
                         active: true,
                         properties,
@@ -727,7 +750,33 @@ pub(crate) fn visit_entity_frames_prepared<
         .find(|t| t.name == "instancebaseline")
         .ok_or("demo has no instancebaseline table")?;
     let instance = decode_instance_baselines(baseline, &classes)?;
-    let mut state = EntityReconstructor::new(MAX_EDICTS, 4, instance)?;
+    // Retain a bounded acknowledgement window for client choke/loss without
+    // allowing long POV recordings to retain their complete entity history.
+    let mut state = EntityReconstructor::new(MAX_EDICTS, 128, instance)?;
+    let is_source_tv = demo.frames.iter().enumerate().find_map(|(index, _)| {
+        prepared.inspection(index).and_then(|inspection| {
+            inspection
+                .messages
+                .iter()
+                .find_map(|message| match message.envelope {
+                    Some(Envelope::ServerInfo { is_source_tv, .. }) => Some(is_source_tv),
+                    _ => None,
+                })
+        })
+    });
+    let terror_player_class = classes
+        .iter()
+        .filter(|class| class.schema.class_name == "CTerrorPlayer")
+        .map(|class| class.schema.data_table_id)
+        .collect::<Vec<_>>();
+    if terror_player_class.len() != 1 {
+        return Err("expected exactly one CTerrorPlayer server class".into());
+    }
+    let identities = if is_source_tv == Some(false) {
+        crate::identity::collect_userinfo_timeline_prepared(prepared, b"pov-recovery-key")?.mappings
+    } else {
+        Vec::new()
+    };
     for (frame_index, frame) in demo.frames.iter().enumerate() {
         if !matches!(
             frame.kind,
@@ -791,6 +840,25 @@ pub(crate) fn visit_entity_frames_prepared<
         let class_by: HashMap<_, _> = source.map_or_else(HashMap::new, |f| {
             f.entities.iter().map(|(i, e)| (*i, e.class_id)).collect()
         });
+        let demo_tick = frame.tick.unwrap_or(0);
+        let implicit_player_classes = if is_source_tv == Some(false) {
+            identities
+                .iter()
+                .filter(|mapping| {
+                    mapping.user_id.is_some()
+                        && mapping.effective_tick.unwrap_or(i32::MIN) <= demo_tick
+                        && !identities.iter().any(|later| {
+                            later.entity_index == mapping.entity_index
+                                && later.effective_tick.unwrap_or(i32::MIN)
+                                    > mapping.effective_tick.unwrap_or(i32::MIN)
+                                && later.effective_tick.unwrap_or(i32::MIN) <= demo_tick
+                        })
+                })
+                .map(|mapping| (mapping.entity_index, terror_player_class[0]))
+                .collect()
+        } else {
+            HashMap::new()
+        };
         let nested = extract_network_bits(payload, start, usize::try_from(bits).expect("20-bit"))?;
         let updates = decode_packet_entity_data(
             &nested,
@@ -798,6 +866,7 @@ pub(crate) fn visit_entity_frames_prepared<
             usize::try_from(updated).expect("11-bit"),
             &classes,
             &class_by,
+            &implicit_player_classes,
             is_delta,
             is_delta,
             usize::try_from(max_entries).expect("11-bit"),
@@ -833,11 +902,87 @@ fn text(e: impl ToString) -> String {
 mod tests {
     use super::*;
 
+    fn delta(index: usize, class_id: Option<u32>) -> EntityUpdate {
+        EntityUpdate {
+            entity_index: index,
+            kind: UpdateKind::Delta,
+            class_id,
+            serial: None,
+            properties: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn recovers_only_an_explicitly_classified_implicit_entity_without_a_baseline() {
+        let baseline = ClassBaseline {
+            class_id: 0,
+            properties: vec![DecodedProperty {
+                index: 0,
+                path: "baseline".into(),
+                value: PropValue::Number(1.0),
+            }],
+            consumed_bits: 0,
+            source_bits: 0,
+        };
+        let mut state = EntityReconstructor::new(32, 4, HashMap::from([(0, baseline)])).unwrap();
+        let frame = state
+            .apply(1, false, None, 0, false, 32, &[delta(1, Some(0))], &[])
+            .unwrap();
+        let recovered = frame.entities.get(&1).unwrap();
+        assert_eq!(recovered.serial, None);
+        assert!(recovered.properties.is_empty());
+
+        let error = EntityReconstructor::new(32, 4, HashMap::new())
+            .unwrap()
+            .apply(1, false, None, 0, false, 32, &[delta(1, None)], &[])
+            .unwrap_err();
+        assert!(error.contains("inactive entity"));
+    }
+
+    #[test]
+    fn authoritative_enter_replaces_an_implicit_lifetime_and_supplies_serial() {
+        let mut state = EntityReconstructor::new(32, 4, HashMap::new()).unwrap();
+        let implicit = state
+            .apply(1, false, None, 0, false, 32, &[delta(1, Some(0))], &[])
+            .unwrap();
+        let implicit_lifetime = implicit.entities[&1].lifetime;
+        let entered = state
+            .apply(
+                2,
+                true,
+                Some(1),
+                0,
+                false,
+                32,
+                &[EntityUpdate {
+                    entity_index: 1,
+                    kind: UpdateKind::Enter,
+                    class_id: Some(0),
+                    serial: Some(7),
+                    properties: Vec::new(),
+                }],
+                &[],
+            )
+            .unwrap();
+        assert_eq!(entered.entities[&1].serial, Some(7));
+        assert_ne!(entered.entities[&1].lifetime, implicit_lifetime);
+    }
+
     #[test]
     fn rejects_zero_explicit_deletion_delta_without_panicking() {
         // count=1 followed by delta=0, both short-form bounded UBit integers.
-        let error = decode_packet_entity_data(&[1, 0], 12, 0, &[], &HashMap::new(), true, true, 32)
-            .unwrap_err();
+        let error = decode_packet_entity_data(
+            &[1, 0],
+            12,
+            0,
+            &[],
+            &HashMap::new(),
+            &HashMap::new(),
+            true,
+            true,
+            32,
+        )
+        .unwrap_err();
         assert!(error.contains("must be positive"));
     }
 }

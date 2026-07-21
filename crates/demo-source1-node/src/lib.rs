@@ -15,9 +15,9 @@ use std::io::{self, Write};
 
 const BINDING_API_VERSION: u32 = 2;
 const FRAMING_SUMMARY_VERSION: u32 = 1;
-const PROJECT_CONFIG_VERSION: u32 = 1;
-const COMPACT_ARTIFACT_WIRE_VERSION: u32 = 1;
-const PARSER_CONFIG_ID: &str = "source1-l4d2-2100-v1";
+const PROJECT_CONFIG_VERSION: u32 = 2;
+const COMPACT_ARTIFACT_WIRE_VERSION: u32 = 2;
+const PARSER_CONFIG_ID: &str = "source1-l4d2-2100-v2";
 const MAX_CONFIG_BYTES: usize = 4 * 1024;
 const MAX_KEY_BYTES: usize = 64;
 const MIN_KEY_BYTES: usize = 16;
@@ -199,7 +199,7 @@ pub fn decode_framing_summary(bytes: Buffer) -> AsyncTask<DecodeFramingTask> {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectConfigV1 {
+struct ProjectConfigV2 {
     schema_version: u32,
     parser_config: String,
     max_input_bytes: usize,
@@ -212,7 +212,7 @@ struct ProjectConfigV1 {
     max_output_bytes: usize,
 }
 
-impl ProjectConfigV1 {
+impl ProjectConfigV2 {
     fn artifact_limits(&self) -> ArtifactLimits {
         ArtifactLimits {
             projection: ProjectLimits {
@@ -230,7 +230,7 @@ impl ProjectConfigV1 {
 pub struct ProjectDemoTask {
     demo_bytes: Vec<u8>,
     pseudonym_key: Vec<u8>,
-    config: ProjectConfigV1,
+    config: ProjectConfigV2,
 }
 
 impl Task for ProjectDemoTask {
@@ -294,6 +294,9 @@ struct CompactArtifactWireV1<'a> {
     projection: ProjectionWireV1<'a>,
     raw_events: Vec<RawEventVisitWire>,
     event_summary: EventTelemetrySummaryWire,
+    source_perspective: demo_source1_native::artifact::SourcePerspective,
+    recorder_commands: &'a [demo_source1_native::artifact::RecorderCommand],
+    command_telemetry_summary: &'a demo_source1_native::artifact::CommandTelemetrySummary,
 }
 
 #[derive(Serialize)]
@@ -335,6 +338,9 @@ fn serialize_artifact(
         },
         raw_events: artifact.raw_events.iter().map(Into::into).collect(),
         event_summary: (&artifact.event_summary).into(),
+        source_perspective: artifact.source_perspective,
+        recorder_commands: &artifact.recorder_commands,
+        command_telemetry_summary: &artifact.command_telemetry_summary,
     };
     let mut writer = CappedWriter::new(maximum);
     serde_json::to_writer(&mut writer, &wire).map_err(|error| ProjectError {
@@ -386,12 +392,12 @@ impl Write for CappedWriter {
     }
 }
 
-fn parse_config(bytes: &[u8]) -> Result<ProjectConfigV1, ProjectError> {
+fn parse_config(bytes: &[u8]) -> Result<ProjectConfigV2, ProjectError> {
     if bytes.is_empty() || bytes.len() > MAX_CONFIG_BYTES {
         return Err(config_error("config must contain between 1 and 4096 bytes"));
     }
-    let config: ProjectConfigV1 = serde_json::from_slice(bytes)
-        .map_err(|_| config_error("config is not canonical v1 JSON"))?;
+    let config: ProjectConfigV2 = serde_json::from_slice(bytes)
+        .map_err(|_| config_error("config is not canonical v2 JSON"))?;
     let canonical =
         serde_json::to_vec(&config).map_err(|_| config_error("config canonicalization failed"))?;
     if canonical != bytes {
@@ -463,10 +469,10 @@ fn to_napi_error(error: &DemoParseError) -> napi::Error {
 mod tests {
     use super::*;
 
-    fn config() -> ProjectConfigV1 {
+    fn config() -> ProjectConfigV2 {
         let limits = ArtifactLimits::default();
-        ProjectConfigV1 {
-            schema_version: 1,
+        ProjectConfigV2 {
+            schema_version: 2,
             parser_config: PARSER_CONFIG_ID.to_owned(),
             max_input_bytes: MAX_INPUT_BYTES,
             max_observations: limits.projection.max_observations,

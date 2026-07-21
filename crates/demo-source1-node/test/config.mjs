@@ -1,7 +1,7 @@
 export function config(overrides = {}) {
   const value = {
-    schemaVersion: 1,
-    parserConfig: "source1-l4d2-2100-v1",
+    schemaVersion: 2,
+    parserConfig: "source1-l4d2-2100-v2",
     maxInputBytes: 512 * 1024 * 1024,
     maxObservations: 2_000_000,
     maxIdentityMappings: 16_384,

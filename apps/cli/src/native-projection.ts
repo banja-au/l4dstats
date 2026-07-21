@@ -15,6 +15,7 @@ import type {
   PlayerProjectionCoverage,
   ProjectableUserInfo,
   ProjectedPlayerObservation,
+  RecorderCommandObservation,
 } from "@l4dstats/contracts";
 import type { PreparedDemoProjection } from "./evidence-bundle.js";
 
@@ -27,6 +28,7 @@ const limits = {
   counters: 256,
   identities: 65_536,
   events: 2_000_000,
+  commands: 2_000_000,
   matches: 100_000,
   witches: 1_000_000,
 } as const;
@@ -72,10 +74,13 @@ export function rehydrateNativeProjection(
       "projection",
       "rawEvents",
       "eventSummary",
+      "sourcePerspective",
+      "recorderCommands",
+      "commandTelemetrySummary",
     ],
     "artifact",
   );
-  if (integer(root.version, "version", 1) !== 1) fail("version must be 1");
+  if (integer(root.version, "version", 2) !== 2) fail("version must be 2");
   const header = readHeader(root.header);
   const projection = object(root.projection, "projection");
   exact(
@@ -161,6 +166,34 @@ export function rehydrateNativeProjection(
       propertyPaths,
     ),
   );
+  const serverInfo =
+    projection.serverInfo === null ? null : readServer(projection.serverInfo);
+  const sourcePerspective =
+    root.sourcePerspective === undefined
+      ? serverInfo === null
+        ? ("unknown" as const)
+        : serverInfo.isSourceTv
+          ? ("source-tv" as const)
+          : ("player-pov" as const)
+      : readPerspective(root.sourcePerspective);
+  const recorderCommands =
+    root.recorderCommands === undefined
+      ? []
+      : array(root.recorderCommands, "recorderCommands", limits.commands).map(
+          (command, index) =>
+            readRecorderCommand(
+              command,
+              index,
+              demoSha256,
+              header.playbackTicks > 0 && header.playbackTimeSeconds > 0
+                ? header.playbackTimeSeconds / header.playbackTicks
+                : null,
+            ),
+        );
+  const commandSummary =
+    root.commandTelemetrySummary === undefined
+      ? null
+      : readCommandSummary(root.commandTelemetrySummary);
   return {
     demoSha256,
     bytes: expected.bytes,
@@ -202,8 +235,39 @@ export function rehydrateNativeProjection(
       "matchStates",
       limits.matches,
     ).map(readMatch),
-    serverInfo:
-      projection.serverInfo === null ? null : readServer(projection.serverInfo),
+    serverInfo,
+    sourcePerspective,
+    recorderCommands,
+    recorderCommandCoverage: {
+      availability:
+        commandSummary !== null && sourcePerspective === "player-pov"
+          ? "observed"
+          : "unavailable",
+      totalCommands: commandSummary?.commands ?? 0,
+      decodedCommands: commandSummary?.decodedCommands ?? 0,
+      malformedCommands: commandSummary?.malformedCommands ?? 0,
+      commandGaps: commandSummary?.gaps ?? 0,
+      firstDemoTick: commandSummary?.firstDemoTick ?? null,
+      lastDemoTick: commandSummary?.lastDemoTick ?? null,
+      recorderPlayerEpochId: {
+        availability: "unavailable",
+        reason:
+          sourcePerspective === "source-tv"
+            ? "SourceTV does not carry per-player user commands"
+            : "recorder identity cannot be established from a demo-local command slot alone",
+      },
+      ...(sourcePerspective === "source-tv"
+        ? {
+            unavailableReason:
+              "SourceTV does not carry per-player user commands",
+          }
+        : commandSummary === null
+          ? {
+              unavailableReason:
+                "recorder command telemetry was not present in compact wire v2",
+            }
+          : {}),
+    },
     eventSummary: readEventSummary(root.eventSummary),
     eventVisits: array(root.rawEvents, "rawEvents", limits.events).map(
       (visit, i) => readEventVisit(visit, i),
@@ -760,6 +824,181 @@ function readEventSummary(v: unknown): GameEventTelemetrySummary {
     ),
   };
 }
+
+function readPerspective(v: unknown) {
+  const value = string(v, "sourcePerspective", 16);
+  if (
+    !(["source-tv", "player-pov", "unknown"] as const).includes(value as never)
+  )
+    fail("sourcePerspective is invalid");
+  return value as "source-tv" | "player-pov" | "unknown";
+}
+
+function readCommandSummary(v: unknown) {
+  const o = camel(
+    v,
+    [
+      "commands",
+      "decodedCommands",
+      "malformedCommands",
+      "firstDemoTick",
+      "lastDemoTick",
+      "recorderPlayerSlot",
+      "recorderIdentityConfidence",
+      "gaps",
+    ],
+    "commandTelemetrySummary",
+  );
+  const nullableTick = (value: unknown, name: string) =>
+    value === null ? null : integer(value, name, 0x7fffffff, -0x80000000);
+  if (o.recorderPlayerSlot !== null)
+    integer(o.recorderPlayerSlot, "recorderPlayerSlot", 255);
+  const confidence = string(
+    o.recorderIdentityConfidence,
+    "recorderIdentityConfidence",
+    16,
+  );
+  if (
+    !(["observed", "inferred", "unavailable"] as const).includes(
+      confidence as never,
+    )
+  )
+    fail("recorderIdentityConfidence is invalid");
+  const result = {
+    commands: integer(o.commands, "commands", limits.commands),
+    decodedCommands: integer(
+      o.decodedCommands,
+      "decodedCommands",
+      limits.commands,
+    ),
+    malformedCommands: integer(
+      o.malformedCommands,
+      "malformedCommands",
+      limits.commands,
+    ),
+    firstDemoTick: nullableTick(o.firstDemoTick, "firstDemoTick"),
+    lastDemoTick: nullableTick(o.lastDemoTick, "lastDemoTick"),
+    gaps: integer(o.gaps, "gaps", limits.commands),
+  };
+  if (result.decodedCommands + result.malformedCommands !== result.commands)
+    fail("command telemetry counts are inconsistent");
+  return result;
+}
+
+function readRecorderCommand(
+  v: unknown,
+  index: number,
+  demoSha256: string,
+  tickIntervalSeconds: number | null,
+): RecorderCommandObservation {
+  const name = `recorderCommands[${index}]`;
+  const o = camel(
+    v,
+    [
+      "demoTick",
+      "recorderPlayerSlot",
+      "outgoingSequence",
+      "commandNumber",
+      "tickCount",
+      "viewAngles",
+      "forwardMove",
+      "sideMove",
+      "upMove",
+      "buttons",
+      "impulse",
+      "weaponSelect",
+      "weaponSubtype",
+      "mouseDx",
+      "mouseDy",
+      "consumedBits",
+      "sourceBits",
+    ],
+    name,
+  );
+  const demoTick = integer(
+    o.demoTick,
+    `${name}.demoTick`,
+    0x7fffffff,
+    -0x80000000,
+  );
+  if (o.recorderPlayerSlot !== null)
+    integer(o.recorderPlayerSlot, `${name}.recorderPlayerSlot`, 255);
+  const outgoingSequence = integer(
+    o.outgoingSequence,
+    `${name}.outgoingSequence`,
+    0x7fffffff,
+    -0x80000000,
+  );
+  const commandNumber = integer(
+    o.commandNumber,
+    `${name}.commandNumber`,
+    0x7fffffff,
+    -0x80000000,
+  );
+  if (outgoingSequence !== commandNumber)
+    fail(`${name} command number does not match outgoing sequence`);
+  const angles = tuple(o.viewAngles, 3, `${name}.viewAngles`).map((value, i) =>
+    number(value, `${name}.viewAngles[${i}]`),
+  );
+  const optionalInteger = (value: unknown, field: string, max: number) =>
+    value === null ? null : integer(value, `${name}.${field}`, max);
+  const consumedBits = integer(o.consumedBits, `${name}.consumedBits`, 8192);
+  const sourceBits = integer(o.sourceBits, `${name}.sourceBits`, 8192);
+  if (consumedBits > sourceBits || sourceBits - consumedBits > 7)
+    fail(`${name} bit consumption is invalid`);
+  const weaponSelect = optionalInteger(o.weaponSelect, "weaponSelect", 0x7ff);
+  const weaponSubtype = optionalInteger(o.weaponSubtype, "weaponSubtype", 0x3f);
+  return {
+    schemaVersion: 1,
+    demoSha256,
+    demoTick,
+    demoTimeSeconds:
+      tickIntervalSeconds === null
+        ? {
+            availability: "unavailable",
+            reason: "demo tick interval unavailable",
+          }
+        : { availability: "derived", value: demoTick * tickIntervalSeconds },
+    recorderPlayerEpochId: {
+      availability: "unavailable",
+      reason:
+        "recorder identity cannot be established from a demo-local command slot alone",
+    },
+    outgoingSequence,
+    commandNumber,
+    clientTickCount: integer(
+      o.tickCount,
+      `${name}.tickCount`,
+      0x7fffffff,
+      -0x80000000,
+    ),
+    viewAngles: { pitch: angles[0]!, yaw: angles[1]!, roll: angles[2]! },
+    intendedMovement: {
+      forward: number(o.forwardMove, `${name}.forwardMove`),
+      side: number(o.sideMove, `${name}.sideMove`),
+      up: number(o.upMove, `${name}.upMove`),
+    },
+    buttons: integer(o.buttons, `${name}.buttons`, 0xffffffff),
+    impulse: integer(o.impulse, `${name}.impulse`, 0xff),
+    weaponSelect:
+      weaponSelect === null
+        ? { availability: "unavailable", reason: "no weapon selection encoded" }
+        : { availability: "observed", value: weaponSelect },
+    weaponSubtype:
+      weaponSubtype === null
+        ? { availability: "unavailable", reason: "no weapon subtype encoded" }
+        : { availability: "observed", value: weaponSubtype },
+    mouseDelta: {
+      x: integer(o.mouseDx, `${name}.mouseDx`, 0x7fff, -0x8000),
+      y: integer(o.mouseDy, `${name}.mouseDy`, 0x7fff, -0x8000),
+    },
+    provenance: {
+      source: "dem_usercmd",
+      scope: "recorder-only",
+      semantics: "client-command-intent",
+    },
+  };
+}
 function readEventVisit(v: unknown, i: number): GameEventVisit {
   const o = camel(
     v,
@@ -814,9 +1053,11 @@ function readRequiredEvent(v: unknown) {
       "actorUserId",
       "victimUserId",
       "attackerUserId",
+      "attackerEntityId",
       "weapon",
       "damage",
       "health",
+      "damageType",
       "decoded",
     ],
     "required event",
@@ -828,9 +1069,11 @@ function readRequiredEvent(v: unknown) {
     "actorUserId",
     "victimUserId",
     "attackerUserId",
+    "attackerEntityId",
     "weapon",
     "damage",
     "health",
+    "damageType",
   ]) {
     const a = object(o[key], key),
       availability = string(a.availability, `${key}.availability`, 16);

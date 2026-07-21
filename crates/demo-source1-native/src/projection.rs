@@ -1172,7 +1172,7 @@ mod tests {
         let entity = EntitySnapshot {
             entity_index: 1,
             class_id: 0,
-            serial: 0,
+            serial: Some(0),
             lifetime: 1,
             active: true,
             properties: Arc::new(vec![Some(PropValue::Array(vec![

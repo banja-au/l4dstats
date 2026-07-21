@@ -157,6 +157,7 @@ export interface MatchTimelineEvent {
     | "round_start"
     | "round_end"
     | "death"
+    | "damage"
     | "team_change"
     | "spawn"
     | "pin_start"
@@ -179,6 +180,13 @@ export interface MatchTimelineEvent {
   weapon?: string;
   infectedClass?: string;
   headshot?: boolean;
+  evidenceClass?:
+    | "client-command-intent"
+    | "server-observed-state"
+    | "gameplay-outcome";
+  damage?: number;
+  damageType?: number;
+  attackerEntityIndex?: number;
   detail: string;
   position?: { x: number; y: number; z: number };
 }
@@ -225,6 +233,35 @@ export interface MapGeometry {
 }
 
 export interface DemoStats {
+  sourcePerspective?: "source-tv" | "player-pov" | "unknown";
+  evidenceSemantics?: {
+    recorderCommands: "client-command-intent";
+    playerState: "server-observed-state";
+    gameEvents: "gameplay-outcome";
+  };
+  recorderCommandEvidence?: {
+    availability: "observed" | "unavailable";
+    scope: "recorder-only";
+    semantics: "client-command-intent";
+    totalCommands: number;
+    decodedCommands: number;
+    malformedCommands: number;
+    commandGaps: number;
+    demoTickRange: { start: number; end: number } | null;
+    recorderPlayerEpochId: string | null;
+    recorderIdentityAvailability: "observed" | "derived" | "unavailable";
+    heldCommandCounts: Record<
+      "attack" | "secondaryAttack" | "reload" | "jump" | "duck" | "use",
+      number
+    >;
+    pressCounts: Record<
+      "attack" | "secondaryAttack" | "reload" | "jump" | "duck" | "use",
+      number
+    >;
+    intendedMovementCommands: number;
+    nonzeroMouseDeltaCommands: number;
+    limitations: string[];
+  };
   durationSeconds: number;
   playbackTicks: number;
   tickRate: number | null;

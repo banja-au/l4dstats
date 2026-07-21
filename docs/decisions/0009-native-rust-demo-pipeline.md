@@ -88,7 +88,9 @@ the core and binding versions, parser config ID, config/wire versions and a
 64-hex build SHA. Production images compute and stamp a nonzero build SHA and
 verify it before packaging the architecture-specific Node-API 8 addon.
 
-The compact transport is wire version 1 with parser config version 1. Strict
+The original compact transport was wire version 1 with parser config version 1.
+Player-POV perspective and recorder-command support introduced wire version 2
+with parser config version 2; both versions are intentionally incompatible. Strict
 TypeScript rehydration and shared downstream packaging preserve explicit
 missingness and provenance. All 22 authorized corpus demos matched the former
 TypeScript `PreparedDemoProjection` semantics exactly before that implementation

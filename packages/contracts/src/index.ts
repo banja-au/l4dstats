@@ -186,6 +186,9 @@ export interface DemoIdentity {
   readonly playbackTimeSeconds: number;
 }
 
+/** Recording vantage point. Unknown is retained when svc_ServerInfo is absent. */
+export type DemoSourcePerspective = "source-tv" | "player-pov" | "unknown";
+
 export interface PlayerEpoch {
   readonly id: string;
   readonly demoSha256: string;
@@ -222,6 +225,50 @@ export interface PlayerObservation {
   readonly buttons: AvailableValue<number>;
 }
 
+/**
+ * One command submitted by the client that recorded a player-POV demo.
+ * It describes recorder intent, not authoritative movement, firing, hits, or
+ * the physical mouse device.
+ */
+export interface RecorderCommandObservation {
+  readonly schemaVersion: typeof observationSchemaVersion;
+  readonly demoSha256: string;
+  readonly demoTick: number;
+  readonly demoTimeSeconds: AvailableValue<number>;
+  readonly recorderPlayerEpochId: AvailableValue<string>;
+  readonly outgoingSequence: number;
+  readonly commandNumber: number;
+  readonly clientTickCount: number;
+  readonly viewAngles: ViewAngles;
+  readonly intendedMovement: {
+    readonly forward: number;
+    readonly side: number;
+    readonly up: number;
+  };
+  readonly buttons: number;
+  readonly impulse: number;
+  readonly weaponSelect: AvailableValue<number>;
+  readonly weaponSubtype: AvailableValue<number>;
+  readonly mouseDelta: { readonly x: number; readonly y: number };
+  readonly provenance: {
+    readonly source: "dem_usercmd";
+    readonly scope: "recorder-only";
+    readonly semantics: "client-command-intent";
+  };
+}
+
+export interface RecorderCommandCoverage {
+  readonly availability: "observed" | "unavailable";
+  readonly totalCommands: number;
+  readonly decodedCommands: number;
+  readonly malformedCommands: number;
+  readonly commandGaps: number;
+  readonly firstDemoTick: number | null;
+  readonly lastDemoTick: number | null;
+  readonly recorderPlayerEpochId: AvailableValue<string>;
+  readonly unavailableReason?: string;
+}
+
 export interface GameEventObservation {
   readonly schemaVersion: typeof observationSchemaVersion;
   readonly demoSha256: string;
@@ -246,6 +293,9 @@ export interface CanonicalDemo {
   readonly observations: readonly PlayerObservation[];
   readonly events: readonly GameEventObservation[];
   readonly coverage: ProtocolCoverage;
+  readonly sourcePerspective?: DemoSourcePerspective;
+  readonly recorderCommands?: readonly RecorderCommandObservation[];
+  readonly recorderCommandCoverage?: RecorderCommandCoverage;
 }
 
 /** Parser-neutral Source 1 demo header metadata. */
@@ -324,6 +374,7 @@ export interface EventFieldAvailability<T extends GameEventValue> {
 export type RequiredGameEventName =
   | "weapon_fire"
   | "player_hurt"
+  | "player_hurt_concise"
   | "player_death";
 
 export interface RequiredGameEventProjection {
@@ -333,9 +384,12 @@ export interface RequiredGameEventProjection {
   readonly actorUserId: EventFieldAvailability<number>;
   readonly victimUserId: EventFieldAvailability<number>;
   readonly attackerUserId: EventFieldAvailability<number>;
+  /** Entity index used by concise hurt; it is not a stable player identity. */
+  readonly attackerEntityId: EventFieldAvailability<number>;
   readonly weapon: EventFieldAvailability<string>;
   readonly damage: EventFieldAvailability<number>;
   readonly health: EventFieldAvailability<number>;
+  readonly damageType: EventFieldAvailability<number>;
   readonly decoded: DecodedGameEvent;
 }
 

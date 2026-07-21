@@ -6,6 +6,7 @@ use crate::game_events::{
 };
 use crate::network::{Envelope, extract_network_bits};
 use crate::projection::{CoreProjection, ProjectLimits};
+use crate::usercmd::{UserCommand, decode_user_command};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -45,6 +46,45 @@ impl Default for ArtifactLimits {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SourcePerspective {
+    SourceTv,
+    PlayerPov,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecorderCommand {
+    pub demo_tick: i32,
+    pub recorder_player_slot: Option<u8>,
+    pub outgoing_sequence: i32,
+    #[serde(flatten)]
+    pub command: UserCommand,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RecorderIdentityConfidence {
+    Observed,
+    Inferred,
+    Unavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandTelemetrySummary {
+    pub commands: usize,
+    pub decoded_commands: usize,
+    pub malformed_commands: usize,
+    pub first_demo_tick: Option<i32>,
+    pub last_demo_tick: Option<i32>,
+    pub recorder_player_slot: Option<u8>,
+    pub recorder_identity_confidence: RecorderIdentityConfidence,
+    pub gaps: usize,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawEventVisit {
@@ -74,6 +114,9 @@ pub struct CompactDemoArtifact {
     pub raw_events: Vec<RawEventVisit>,
     pub event_summary: EventTelemetrySummary,
     pub required_events: Vec<RequiredEvent>,
+    pub source_perspective: SourcePerspective,
+    pub recorder_commands: Vec<RecorderCommand>,
+    pub command_telemetry_summary: CommandTelemetrySummary,
 }
 
 #[allow(clippy::too_many_lines)]
@@ -112,6 +155,86 @@ pub fn build_compact_artifact(
     let mut raw_events = Vec::new();
     let mut event_summary = EventTelemetrySummary::default();
     let mut required_events = Vec::new();
+    let source_perspective = demo
+        .frames
+        .iter()
+        .enumerate()
+        .find_map(|(index, _)| {
+            prepared.inspection(index).and_then(|inspection| {
+                inspection
+                    .messages
+                    .iter()
+                    .find_map(|message| match message.envelope {
+                        Some(Envelope::ServerInfo { is_source_tv, .. }) => Some(if is_source_tv {
+                            SourcePerspective::SourceTv
+                        } else {
+                            SourcePerspective::PlayerPov
+                        }),
+                        _ => None,
+                    })
+            })
+        })
+        .unwrap_or(SourcePerspective::Unknown);
+    let mut recorder_commands = Vec::new();
+    let mut command_count = 0_usize;
+    let mut malformed_commands = 0_usize;
+    let mut command_slots = std::collections::BTreeSet::new();
+    for frame in &demo.frames {
+        if frame.kind != DemoCommandKind::UserCommand {
+            continue;
+        }
+        command_count += 1;
+        if command_count > 10_000_000 {
+            return Err(ProjectError::classify(
+                "user-command-limits",
+                "user-command visit limit exceeded",
+            ));
+        }
+        if let Some(slot) = frame.player_slot {
+            command_slots.insert(slot);
+        }
+        let Some(payload) = frame.payload else {
+            malformed_commands += 1;
+            continue;
+        };
+        let Some(outgoing_sequence) = frame.outgoing_sequence else {
+            malformed_commands += 1;
+            continue;
+        };
+        match (frame.tick, decode_user_command(payload)) {
+            (Some(demo_tick), Ok(command)) if command.command_number == outgoing_sequence => {
+                recorder_commands.push(RecorderCommand {
+                    demo_tick,
+                    recorder_player_slot: frame.player_slot,
+                    outgoing_sequence,
+                    command,
+                });
+            }
+            _ => malformed_commands += 1,
+        }
+    }
+    let gaps = recorder_commands
+        .windows(2)
+        .filter(|pair| {
+            pair[1].command.command_number != pair[0].command.command_number.saturating_add(1)
+        })
+        .count();
+    let recorder_player_slot = (command_slots.len() == 1)
+        .then(|| command_slots.first().copied())
+        .flatten();
+    let command_telemetry_summary = CommandTelemetrySummary {
+        commands: command_count,
+        decoded_commands: recorder_commands.len(),
+        malformed_commands,
+        first_demo_tick: recorder_commands.first().map(|command| command.demo_tick),
+        last_demo_tick: recorder_commands.last().map(|command| command.demo_tick),
+        recorder_player_slot,
+        // The outer demo player slot identifies a command stream, not a
+        // stable player epoch. Recorder identity remains unavailable until a
+        // separately validated identity join is implemented.
+        recorder_identity_confidence: RecorderIdentityConfidence::Unavailable,
+        gaps,
+    };
     for (frame_index, frame) in demo.frames.iter().enumerate() {
         if !matches!(
             frame.kind,
@@ -285,6 +408,9 @@ pub fn build_compact_artifact(
         raw_events,
         event_summary,
         required_events,
+        source_perspective,
+        recorder_commands,
+        command_telemetry_summary,
     })
 }
 

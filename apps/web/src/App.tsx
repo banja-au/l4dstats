@@ -6812,17 +6812,18 @@ function Timeline({
     spawn: 2,
     tank_control: 3,
     attack: 4,
-    pin_start: 5,
-    incap: 6,
-    clear: 7,
-    pin_end: 8,
-    revive: 9,
-    death: 10,
-    witch_spawn: 11,
-    witch_enrage: 12,
-    witch_burn: 13,
-    witch_end: 14,
-    round_end: 15,
+    damage: 5,
+    pin_start: 6,
+    incap: 7,
+    clear: 8,
+    pin_end: 9,
+    revive: 10,
+    death: 11,
+    witch_spawn: 12,
+    witch_enrage: 13,
+    witch_burn: 14,
+    witch_end: 15,
+    round_end: 16,
   };
   const demos = stats.map((demo, demoIndex) => ({
     demo,
@@ -6852,7 +6853,7 @@ function Timeline({
     0,
   );
   const groups: Record<string, MatchTimelineEvent["type"][]> = {
-    combat: ["death", "incap", "attack", "clear"],
+    combat: ["death", "damage", "incap", "attack", "clear"],
     pins: ["pin_start", "pin_end", "clear"],
     infected: ["spawn", "tank_control", "attack"],
     bosses: [
@@ -7171,6 +7172,7 @@ function Timeline({
           attack: "ataque",
           clear: "liberación",
           death: "muerte",
+          damage: "daño",
           incap: "incapacitación",
           pin_start: "inicio del agarre",
           pin_end: "fin del agarre",
@@ -7193,6 +7195,18 @@ function Timeline({
       return tx("{player} changed team", "{player} cambió de equipo", {
         player: event.subject ?? tx("Player", "Jugador"),
       });
+    if (event.type === "damage")
+      return tx(
+        "{player} took {damage} observed damage",
+        "{player} recibió {damage} de daño observado",
+        {
+          player: victim,
+          damage:
+            event.damage === undefined
+              ? tx("unknown", "desconocido")
+              : whole.format(event.damage),
+        },
+      );
     if (event.type === "tank_control")
       return tx(
         "{player} took Tank control",
@@ -8188,6 +8202,15 @@ function Quality({
         : 0,
     ]),
   ) as Record<(typeof fields)[number], number>;
+  const perspectiveCounts = analyses.reduce<Record<string, number>>(
+    (counts, analysis) => {
+      const perspective =
+        analysis.engineResult.demo.stats?.sourcePerspective ?? "unknown";
+      counts[perspective] = (counts[perspective] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
   return (
     <div className="tab-panel">
       <div className="section-heading">
@@ -8205,10 +8228,82 @@ function Quality({
       </div>
       <p className="coverage-intro">
         {tx(
-          "SourceTV demos do not contain every action a player performed. These percentages show how often each network field was available across sampled player states. They measure evidence coverage, not match quality or player skill.",
-          "Las demos de SourceTV no contienen todas las acciones realizadas por un jugador. Estos porcentajes muestran con qué frecuencia estuvo disponible cada campo de red en los estados de jugador muestreados. Miden la cobertura de evidencia, no la calidad de la partida ni la habilidad del jugador.",
+          "Demo perspectives retain different evidence. SourceTV provides server-observed multi-player state; player POV can additionally provide recorder-only command intent. These percentages measure retained server-state coverage, not match quality or player skill.",
+          "Las perspectivas de demo conservan evidencia diferente. SourceTV proporciona estados multijugador observados por el servidor; la perspectiva del jugador también puede aportar intención de comandos solo del grabador. Estos porcentajes miden la cobertura conservada del estado del servidor, no la calidad de la partida ni la habilidad del jugador.",
         )}
       </p>
+      <article className="panel coverage-intro">
+        <h3>{tx("Recording perspective", "Perspectiva de grabación")}</h3>
+        <p>
+          {Object.entries(perspectiveCounts)
+            .map(([perspective, count]) => `${perspective}: ${count}`)
+            .join(" · ")}
+        </p>
+        <p>
+          {tx(
+            "Command intent, server-observed state, and gameplay outcomes remain separate evidence classes. Recorder attack input is not labeled as a shot, hit, miss, or accuracy.",
+            "La intención de comandos, el estado observado por el servidor y los resultados del juego permanecen como clases de evidencia separadas. La entrada de ataque del grabador no se etiqueta como disparo, impacto, fallo ni precisión.",
+          )}
+        </p>
+      </article>
+      {analyses
+        .filter(
+          (analysis) =>
+            analysis.engineResult.demo.stats?.sourcePerspective ===
+            "player-pov",
+        )
+        .map((analysis) => {
+          const commands =
+            analysis.engineResult.demo.stats?.recorderCommandEvidence;
+          return (
+            <article
+              className="panel coverage-intro"
+              key={`commands-${analysis.demoSha256}`}
+            >
+              <h3>
+                {analysis.engineResult.demo.mapName} ·{" "}
+                {tx(
+                  "Recorder command intent",
+                  "Intención de comandos del grabador",
+                )}
+              </h3>
+              <p>
+                {commands?.availability === "observed"
+                  ? tx(
+                      "{decoded} of {total} commands decoded · {gaps} gaps · recorder identity {identity}",
+                      "{decoded} de {total} comandos decodificados · {gaps} huecos · identidad del grabador {identity}",
+                      {
+                        decoded: whole.format(commands.decodedCommands),
+                        total: whole.format(commands.totalCommands),
+                        gaps: whole.format(commands.commandGaps),
+                        identity: commands.recorderIdentityAvailability,
+                      },
+                    )
+                  : tx(
+                      "Recorder command telemetry unavailable; no zero values were substituted.",
+                      "La telemetría de comandos del grabador no está disponible; no se sustituyeron valores por cero.",
+                    )}
+              </p>
+              {commands?.availability === "observed" && (
+                <p>
+                  {tx(
+                    "Observed held commands — attack {attack}, shove/secondary {secondary}, reload {reload}, movement intent {movement}, nonzero mouse delta {mouse}.",
+                    "Comandos mantenidos observados — ataque {attack}, empujón/secundario {secondary}, recarga {reload}, intención de movimiento {movement}, delta de ratón no nulo {mouse}.",
+                    {
+                      attack: whole.format(commands.heldCommandCounts.attack),
+                      secondary: whole.format(
+                        commands.heldCommandCounts.secondaryAttack,
+                      ),
+                      reload: whole.format(commands.heldCommandCounts.reload),
+                      movement: whole.format(commands.intendedMovementCommands),
+                      mouse: whole.format(commands.nonzeroMouseDeltaCommands),
+                    },
+                  )}
+                </p>
+              )}
+            </article>
+          );
+        })}
       <div className="quality-grid">
         <article className="panel rings">
           <Ring value={averages.position} label={tx("Position", "Posición")} />

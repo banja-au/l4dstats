@@ -23,6 +23,9 @@ struct ArtifactStageWire<'a> {
     projection: ProjectionStageWire<'a>,
     raw_events: Vec<demo_source1_native::event_wire::RawEventVisitWire>,
     event_summary: demo_source1_native::event_wire::EventTelemetrySummaryWire,
+    source_perspective: demo_source1_native::artifact::SourcePerspective,
+    recorder_commands: &'a [demo_source1_native::artifact::RecorderCommand],
+    command_telemetry_summary: &'a demo_source1_native::artifact::CommandTelemetrySummary,
 }
 
 #[derive(Serialize)]
@@ -45,7 +48,7 @@ fn main() -> ExitCode {
     let mut args = env::args_os().skip(1);
     let Some(first) = args.next() else {
         eprintln!(
-            "usage: demo-source1-stage [framing|network|schemas|events|identity|entities|projection|artifact] <demo.dem>"
+            "usage: demo-source1-stage [framing|network|schemas|events|identity|entities|projection|artifact|artifact-check] <demo.dem>"
         );
         return ExitCode::from(2);
     };
@@ -67,6 +70,7 @@ fn main() -> ExitCode {
         || first == "entities"
         || first == "projection"
         || first == "artifact"
+        || first == "artifact-check"
     {
         (first.to_string_lossy().into_owned(), args.next())
     } else {
@@ -84,7 +88,7 @@ fn main() -> ExitCode {
         }
     };
     match decode_demo(&bytes, DecodeOptions::default()) {
-        Ok(_d) if mode == "artifact" => {
+        Ok(_d) if mode == "artifact" || mode == "artifact-check" => {
             let artifact = match build_compact_artifact(
                 &bytes,
                 b"native-parity-key-32-bytes-long!!",
@@ -101,6 +105,24 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
+            if mode == "artifact-check" {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "stage": "artifact-check-v2",
+                        "demoSha256": &artifact.projection.demo_sha256,
+                        "sourcePerspective": &artifact.source_perspective,
+                        "bytesConsumed": artifact.bytes_consumed,
+                        "stopped": artifact.stopped,
+                        "epochs": artifact.projection.epochs.len(),
+                        "events": artifact.raw_events.len(),
+                        "recorderCommands": artifact.recorder_commands.len(),
+                        "decodedRecorderCommands": artifact.command_telemetry_summary.decoded_commands,
+                        "malformedRecorderCommands": artifact.command_telemetry_summary.malformed_commands,
+                    })
+                );
+                return ExitCode::SUCCESS;
+            }
             let stdout = io::stdout();
             let wire = ArtifactStageWire {
                 version: artifact.version,
@@ -122,6 +144,9 @@ fn main() -> ExitCode {
                 },
                 raw_events: artifact.raw_events.iter().map(Into::into).collect(),
                 event_summary: (&artifact.event_summary).into(),
+                source_perspective: artifact.source_perspective,
+                recorder_commands: &artifact.recorder_commands,
+                command_telemetry_summary: &artifact.command_telemetry_summary,
             };
             if let Err(error) = serde_json::to_writer(stdout.lock(), &wire) {
                 eprintln!("artifact serialization: {error}");

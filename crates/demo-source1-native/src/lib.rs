@@ -15,6 +15,7 @@ pub mod projection;
 pub mod reader;
 pub mod string_tables;
 mod traversal;
+pub mod usercmd;
 pub mod wire;
 
 pub use demo::{DecodeOptions, DemoDecodeResult, DemoParseError, decode_demo};

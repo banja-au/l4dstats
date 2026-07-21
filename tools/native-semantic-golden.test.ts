@@ -5,7 +5,7 @@ import {
 } from "./native-semantic-golden";
 
 describe("native semantic golden", () => {
-  it("normalizes only parser lineage", () => {
+  it("normalizes parser lineage and append-only compact-wire-v2 fields", () => {
     const base = {
       parser: { buildSha256: "a" },
       parserVersion: "a",
@@ -16,6 +16,14 @@ describe("native semantic golden", () => {
         ...base,
         parser: { buildSha256: "c" },
         parserVersion: "c",
+      } as never),
+    );
+    expect(preparedSemanticSha256(base as never)).toBe(
+      preparedSemanticSha256({
+        ...base,
+        sourcePerspective: "source-tv",
+        recorderCommands: [],
+        recorderCommandCoverage: { availability: "unavailable" },
       } as never),
     );
   });

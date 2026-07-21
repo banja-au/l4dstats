@@ -156,6 +156,12 @@ voice, private input, aim signals, and cheating evidence. It also excludes
 maximum pounce damage and maximum Jockey ride because maxima grow with
 opportunity and are poor rate statistics.
 
+Player-POV command fields, `player_hurt_concise`, and any future probable-shot,
+input-angle or accuracy-like derivations remain excluded. Recorder-only
+telemetry must not change rating coverage, eligibility, weights, confidence or
+MVP selection, and SourceTV and POV results must remain comparable on the same
+documented server-observed inputs.
+
 Resource use and ghost time remain context, not automatic positive or negative
 points. Consuming a medkit is not inherently good, and waiting in ghost can be
 part of coordinated play.

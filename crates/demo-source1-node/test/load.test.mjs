@@ -11,12 +11,12 @@ const metadata = binding.bindingMetadata();
 assert.deepEqual(metadata, {
   bindingApiVersion: 2,
   framingSummaryVersion: 1,
-  projectConfigVersion: 1,
-  compactArtifactWireVersion: 1,
-  parserConfigId: "source1-l4d2-2100-v1",
+  projectConfigVersion: 2,
+  compactArtifactWireVersion: 2,
+  parserConfigId: "source1-l4d2-2100-v2",
   buildSha256: metadata.buildSha256,
-  bindingCrateVersion: "0.1.0",
-  coreCrateVersion: "0.1.0",
+  bindingCrateVersion: "0.2.0",
+  coreCrateVersion: "0.2.0",
   nodeApiVersion: 8,
 });
 assert.match(metadata.buildSha256, /^[a-fA-F0-9]{64}$/);

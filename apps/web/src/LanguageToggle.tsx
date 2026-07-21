@@ -10,6 +10,7 @@ export function LanguageToggle() {
     <button
       className="language-toggle"
       type="button"
+      aria-label={`${t("language.label")}: ${t(`language.${next === "en" ? "english" : "spanish"}`)}`}
       title={t(`language.${next === "en" ? "english" : "spanish"}`)}
       onClick={() => {
         setLocale(next);

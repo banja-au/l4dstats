@@ -142,3 +142,30 @@ jobs:
             }
             console.log(`Attached ${body.result.hostname} to ${body.result.service}`);
           '
+      - name: Verify deployed production boundary
+        run: |
+          health_url="https://${PRODUCTION_HOSTNAME}/health"
+          stats_url="https://${PRODUCTION_HOSTNAME}/api/stats"
+          root_url="https://${PRODUCTION_HOSTNAME}/"
+          for attempt in $(seq 1 30); do
+            if response="$(curl --fail-with-body --silent --show-error \
+              --connect-timeout 5 --max-time 15 "$health_url")"; then
+              RESPONSE="$response" node -e '
+                const body = JSON.parse(process.env.RESPONSE);
+                if (body.status !== "ok" || body.environment !== "production") process.exit(1);
+              ' && break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "production health did not become ready" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          stats="$(curl --fail-with-body --silent --show-error \
+            --connect-timeout 5 --max-time 30 "$stats_url")"
+          RESPONSE="$stats" node -e '
+            const body = JSON.parse(process.env.RESPONSE);
+            if (!body.totals || !Number.isInteger(body.totals.demosProcessed) || body.totals.demosProcessed < 0) process.exit(1);
+          '
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 5 --max-time 30 --output /dev/null "$root_url"

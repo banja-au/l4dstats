@@ -4,7 +4,7 @@ import { rehydrateNativeProjection } from "./native-projection";
 const hash = "a".repeat(64);
 function artifact(row?: unknown) {
   return {
-    version: 1,
+    version: 2,
     header: {
       stamp: "HL2DEMO",
       demoProtocol: 4,
@@ -45,6 +45,18 @@ function artifact(row?: unknown) {
     },
     rawEvents: [],
     eventSummary: { schemaLists: 0, schemas: 0, events: 0, requiredEvents: {} },
+    sourcePerspective: "source-tv",
+    recorderCommands: [],
+    commandTelemetrySummary: {
+      commands: 0,
+      decodedCommands: 0,
+      malformedCommands: 0,
+      firstDemoTick: null,
+      lastDemoTick: null,
+      recorderPlayerSlot: null,
+      recorderIdentityConfidence: "unavailable",
+      gaps: 0,
+    },
   };
 }
 const expected = { demoSha256: hash, bytes: 1072 };
@@ -61,8 +73,8 @@ describe("native compact projection validation", () => {
   });
   it("rejects versions, unknown fields and mismatched input lineage", () => {
     expect(() =>
-      rehydrateNativeProjection({ ...artifact(), version: 2 }, expected),
-    ).toThrow("version is out of range");
+      rehydrateNativeProjection({ ...artifact(), version: 1 }, expected),
+    ).toThrow("version must be 2");
     expect(() =>
       rehydrateNativeProjection({ ...artifact(), extra: true }, expected),
     ).toThrow("fields are invalid");
@@ -72,6 +84,60 @@ describe("native compact projection validation", () => {
         demoSha256: "b".repeat(64),
       }),
     ).toThrow("does not match the input");
+  });
+  it("rehydrates recorder commands as recorder-only client intent", () => {
+    const pov = artifact();
+    pov.sourcePerspective = "player-pov";
+    (pov.recorderCommands as unknown[]) = [
+      {
+        demoTick: 12,
+        recorderPlayerSlot: 0,
+        outgoingSequence: 41,
+        commandNumber: 41,
+        tickCount: 900,
+        viewAngles: [1, 2, 0],
+        forwardMove: 450,
+        sideMove: 0,
+        upMove: 0,
+        buttons: 1,
+        impulse: 0,
+        weaponSelect: null,
+        weaponSubtype: null,
+        mouseDx: 4,
+        mouseDy: -2,
+        consumedBits: 13,
+        sourceBits: 16,
+      },
+    ];
+    pov.commandTelemetrySummary = {
+      commands: 1,
+      decodedCommands: 1,
+      malformedCommands: 0,
+      firstDemoTick: 12,
+      lastDemoTick: 12,
+      recorderPlayerSlot: 0,
+      recorderIdentityConfidence: "observed",
+      gaps: 0,
+    } as unknown as typeof pov.commandTelemetrySummary;
+    const value = rehydrateNativeProjection(pov, expected);
+    expect(value.sourcePerspective).toBe("player-pov");
+    expect(value.recorderCommandCoverage).toMatchObject({
+      availability: "observed",
+      decodedCommands: 1,
+    });
+    expect(value.recorderCommands[0]).toMatchObject({
+      commandNumber: 41,
+      clientTickCount: 900,
+      buttons: 1,
+      provenance: {
+        source: "dem_usercmd",
+        scope: "recorder-only",
+        semantics: "client-command-intent",
+      },
+    });
+    expect(value.recorderCommands[0]?.recorderPlayerEpochId.availability).toBe(
+      "unavailable",
+    );
   });
   it("rejects row lengths, registry indexes, masks and non-finite values", () => {
     const base = [

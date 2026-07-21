@@ -24,15 +24,16 @@ for standard filename evidence of map 3, or three distinct map names for a
 custom campaign. This adapter metadata is only an ingestion maturity gate; it
 does not replace demo-extracted chapter evidence or prove earlier maps exist.
 
-This is the source of truth for what L4DStats extracts from L4D2 SourceTV
-`.dem` files. Update it in the same change as any decoder, projection, artifact,
+This is the source of truth for what L4DStats extracts from L4D2 SourceTV and
+player-POV `.dem` files. Update it in the same change as any decoder, projection, artifact,
 or statistic change. Never present an unavailable value as zero.
 
 ## Supported input
 
 - Source 1 demo protocol `4`, L4D2 network protocol `2100`.
-- SourceTV demos. Other protocols and POV demos are unsupported until an
-  explicit decoder is implemented and tested.
+- SourceTV and player-POV demos. The recording perspective is retained as
+  `source-tv`, `player-pov`, or explicitly `unknown`; perspective-specific
+  telemetry is never generalized to players who were not the recorder.
 - In the proposed hosted deployment, a successfully parsed source demo is
   deleted after its derived artifacts and lineage are durably verified. The
   SHA-256, source metadata, byte size, parser/config/build versions, map lineage
@@ -55,7 +56,7 @@ or statistic change. Never present an unavailable value as zero.
 Normal evidence analysis uses the clean-room Rust parser through one coarse,
 bytes-only Node-API call. It is the repository's only demo parser; failures are
 reported explicitly and never select a fallback implementation. Rust emits
-compact artifact wire version 1, a private
+compact artifact wire version 2, a private
 transport into the shared TypeScript statistics, detector and evidence packaging
 path rather than a second public data contract.
 
@@ -75,12 +76,170 @@ removed, exact 22-demo semantic parity to its prepared-projection output was
 recorded as migration evidence. That historical comparison does not replace the
 still-open licensed game-playback validation boundary.
 
+## Protocol-2100 decoding reference
+
+This section documents the bounded format implemented by this repository so an
+independent parser author can reproduce the same evidence boundary. It is not a
+claim that every Source-engine branch uses this layout. Multibyte byte-aligned
+scalars below are little-endian unless stated otherwise; packet-message and
+entity payloads are bit streams whose field widths come from the protocol and
+dynamic send tables.
+
+### Fixed header
+
+The protocol-4 header is 1,072 bytes:
+
+| Offset | Bytes | Field                                                |
+| -----: | ----: | ---------------------------------------------------- |
+|      0 |     8 | NUL-padded Latin-1 stamp, expected `HL2DEMO`         |
+|      8 |     4 | signed demo protocol, supported value `4`            |
+|     12 |     4 | signed network protocol, supported L4D2 value `2100` |
+|     16 |   260 | server name                                          |
+|    276 |   260 | recorder/client name                                 |
+|    536 |   260 | map name                                             |
+|    796 |   260 | game directory                                       |
+|   1056 |     4 | finite, nonnegative playback time as `float32`       |
+|   1060 |     4 | nonnegative signed playback ticks                    |
+|   1064 |     4 | nonnegative signed playback frames                   |
+|   1068 |     4 | nonnegative signed sign-on length                    |
+
+Fixed strings terminate at the first NUL and are not trusted identifiers.
+Playback metadata is summary metadata, not an authoritative continuous clock.
+
+### Outer command framing
+
+After the header, protocol-4 commands normally begin with one byte command,
+signed 32-bit demo tick, and one byte player slot. Known command IDs are:
+
+|  ID | Command         | Body after tick/slot                                                                   |
+| --: | --------------- | -------------------------------------------------------------------------------------- |
+|   1 | sign-on         | four command-info records, inbound/outbound sequences, length-prefixed network payload |
+|   2 | packet          | same body as sign-on                                                                   |
+|   3 | sync tick       | no body                                                                                |
+|   4 | console command | signed 32-bit byte length and payload                                                  |
+|   5 | user command    | signed 32-bit outgoing sequence, then signed 32-bit byte length and payload            |
+|   6 | data tables     | signed 32-bit byte length and payload                                                  |
+|   7 | stop            | terminal command; this decoder accepts an optional signed tick but no slot/body        |
+|   8 | custom data     | signed 32-bit callback ID, then signed 32-bit byte length and payload                  |
+|   9 | string tables   | signed 32-bit byte length and payload                                                  |
+
+Each command-info record is a signed flags word followed by six three-float
+vectors: view origin, view angles, local view angles, then their secondary
+variants. A parser must bounds-check every signed length before conversion,
+stop if an unknown command makes subsequent framing ambiguous, and distinguish
+clean `stop`, truncation, and trailing bytes. Current defaults cap a demo at
+512 MiB, ten million outer commands, and 64 MiB per outer payload.
+
+### Clocks and packet messages
+
+At least three coordinates can coexist:
+
+- outer demo command tick, used as L4DStats' canonical deep-link coordinate;
+- `svc_Tick` engine tick inside a packet; and
+- POV user-command `tick_count`.
+
+They are retained separately. Do not calculate one by assuming the other is
+continuous: pause, restart, skip, choke/loss and recording boundaries can
+create gaps or repeated values. Derived demo seconds use the finite positive
+`svc_ServerInfo` tick interval with explicit availability.
+
+Sign-on and packet payloads contain a sequence of bit-packed net messages. For
+the protocol-2100 projection, `svc_ServerInfo` supplies network protocol,
+server generation, `is_source_tv`, class/client counts and tick interval.
+That decoded flag—not header recorder name or filename—selects `source-tv`
+versus `player-pov`; missing server info produces `unknown`. Message IDs and
+schemas are branch-specific and parsing is bounded before nested payload bits
+are visited.
+
+### Sign-on state, schemas and identity
+
+The data-table snapshot describes send tables and server classes dynamically.
+The parser flattens inherited/excluded properties into class-specific schemas;
+property order, flags and bit encodings must come from that snapshot rather
+than a hard-coded C++ struct. The string-table snapshot supplies
+`instancebaseline` class baselines and `userinfo`. Later string-table updates
+are applied at their effective demo tick so an entity index/user ID/slot is
+never treated as a permanent human identity. Protocol-2100 `userinfo` XUID is
+network-byte-order even though adjacent scalar fields are little-endian.
+
+`svc_PacketEntities` carries `max_entries` (11 bits), a delta flag and optional
+32-bit `delta_from` engine sequence, one-bit baseline slot, updated-entry count
+(11 bits), nested data length (20 bits), update-baseline flag, and that many
+nested bits. A full snapshot starts without a prior frame. A delta must be
+applied to the referenced engine snapshot, not simply the most recently seen
+packet. The implementation retains a bounded 128-snapshot history to tolerate
+longer acknowledged-reference gaps; a missing referenced frame is a quality
+failure, never permission to substitute empty state.
+
+Entity updates encode leave/delete, enter with class and serial, or delta of an
+existing lifetime. Instance baselines apply on authoritative entry. Entity
+indices are reusable, so class, serial, `userinfo`, connection epoch and tick
+are all part of reconstruction provenance.
+
+Player POV has one empirically verified lifecycle exception. Its initial full
+snapshot can omit an occupied local `CTerrorPlayer`, then send a delta for that
+entity without `Enter`. Recovery is allowed only when `is_source_tv` is false,
+effective `userinfo` occupies that entity index, and exactly one server class
+is `CTerrorPlayer`. The implicit lifetime applies only properties present in
+the delta—no instance baseline or invented serial—and a later authoritative
+entry reconciles it. SourceTV, ambiguous identity/class and non-player unknown
+entities continue to fail closed.
+
+### Player-POV `dem_usercmd`
+
+For the inspected L4D2 protocol-2100 player recordings, the outer outgoing
+sequence equals the decoded command number and is checked as an integrity
+invariant. The inner payload is a bitwise delta from zero in this order:
+
+1. changed flag, then optional signed 32-bit `command_number`;
+2. changed flag, then optional signed 32-bit `tick_count`;
+3. three changed flags, each followed by an optional finite `float32` view angle;
+4. changed flags and optional finite `float32` forward, side and up movement;
+5. presence flag and optional 32-bit buttons mask;
+6. presence flag and optional 8-bit impulse;
+7. presence flag and optional 11-bit weapon selection, followed by a subtype
+   presence flag and optional 6-bit subtype;
+8. changed flag and optional signed 16-bit mouse X delta;
+9. changed flag and optional signed 16-bit mouse Y delta.
+
+Absent delta fields decode to zero for that command because the recorder writes
+these payloads against the zero command baseline; this is protocol decoding,
+not imputation of an unavailable observation. Remaining high padding bits in
+the last byte must be zero. The implementation caps each inner payload at 1,024
+bytes and records malformed commands and sequence gaps separately from decoded
+commands. Unused high bits in the final source byte are padding rather than
+telemetry; their values are excluded. A further whole trailing byte is rejected.
+
+These fields describe only the recording client's submitted command. Button
+bits are held state, not action counts. The command may be rejected or unable
+to act because of cooldown, reload, empty ammunition, deploy delay, incap/pin,
+pause, prediction correction or weapon-specific rules. Automatic weapons,
+shotgun pellets, melee, chainsaw, throwables, mounted weapons and infected
+abilities also prevent a universal command-to-shot conversion.
+
+### Events and perspective differences
+
+Game-event schemas arrive dynamically in `svc_GameEventList`; event payloads
+must be interpreted through the matching schema, not a global assumed layout.
+The inspected SourceTV corpus is event-sparse. The inspected player-POV corpus
+adds `player_hurt_concise` (victim user ID, attacker entity index, health damage
+and damage-type mask) but has no authoritative `weapon_fire`, `bullet_impact`,
+or ordinary rich `player_hurt`. Attacker entity is resolved at the event tick
+and may remain ambiguous after reuse. Concise hurt does not contain weapon, hit
+group, impact position, fired-shot count or a denominator covering common
+infected and world misses.
+
+Corpus observations are availability evidence, not protocol guarantees. Every
+consumer must inspect per-demo schemas and coverage and keep unavailable fields
+unavailable.
+
 ## Directly decoded data
 
 | Source                                   | Retained data                                                                                                                                                                                                                                                  | Limits                                                                                                                                                                                                                                                                          |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Demo header                              | map, playback time/ticks, byte size, protocols                                                                                                                                                                                                                 | Header time can include non-play time.                                                                                                                                                                                                                                          |
 | Demo framing                             | command kind/tick, packets, sign-on, data/string tables                                                                                                                                                                                                        | Corrupt or ambiguous framing fails closed.                                                                                                                                                                                                                                      |
+| POV `dem_usercmd`                        | recorder command number and client tick, view angles, intended movement, buttons, impulse, requested weapon/subtype when present, and command-generation mouse deltas                                                                                          | Recorder-only client command intent. It does not prove a shot, achieved movement, a hit, physical raw mouse motion, recoil compensation, or the rendered crosshair. SourceTV has no per-player commands.                                                                        |
 | `svc_Tick`                               | engine tick                                                                                                                                                                                                                                                    | Demo and engine ticks are distinct clocks.                                                                                                                                                                                                                                      |
 | Data tables, baselines, `PacketEntities` | bounded entity snapshots/deltas                                                                                                                                                                                                                                | Only networked send properties exist.                                                                                                                                                                                                                                           |
 | `CTerrorPlayer`                          | position, eye angles, team, named L4D2 class, weapon, health/temp health, life/incap/ghost state, Versus team, Tank frustration, pin relationships, checkpoint total infected kills/revives/incaps/SI incaps/pounces/highest pounce damage/longest Jockey ride | SourceTV omits user-command buttons. Counters can reset at round/team transitions.                                                                                                                                                                                              |
@@ -90,6 +249,7 @@ still-open licensed game-playback validation boundary.
 | `userinfo`                               | entity mapping, normalized protocol-2100 user ID, player name, decimal SteamID64, privacy-safe stable token                                                                                                                                                    | XUID uses network byte order while adjacent scalars are little-endian; human IDs are corpus-validated against the Steam individual-account shape. Names are untrusted display text and can change or collide. Slot reuse is epoch-scoped; malformed identity stays unavailable. |
 | `svc_GameEventList`/`svc_GameEvent`      | every event schema/payload actually sent                                                                                                                                                                                                                       | Inspected CEDAPug SourceTV commonly sends only deaths, team/disconnect, round boundaries, and HLTV status. Never assume other events exist.                                                                                                                                     |
 | `player_death`                           | user IDs, weapon, headshot, bot flags, infected victim class, death position                                                                                                                                                                                   | It does not provide damage, assists, hits, or shots. An empty victim name commonly denotes a Survivor death.                                                                                                                                                                    |
+| `player_hurt_concise`                    | victim user ID, attacker entity index, health damage, and damage-type mask when the event schema supplies them                                                                                                                                                 | Attacker entity index is resolved against entity/identity state at that tick and can remain unavailable. The event omits weapon, hit group, impact point, and an authoritative fired-shot record.                                                                               |
 
 ## Derived artifact statistics
 
@@ -101,8 +261,12 @@ still-open licensed game-playback validation boundary.
   association is provisional, high-confidence, or unassociated. Filenames are
   never used for grouping.
 
-- Demo: duration, tick rate, observation/event counts, decode issues, and field
-  availability.
+- Demo: duration, tick rate, perspective, observation/event counts, decode
+  issues, field availability, and recorder-command decoding/gap coverage.
+- Player POV command evidence: recorder-scoped command states, press/release
+  edges, hold durations, intended movement, command view angles, and mouse
+  deltas. Product surfaces separate these from server-observed state and
+  outcomes. Attack-button state is never renamed to shot or accuracy.
 - Participation: known fake-player identities are excluded before competitive
   player statistics, traces, ratings, and player counts are derived. Human
   identities never observed on Survivor or Infected are emitted separately as
@@ -286,17 +450,17 @@ still-open licensed game-playback validation boundary.
 
 ## Not reliably extractable today
 
-| Metric                                                          | Why unavailable                                                                                                                                      | What would unblock it                                                                               |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Shots, hits, misses, accuracy                                   | SourceTV omits player commands; inspected demos omit `weapon_fire`/hurt events.                                                                      | Reliable events or a per-weapon ammo model validated on fixtures.                                   |
-| Exact general dealt damage, attack cause, friendly fire         | `player_hurt` is absent; health deltas do not identify attackers and include healing/resets. Tank checkpoint totals above are the bounded exception. | Hurt events, server stats logs, or validated attacker/damage state.                                 |
-| Exact damage taken                                              | Network sampling can skip changes; temp health/incaps alter health semantics.                                                                        | Current observed health loss is only a lower bound; full validated health reconstruction is needed. |
-| Shoves, deadstops, skeets, levels, crowns, general clears/saves | These are semantic sequences and key input/hurt events are absent. The narrow death-correlated clear above is the only supported clear.              | Validated multi-entity detectors with real corpus fixtures and precision tests.                     |
-| Witch health, startler, target, crown, and attributed damage    | The Witch send table exposes rage, burning, and position, but not the necessary health/attacker fields.                                              | Server plugin events or another validated telemetry source.                                         |
-| Server team name attached to Team A/B score                     | The first-half Survivor roster can be mapped to a score index from observed `teamsFlipped`, but the demo does not carry an external team name.       | External match metadata or a known scoreboard.                                                      |
-| Hit groups and weapon efficiency                                | Hurt/hit-group events are absent.                                                                                                                    | Reliable hurt events or validated trace reconstruction.                                             |
-| Voice, intent, player input, recoil compensation                | SourceTV has no private voice and no per-player user commands.                                                                                       | POV or server telemetry; never infer absent inputs from camera movement.                            |
-| Definitive cheating probability                                 | No defensible calibrated labeled L4D2 dataset exists in this project.                                                                                | Licensed representative labels and measured calibration/error rates.                                |
+| Metric                                                          | Why unavailable                                                                                                                                                            | What would unblock it                                                                               |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Shots, hits, misses, accuracy                                   | POV attack commands express intent, not accepted weapon fire; concise hurt covers player damage but supplies no global shot/hit/miss denominator. SourceTV omits commands. | Reliable fire/outcome events or a per-weapon shot model validated on controlled fixtures.           |
+| Exact general dealt damage, attack cause, friendly fire         | Concise hurt can expose bounded player damage, but attacker entity resolution may be ambiguous and it omits weapon/hit group; health deltas include healing/resets.        | Validated tick-scoped attribution plus richer hurt/fire telemetry or server logs.                   |
+| Exact damage taken                                              | Network sampling can skip changes; temp health/incaps alter health semantics.                                                                                              | Current observed health loss is only a lower bound; full validated health reconstruction is needed. |
+| Shoves, deadstops, skeets, levels, crowns, general clears/saves | These are semantic sequences and key input/hurt events are absent. The narrow death-correlated clear above is the only supported clear.                                    | Validated multi-entity detectors with real corpus fixtures and precision tests.                     |
+| Witch health, startler, target, crown, and attributed damage    | The Witch send table exposes rage, burning, and position, but not the necessary health/attacker fields.                                                                    | Server plugin events or another validated telemetry source.                                         |
+| Server team name attached to Team A/B score                     | The first-half Survivor roster can be mapped to a score index from observed `teamsFlipped`, but the demo does not carry an external team name.                             | External match metadata or a known scoreboard.                                                      |
+| Hit groups and weapon efficiency                                | Hurt/hit-group events are absent.                                                                                                                                          | Reliable hurt events or validated trace reconstruction.                                             |
+| Other players' intent/input; voice; recoil compensation         | POV commands cover only the recorder and are not physical raw mouse data; SourceTV has no per-player commands and neither perspective contains private voice.              | Consented client/server telemetry; never infer absent inputs from camera movement.                  |
+| Definitive cheating probability                                 | No defensible calibrated labeled L4D2 dataset exists in this project.                                                                                                      | Licensed representative labels and measured calibration/error rates.                                |
 
 ## Required change checklist
 
@@ -320,6 +484,11 @@ information when every compared player is zero. Cross-map aggregation is
 strict: if an additive metric is unavailable for any selected map on which the
 player appears, its game total remains unavailable instead of treating that map
 as zero.
+Player-POV command fields, concise damage events, probable-shot derivations,
+aim/input measures and accuracy-like values are deliberately excluded. A
+different capture perspective must not change rating eligibility, component
+coverage, weights or MVP selection merely because it exposes recorder-only
+telemetry.
 
 ## Hosted aggregate materialization
 

@@ -9,7 +9,12 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseArguments, runBenchmark, summarize } from "./benchmark.mjs";
+import {
+  parseArguments,
+  runBenchmark,
+  scoreQuality,
+  summarize,
+} from "./benchmark.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "demo-benchmark-"));
 const demoA = join(root, "private-a.dem");
@@ -35,17 +40,46 @@ const result = await runBenchmark({
   outputCapBytes: 1_024,
   nativeCommand,
   nativeArtifact: rust,
-  nativeVersion: "0.1.0",
+  nativeVersion: "0.2.0",
   nativeBuildSha256: "a".repeat(64),
   thresholds: {},
 });
 assert.equal(result.fixtures.length, 2);
 assert.equal(JSON.stringify(result).includes("private-a"), false);
-assert.equal(result.schemaVersion, 2);
+assert.equal(result.schemaVersion, 3);
 assert.equal(result.results.corpusWallMilliseconds.min > 0, true);
 assert.equal(Object.keys(result.results.perDemoWallMilliseconds).length, 2);
 assert.equal(result.results.throughputBytesPerSecond.median > 0, true);
 assert.equal(result.thresholds.passed, true);
+assert.equal(result.qualityScore.average, null);
+assert.deepEqual(
+  scoreQuality(
+    {
+      corpusWallMilliseconds: { median: 80 },
+      maxRssKiB: { median: 100 },
+      throughputBytesPerSecond: { median: 125 },
+    },
+    {
+      maxMedianWallMilliseconds: 100,
+      maxMedianRssKiB: 100,
+      minMedianThroughputBytesPerSecond: 100,
+    },
+    4.6,
+  ),
+  {
+    methodology: "release-threshold-headroom/v1",
+    interpretation:
+      "4.0 meets a configured threshold; 5.0 is at least 25% better",
+    dimensions: [
+      { name: "median-wall-time", observed: 80, threshold: 100, score: 5 },
+      { name: "median-rss", observed: 100, threshold: 100, score: 4 },
+      { name: "median-throughput", observed: 125, threshold: 100, score: 5 },
+    ],
+    average: 4.667,
+    minimumRequired: 4.6,
+    passed: true,
+  },
+);
 assert.deepEqual(summarize([1, 2, 3, 4]), {
   min: 1,
   max: 4,
@@ -140,5 +174,20 @@ await assert.rejects(
     thresholds: { maxMedianWallMilliseconds: 0.0001 },
   }),
   /native benchmark regression/,
+);
+await assert.rejects(
+  runBenchmark({
+    demos: [demoA],
+    mode: "stage",
+    warmups: 0,
+    repetitions: 1,
+    timeoutMilliseconds: 5_000,
+    outputCapBytes: 1_024,
+    nativeCommand,
+    nativeArtifact: rust,
+    thresholds: {},
+    minQualityScore: 4.9,
+  }),
+  /quality score unavailable\/5 is below required 4\.9\/5/,
 );
 process.stdout.write("demo benchmark tests: ok\n");

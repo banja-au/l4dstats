@@ -34,7 +34,7 @@
     "posthog:dashboard": "node scripts/provision-posthog-dashboard.mjs",
     "test:production": "pnpm build && node scripts/check-production-compose.mjs && node scripts/test-production-probes.mjs && node scripts/test-compiled-stack.mjs && node --conditions=production scripts/test-parser-sandbox.mjs",
     "test:sandbox": "pnpm --filter @l4dstats/worker build && pnpm --filter @l4dstats/cli build && node --conditions=production scripts/test-parser-sandbox.mjs",
-    "test:recovery": "pnpm --filter @l4dstats/storage build && node scripts/test-backup-restore.mjs",
+    "test:recovery": "pnpm --filter @l4dstats/storage build && node --conditions=production scripts/test-backup-restore.mjs",
     "dev:cli": "pnpm native:prepare && pnpm --filter @l4dstats/cli dev",
     "backfill": "pnpm --filter @l4dstats/backfill dev",
     "maps:install": "docker compose --profile maps run --rm maps-install",

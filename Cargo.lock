@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "demo-source1-native"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "hmac",
@@ -91,7 +91,7 @@ dependencies = [
 
 [[package]]
 name = "demo-source1-node"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "demo-source1-native",
  "hex",

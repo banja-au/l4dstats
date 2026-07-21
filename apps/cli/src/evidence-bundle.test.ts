@@ -13,6 +13,7 @@ import {
   clusterSpawnWindows,
   deriveCompetitiveStats,
   deriveObservedOpeningAreaV1,
+  deriveRecorderCommandEvidence,
   deriveSurvivorHealthTraces,
   maximumObservedHealthDrawdown,
   sumPositiveCounterDeltas,
@@ -133,6 +134,70 @@ describe("evidence bundle windows", () => {
       (window.payload as { retainedObservationCount: number })
         .retainedObservationCount,
     ).toBeLessThanOrEqual(512);
+  });
+});
+
+describe("recorder command evidence", () => {
+  it("counts held intent and only derives edges across contiguous commands", () => {
+    const command = (commandNumber: number, buttons: number) => ({
+      schemaVersion: 1 as const,
+      demoSha256: "a".repeat(64),
+      demoTick: commandNumber,
+      demoTimeSeconds: {
+        availability: "derived" as const,
+        value: commandNumber / 30,
+      },
+      recorderPlayerEpochId: {
+        availability: "unavailable" as const,
+        reason: "fixture",
+      },
+      outgoingSequence: commandNumber,
+      commandNumber,
+      clientTickCount: commandNumber + 100,
+      viewAngles: { pitch: 0, yaw: 0, roll: 0 },
+      intendedMovement: {
+        forward: commandNumber === 1 ? 450 : 0,
+        side: 0,
+        up: 0,
+      },
+      buttons,
+      impulse: 0,
+      weaponSelect: {
+        availability: "unavailable" as const,
+        reason: "not present",
+      },
+      weaponSubtype: {
+        availability: "unavailable" as const,
+        reason: "not present",
+      },
+      mouseDelta: { x: commandNumber === 1 ? 3 : 0, y: 0 },
+      provenance: {
+        source: "dem_usercmd" as const,
+        scope: "recorder-only" as const,
+        semantics: "client-command-intent" as const,
+      },
+    });
+    const result = deriveRecorderCommandEvidence(
+      [command(1, 1), command(2, 1), command(4, 1)],
+      {
+        availability: "observed",
+        totalCommands: 3,
+        decodedCommands: 3,
+        malformedCommands: 0,
+        commandGaps: 1,
+        firstDemoTick: 1,
+        lastDemoTick: 4,
+        recorderPlayerEpochId: {
+          availability: "unavailable",
+          reason: "fixture",
+        },
+      },
+    );
+    expect(result.heldCommandCounts.attack).toBe(3);
+    expect(result.pressCounts.attack).toBe(2);
+    expect(result.intendedMovementCommands).toBe(1);
+    expect(result.nonzeroMouseDeltaCommands).toBe(1);
+    expect(result.limitations.join(" ")).toContain("not a fired shot");
   });
 });
 

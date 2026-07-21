@@ -29,10 +29,32 @@ export function preparedSemanticSha256(
   const {
     parser: _parser,
     parserVersion: _parserVersion,
+    sourcePerspective: _sourcePerspective,
+    recorderCommands: _recorderCommands,
+    recorderCommandCoverage: _recorderCommandCoverage,
+    eventVisits,
     ...semantic
   } = prepared;
+  // Contract v1 predates perspective-scoped command telemetry and the two
+  // append-only concise-damage availability fields. Keep verifying every
+  // historical SourceTV semantic while v2 fields receive their own focused
+  // contract and corpus tests.
+  const legacyEventVisits = eventVisits?.map((visit) => {
+    if (visit.required === null) return visit;
+    const {
+      attackerEntityId: _attackerEntityId,
+      damageType: _damageType,
+      ...required
+    } = visit.required;
+    return { ...visit, required };
+  });
   const hash = createHash("sha256");
-  appendCanonical(hash, semantic);
+  appendCanonical(
+    hash,
+    legacyEventVisits === undefined
+      ? semantic
+      : { ...semantic, eventVisits: legacyEventVisits },
+  );
   return hash.digest("hex");
 }
 

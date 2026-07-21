@@ -4,8 +4,8 @@ import type { MapVector3 } from "./index.js";
 
 const require = createRequire(import.meta.url);
 const parserConfig = {
-  schemaVersion: 1,
-  parserConfig: "source1-l4d2-2100-v1",
+  schemaVersion: 2,
+  parserConfig: "source1-l4d2-2100-v2",
   maxInputBytes: 512 * 1024 * 1024,
   maxObservations: 2_000_000,
   maxIdentityMappings: 16_384,
@@ -36,7 +36,7 @@ export function readNativeAlignmentArtifact(
   if (value === null || typeof value !== "object" || Array.isArray(value))
     throw new TypeError("native demo artifact must be an object");
   const artifact = value as Record<string, unknown>;
-  if (artifact.version !== 1)
+  if (artifact.version !== 2)
     throw new RangeError("unsupported artifact version");
   const header = object(artifact.header, "artifact header");
   if (typeof header.mapName !== "string" || header.mapName.length === 0)
@@ -96,7 +96,7 @@ export async function projectNativeDemoAlignment(
   const metadata = object(binding.bindingMetadata(), "native parser metadata");
   if (
     metadata.bindingApiVersion !== 2 ||
-    metadata.compactArtifactWireVersion !== 1 ||
+    metadata.compactArtifactWireVersion !== 2 ||
     metadata.parserConfigId !== parserConfig.parserConfig
   )
     throw new Error("Native demo parser addon is incompatible");
